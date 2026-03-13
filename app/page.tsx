@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -12,6 +12,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token')) {
+      router.push('/auth/callback' + hash)
+      return
+    }
+    if (hash && hash.includes('token_hash')) {
+      router.push('/auth/callback' + hash)
+      return
+    }
+  }, [])
 
   const handleAuth = async () => {
     setLoading(true)
