@@ -68,9 +68,15 @@ const FIELDS: Array<{
   }
 ]
 
+const EMPTY_PHRASES = ['none yet', 'none', 'not yet', 'n/a', 'tbd', 'unknown', 'nothing yet']
+
 function isFieldEmpty(value: any): boolean {
   if (!value) return true
-  if (typeof value === 'string' && value.trim().length < 5) return true
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed.length < 5) return true
+    if (EMPTY_PHRASES.includes(trimmed.toLowerCase())) return true
+  }
   if (Array.isArray(value) && value.length === 0) return true
   return false
 }
@@ -474,7 +480,7 @@ export default function FilmStudio() {
               </div>
 
               {/* PORTRAIT FIELDS */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1.75rem 2rem' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1.25rem 2rem 1.75rem' }}>
                 {!filmMemory ? (
                   <p style={{ color: '#2e2e2e', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: 1.7 }}>
                     The portrait is still taking shape. Keep the conversation going — then update the portrait to see what has been found.
