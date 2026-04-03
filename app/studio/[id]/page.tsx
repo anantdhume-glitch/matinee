@@ -28,8 +28,10 @@ type DirectEditState = {
   saving: boolean
 }
 
-// The five fields — their labels, gap questions, and the prompt
-// sent to the conversation when a filmmaker clicks "Explore with Matinee"
+type EntryMode = 'choice' | 'uploading' | 'soul' | 'conversation'
+
+const EMPTY_PHRASES = ['none yet', 'none', 'not yet', 'n/a', 'tbd', 'unknown', 'nothing yet']
+
 const FIELDS: Array<{
   key: keyof FilmMemory
   label: string
@@ -68,8 +70,6 @@ const FIELDS: Array<{
   }
 ]
 
-const EMPTY_PHRASES = ['none yet', 'none', 'not yet', 'n/a', 'tbd', 'unknown', 'nothing yet']
-
 function isFieldEmpty(value: any): boolean {
   if (!value) return true
   if (typeof value === 'string') {
@@ -107,7 +107,6 @@ function formatDate(ts: string): string {
   )
 }
 
-// Shared button styles to avoid repetition
 const btnBase: React.CSSProperties = {
   background: 'none',
   fontFamily: 'Georgia, serif',
@@ -125,6 +124,12 @@ export default function FilmStudio() {
   const [loading, setLoading] = useState(true)
   const [thinking, setThinking] = useState(false)
   const [film, setFilm] = useState<{ title: string } | null>(null)
+
+  // Entry flow
+  const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
+  const [scriptSoul, setScriptSoul] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Portrait state
   const [portraitOpen, setPortraitOpen] = useState(false)
@@ -159,8 +164,10 @@ export default function FilmStudio() {
 
       if (msgData && msgData.length > 0) {
         setMessages(msgData)
+        setEntryMode('conversation')
       } else {
-        await openingMessage(filmData.title)
+        // First session — show entry choice
+        setEntryMode('choice')
       }
       setLoading(false)
     }
@@ -191,6 +198,51 @@ export default function FilmStudio() {
     const matineeMessage = { role: 'assistant', content: data.content, film_id: filmId }
     await supabase.from('messages').insert(matineeMessage)
     setMessages([{ id: 'opening', role: 'assistant', content: data.content }])
+  }
+
+  const beginFromConversation = async () => {
+    setEntryMode('conversation')
+    await openingMessage(film?.title || 'Untitled Film')
+  }
+
+  const handleScriptUpload = async (file: File) => {
+    setUploadError(null)
+    setEntryMode('uploading')
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('filmId', filmId)
+
+    try {
+      const response = await fetch('/api/parse-script', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || data.error) {
+        setUploadError(data.error || 'Something went wrong reading your script.')
+        setEntryMode('choice')
+        return
+      }
+
+      setScriptSoul(data.emotional_core)
+      setEntryMode('soul')
+
+      // After the filmmaker has seen the soul, save Matinee's opening and enter conversation
+      setTimeout(async () => {
+        const openingText = `I've spent time with your script.\n\nThe Film Memory is built. I know your story, your characters, the decisions already made, and what still needs to be found.\n\nBefore we go anywhere — what made you say yes to this one?`
+        const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
+        await supabase.from('messages').insert(matineeMessage)
+        setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
+        setEntryMode('conversation')
+      }, 3000)
+
+    } catch {
+      setUploadError("The script couldn't be read. Try again — it's worth it.")
+      setEntryMode('choice')
+    }
   }
 
   const sendMessage = async (overrideText?: string) => {
@@ -249,7 +301,6 @@ export default function FilmStudio() {
     setThinking(false)
   }
 
-  // Refresh the portrait by reading the latest memory from Supabase
   const refreshPortrait = async () => {
     setPortraitLoading(true)
     const { data: memoryData } = await supabase
@@ -259,7 +310,6 @@ export default function FilmStudio() {
     setPortraitLoading(false)
   }
 
-  // Toggle portrait — refresh automatically on first open
   const togglePortrait = async () => {
     if (!portraitOpen && !portraitRefreshedAt) {
       await refreshPortrait()
@@ -267,7 +317,6 @@ export default function FilmStudio() {
     setPortraitOpen(p => !p)
   }
 
-  // Pre-fill the conversation input and focus it
   const exploreWithMatinee = (prompt: string) => {
     setInput(prompt)
     setTimeout(() => inputRef.current?.focus(), 50)
@@ -278,7 +327,6 @@ export default function FilmStudio() {
     setDirectEdit({ field, value: current, saving: false })
   }
 
-  // Save a direct edit to Supabase, recording a note in raw_memory
   const saveDirectEdit = async () => {
     if (!directEdit.field || directEdit.saving) return
     setDirectEdit(prev => ({ ...prev, saving: true }))
@@ -286,7 +334,6 @@ export default function FilmStudio() {
     const { data: existing } = await supabase
       .from('film_memory').select('*').eq('film_id', filmId).single()
 
-    // Preserve any previous direct-edit notes in raw_memory
     let rawMemory: any = {}
     if (existing?.raw_memory) {
       try { rawMemory = JSON.parse(existing.raw_memory) } catch {}
@@ -306,17 +353,11 @@ export default function FilmStudio() {
     }
 
     if (existing) {
-      await supabase
-        .from('film_memory')
-        .update(updatePayload)
-        .eq('film_id', filmId)
+      await supabase.from('film_memory').update(updatePayload).eq('film_id', filmId)
     } else {
-      await supabase
-        .from('film_memory')
-        .insert({ ...updatePayload, film_id: filmId })
+      await supabase.from('film_memory').insert({ ...updatePayload, film_id: filmId })
     }
 
-    // Update local portrait state so the field appears filled immediately
     setFilmMemory(prev =>
       prev ? { ...prev, [directEdit.field!]: directEdit.value } : null
     )
@@ -333,29 +374,153 @@ export default function FilmStudio() {
     </main>
   )
 
+  // ── ENTRY SCREENS ─────────────────────────────────────────────────────────
+  if (entryMode !== 'conversation') {
+    return (
+      <main style={{
+        backgroundColor: '#0a0a0a', minHeight: '100vh',
+        display: 'flex', flexDirection: 'column',
+        fontFamily: 'Georgia, serif', color: '#e8e0d0'
+      }}>
+        <nav style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '1.5rem 2rem', borderBottom: '1px solid #1a1a1a'
+        }}>
+          <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.8rem' }}>MATINEE</span>
+          <span style={{ color: '#555', fontSize: '0.8rem', fontStyle: 'italic' }}>{film?.title}</span>
+        </nav>
+
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          padding: '3rem 2rem', maxWidth: '560px', margin: '0 auto', width: '100%'
+        }}>
+
+          {/* CHOICE */}
+          {entryMode === 'choice' && (
+            <>
+              <p style={{
+                fontSize: '1.4rem', lineHeight: 1.75, color: '#e8e0d0',
+                textAlign: 'center', marginBottom: '3.5rem', fontWeight: 300
+              }}>
+                Where are you in this film's journey?
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+                <button
+                  onClick={beginFromConversation}
+                  style={{
+                    ...btnBase,
+                    border: '1px solid #2a2a2a', color: '#888',
+                    padding: '1.1rem 2rem', fontSize: '0.8rem',
+                    textAlign: 'left', letterSpacing: '0.05em', width: '100%'
+                  }}
+                >
+                  I have an idea. Let's find the film together.
+                </button>
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    ...btnBase,
+                    border: '1px solid #6B5A38', color: '#c9a96e',
+                    padding: '1.1rem 2rem', fontSize: '0.8rem',
+                    textAlign: 'left', letterSpacing: '0.05em', width: '100%'
+                  }}
+                >
+                  I have a script. Let Matinee read it first.
+                </button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) handleScriptUpload(file)
+                  }}
+                />
+              </div>
+
+              {uploadError && (
+                <p style={{
+                  marginTop: '1.5rem', fontSize: '0.8rem',
+                  color: '#6B3333', fontStyle: 'italic', textAlign: 'center'
+                }}>
+                  {uploadError}
+                </p>
+              )}
+
+              <p style={{
+                marginTop: '2rem', fontSize: '0.72rem',
+                color: '#2e2e2e', letterSpacing: '0.04em', textAlign: 'center'
+              }}>
+                PDF or Word document · Your script is never stored
+              </p>
+            </>
+          )}
+
+          {/* UPLOADING */}
+          {entryMode === 'uploading' && (
+            <div style={{ textAlign: 'center' }}>
+              <p style={{
+                fontSize: '1.1rem', color: '#555',
+                fontStyle: 'italic', lineHeight: 1.7, marginBottom: '0.75rem'
+              }}>
+                Reading your script...
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#2e2e2e', letterSpacing: '0.06em' }}>
+                Building the Film Memory. This takes a moment.
+              </p>
+            </div>
+          )}
+
+          {/* SOUL DISPLAY */}
+          {entryMode === 'soul' && scriptSoul && (
+            <div style={{ textAlign: 'center' }}>
+              <p style={{
+                fontSize: '0.62rem', letterSpacing: '0.2em',
+                color: '#6B5A38', textTransform: 'uppercase', marginBottom: '1.5rem'
+              }}>
+                What the film is becoming
+              </p>
+              <p style={{
+                fontSize: '1.5rem', lineHeight: 1.75,
+                color: '#e8e0d0', fontWeight: 300, marginBottom: '2.5rem'
+              }}>
+                {scriptSoul}
+              </p>
+              <p style={{
+                fontSize: '0.75rem', color: '#2e2e2e',
+                letterSpacing: '0.06em', fontStyle: 'italic'
+              }}>
+                The Film Memory is built. Stepping into the Studio...
+              </p>
+            </div>
+          )}
+
+        </div>
+      </main>
+    )
+  }
+
+  // ── MAIN STUDIO ───────────────────────────────────────────────────────────
   return (
     <main style={{
-      backgroundColor: '#0a0a0a',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: 'Georgia, serif',
-      color: '#e8e0d0',
-      overflow: 'hidden'
+      backgroundColor: '#0a0a0a', height: '100vh',
+      display: 'flex', flexDirection: 'column',
+      fontFamily: 'Georgia, serif', color: '#e8e0d0', overflow: 'hidden'
     }}>
 
-      {/* ── NAV ─────────────────────────────────────────── */}
+      {/* NAV */}
       <nav style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '1.5rem 2rem', borderBottom: '1px solid #1a1a1a', flexShrink: 0
       }}>
-        <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.8rem' }}>
-          MATINEE
-        </span>
+        <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.8rem' }}>MATINEE</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <span style={{ color: '#555', fontSize: '0.8rem', fontStyle: 'italic' }}>
-            {film?.title}
-          </span>
+          <span style={{ color: '#555', fontSize: '0.8rem', fontStyle: 'italic' }}>{film?.title}</span>
           <span
             onClick={() => router.push('/studio')}
             style={{ color: '#444', fontSize: '0.7rem', cursor: 'pointer', letterSpacing: '0.1em' }}
@@ -376,10 +541,10 @@ export default function FilmStudio() {
         </div>
       </nav>
 
-      {/* ── BODY ────────────────────────────────────────── */}
+      {/* BODY */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* ── CONVERSATION ────────────────────────────── */}
+        {/* CONVERSATION */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
             <div style={{
@@ -389,10 +554,7 @@ export default function FilmStudio() {
               {messages.map((msg, i) => (
                 <div key={i}>
                   {msg.role === 'assistant' ? (
-                    <p style={{
-                      fontSize: '1.15rem', lineHeight: '1.85',
-                      color: '#e8e0d0', fontWeight: 300
-                    }}>
+                    <p style={{ fontSize: '1.15rem', lineHeight: '1.85', color: '#e8e0d0', fontWeight: 300 }}>
                       {msg.content}
                     </p>
                   ) : (
@@ -426,17 +588,12 @@ export default function FilmStudio() {
                   fontFamily: 'Georgia, serif'
                 }}
               />
-              <span
-                onClick={() => sendMessage()}
-                style={{ color: '#444', cursor: 'pointer', fontSize: '1.1rem' }}
-              >
-                →
-              </span>
+              <span onClick={() => sendMessage()} style={{ color: '#444', cursor: 'pointer', fontSize: '1.1rem' }}>→</span>
             </div>
           </div>
         </div>
 
-        {/* ── FILM PORTRAIT PANEL ──────────────────────── */}
+        {/* FILM PORTRAIT PANEL */}
         <div style={{
           width: portraitOpen ? '380px' : '0px',
           overflow: 'hidden',
@@ -450,11 +607,7 @@ export default function FilmStudio() {
             <div style={{ width: '380px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
               {/* PORTRAIT HEADER */}
-              <div style={{
-                padding: '1.25rem 1.75rem 1rem',
-                borderBottom: '1px solid #141414',
-                flexShrink: 0
-              }}>
+              <div style={{ padding: '1.25rem 1.75rem 1rem', borderBottom: '1px solid #141414', flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                   <span style={{ fontSize: '0.62rem', letterSpacing: '0.2em', color: '#3a3a3a', textTransform: 'uppercase' }}>
                     Film Portrait
@@ -494,8 +647,6 @@ export default function FilmStudio() {
                     return (
                       <div key={field.key}>
                         <div style={{ marginBottom: '1.75rem' }}>
-
-                          {/* FIELD LABEL */}
                           <p style={{
                             fontSize: '0.6rem', letterSpacing: '0.18em',
                             color: '#6B5A38', textTransform: 'uppercase', marginBottom: '0.65rem'
@@ -504,7 +655,6 @@ export default function FilmStudio() {
                           </p>
 
                           {isEmpty ? (
-                            // GAP — unresolved field
                             <div style={{ border: '1px solid #161616', borderRadius: '2px', padding: '0.9rem 1rem' }}>
                               <p style={{
                                 fontSize: '0.875rem', lineHeight: 1.7,
@@ -514,27 +664,19 @@ export default function FilmStudio() {
                               </p>
 
                               {isEditing ? (
-                                // Direct edit textarea
                                 <div>
                                   <textarea
                                     value={directEdit.value}
                                     onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
                                     placeholder="Write here..."
                                     style={{
-                                      width: '100%',
-                                      background: '#0d0d0d',
-                                      border: '1px solid #2a2a2a',
-                                      color: '#e8e0d0',
-                                      fontFamily: 'Georgia, serif',
-                                      fontSize: '0.85rem',
-                                      lineHeight: 1.6,
-                                      padding: '0.6rem 0.75rem',
-                                      resize: 'vertical',
-                                      minHeight: '80px',
-                                      outline: 'none',
-                                      borderRadius: '2px',
-                                      marginBottom: '0.6rem',
-                                      boxSizing: 'border-box'
+                                      width: '100%', background: '#0d0d0d',
+                                      border: '1px solid #2a2a2a', color: '#e8e0d0',
+                                      fontFamily: 'Georgia, serif', fontSize: '0.85rem',
+                                      lineHeight: 1.6, padding: '0.6rem 0.75rem',
+                                      resize: 'vertical', minHeight: '80px',
+                                      outline: 'none', borderRadius: '2px',
+                                      marginBottom: '0.6rem', boxSizing: 'border-box'
                                     }}
                                   />
                                   <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -554,7 +696,6 @@ export default function FilmStudio() {
                                   </div>
                                 </div>
                               ) : (
-                                // Two paths into a gap
                                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                   <button
                                     onClick={() => exploreWithMatinee(field.prompt)}
@@ -572,17 +713,12 @@ export default function FilmStudio() {
                               )}
                             </div>
                           ) : (
-                            // FILLED FIELD
-                            <p style={{
-                              fontSize: '0.9rem', lineHeight: 1.8,
-                              color: '#b8af9f', whiteSpace: 'pre-wrap'
-                            }}>
+                            <p style={{ fontSize: '0.9rem', lineHeight: 1.8, color: '#b8af9f', whiteSpace: 'pre-wrap' }}>
                               {renderFieldValue(field.key, value)}
                             </p>
                           )}
                         </div>
 
-                        {/* Divider between fields */}
                         {idx < FIELDS.length - 1 && (
                           <div style={{ height: '1px', background: '#111', marginBottom: '1.75rem' }} />
                         )}
