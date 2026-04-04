@@ -538,17 +538,30 @@ export default function FilmStudio() {
           >
             THE STUDIO
           </span>
-          <button
-            onClick={() => fileInputRef.current?.click()}
+          <label
             style={{
               ...btnBase,
               border: '1px solid #2a2a2a',
               color: '#444',
-              fontSize: '0.7rem'
+              fontSize: '0.7rem',
+              cursor: 'pointer',
+              display: 'inline-block'
             }}
           >
             UPLOAD SCRIPT
-          </button>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  e.target.value = ''
+                  handleScriptUpload(file)
+                }
+              }}
+            />
+          </label>
           <button
             onClick={togglePortrait}
             style={{
@@ -563,20 +576,7 @@ export default function FilmStudio() {
         </div>
       </nav>
 
-      {/* Hidden file input for nav script upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.doc,.docx"
-        style={{ display: 'none' }}
-        onChange={e => {
-          const file = e.target.files?.[0]
-          if (file) {
-            e.target.value = ''
-            handleScriptUpload(file)
-          }
-        }}
-      />
+
 
       {/* BODY */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
