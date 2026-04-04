@@ -10,7 +10,8 @@ const supabaseAdmin = createClient(
 
 async function extractText(buffer: Buffer, fileName: string): Promise<string> {
   if (fileName.endsWith('.pdf')) {
-    const pdfParse = (await import('pdf-parse')).default
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse')
     const data = await pdfParse(buffer)
     return data.text
   }
