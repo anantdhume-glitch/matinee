@@ -207,7 +207,10 @@ export default function FilmStudio() {
 
   const handleScriptUpload = async (file: File) => {
     setUploadError(null)
-    setEntryMode('uploading')
+    // If already in conversation, stay there but show a thinking state
+    const wasInConversation = entryMode === 'conversation'
+    if (!wasInConversation) setEntryMode('uploading')
+    else setThinking(true)
 
     const formData = new FormData()
     formData.append('file', file)
@@ -223,25 +226,33 @@ export default function FilmStudio() {
 
       if (!response.ok || data.error) {
         setUploadError(data.error || 'Something went wrong reading your script.')
-        setEntryMode('choice')
+        if (!wasInConversation) setEntryMode('choice')
+        else setThinking(false)
         return
       }
 
-      setScriptSoul(data.emotional_core)
-      setEntryMode('soul')
+      const openingText = `I\'ve spent time with your script.\n\nThe Film Memory is built. I know your story, your characters, the decisions already made, and what still needs to be found.\n\nBefore we go anywhere — what made you say yes to this one?`
+      const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
+      await supabase.from('messages').insert(matineeMessage)
 
-      // After the filmmaker has seen the soul, save Matinee's opening and enter conversation
-      setTimeout(async () => {
-        const openingText = `I've spent time with your script.\n\nThe Film Memory is built. I know your story, your characters, the decisions already made, and what still needs to be found.\n\nBefore we go anywhere — what made you say yes to this one?`
-        const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
-        await supabase.from('messages').insert(matineeMessage)
-        setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
-        setEntryMode('conversation')
-      }, 3000)
+      if (wasInConversation) {
+        // Stay in conversation, append Matinee's message
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: openingText }])
+        setThinking(false)
+      } else {
+        // Show soul screen first, then enter conversation
+        setScriptSoul(data.emotional_core)
+        setEntryMode('soul')
+        setTimeout(async () => {
+          setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
+          setEntryMode('conversation')
+        }, 3000)
+      }
 
     } catch {
-      setUploadError("The script couldn't be read. Try again — it's worth it.")
-      setEntryMode('choice')
+      setUploadError("The script couldn\'t be read. Try again — it\'s worth it.")
+      if (!wasInConversation) setEntryMode('choice')
+      else setThinking(false)
     }
   }
 
@@ -528,6 +539,17 @@ export default function FilmStudio() {
             THE STUDIO
           </span>
           <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              ...btnBase,
+              border: '1px solid #2a2a2a',
+              color: '#444',
+              fontSize: '0.7rem'
+            }}
+          >
+            UPLOAD SCRIPT
+          </button>
+          <button
             onClick={togglePortrait}
             style={{
               ...btnBase,
@@ -540,6 +562,21 @@ export default function FilmStudio() {
           </button>
         </div>
       </nav>
+
+      {/* Hidden file input for nav script upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx"
+        style={{ display: 'none' }}
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) {
+            e.target.value = ''
+            handleScriptUpload(file)
+          }
+        }}
+      />
 
       {/* BODY */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

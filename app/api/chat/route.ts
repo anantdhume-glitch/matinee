@@ -1,13 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: string) {
   const memoryBlock = filmMemory
@@ -15,7 +9,7 @@ function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: stri
 - Emotional core: ${filmMemory.emotional_core || 'Still emerging'}
 - Characters: ${filmMemory.characters ? JSON.stringify(filmMemory.characters) : 'Not yet discovered'}
 - Decisions made: ${filmMemory.decisions_made || 'None yet'}
-- The filmmaker own words: ${filmMemory.filmmakers_words || 'None captured yet'}
+- The filmmaker's own words: ${filmMemory.filmmakers_words || 'None captured yet'}
 - What is still unresolved: ${filmMemory.unresolved_threads || 'Everything is open'}`
     : 'No memory yet. This is the first session. Begin building it through conversation.'
 
@@ -55,7 +49,13 @@ If SESSION is RETURNING, you speak first. Reflect what was built last time as a 
 MEMORY EXTRACTION:
 After every exchange, you will also return a JSON memory update. This is invisible to the filmmaker. Extract only what has genuinely been revealed, never invent or assume.
 
-Your response must ALWAYS be a valid JSON object with exactly two fields:
+CRITICAL INSTRUCTION — OUTPUT FORMAT:
+Your response must ALWAYS be a valid JSON object with exactly two fields.
+You must NEVER wrap it in markdown code fences.
+You must NEVER add any text before or after the JSON.
+You must NEVER use backticks of any kind.
+Output the raw JSON object and nothing else.
+
 {
   "content": "your response to the filmmaker here",
   "memory": {
@@ -65,14 +65,38 @@ Your response must ALWAYS be a valid JSON object with exactly two fields:
     "filmmakers_words": "exact phrases the filmmaker used when something became real",
     "unresolved_threads": "what is still open, what needs to come next"
   }
+}`
 }
 
-Return only valid JSON. No preamble. No markdown. No backticks. Just the JSON object.`
+function extractJSON(raw: string): { content: string; memory: any } | null {
+  // Strip markdown fences if present
+  const stripped = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+
+  // Try parsing the stripped text
+  try {
+    const parsed = JSON.parse(stripped)
+    if (parsed.content) return parsed
+  } catch {}
+
+  // Try finding a JSON object anywhere in the string
+  const match = stripped.match(/\{[\s\S]*\}/)
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[0])
+      if (parsed.content) return parsed
+    } catch {}
+  }
+
+  return null
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { filmId, messages, filmMemory, sessionType, filmTitle } = await req.json()
+    const { messages, filmMemory, sessionType, filmTitle } = await req.json()
 
     const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle)
 
@@ -81,7 +105,7 @@ export async function POST(req: NextRequest) {
       : [{ role: 'user', content: 'Begin.' }]
 
     const response = await anthropic.messages.create({
-      model:'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
       system: systemPrompt,
       messages: apiMessages
@@ -89,14 +113,22 @@ export async function POST(req: NextRequest) {
 
     const rawContent = response.content[0].type === 'text' ? response.content[0].text : ''
 
-    try {
-      const parsed = JSON.parse(rawContent)
+    const parsed = extractJSON(rawContent)
+
+    if (parsed) {
       return NextResponse.json({ content: parsed.content, memory: parsed.memory })
-    } catch {
-      return NextResponse.json({ content: rawContent, memory: null })
     }
+
+    // Last resort — return the raw text as content so the filmmaker
+    // never sees a broken screen, and log for debugging
+    console.error('Could not parse Matinee response as JSON:', rawContent)
+    return NextResponse.json({ content: rawContent, memory: null })
+
   } catch (error) {
     console.error('API error:', error)
-    return NextResponse.json({ content: 'Something went wrong. Please try again.', memory: null }, { status: 500 })
+    return NextResponse.json(
+      { content: 'The Studio has been quiet for a moment. Try again — it\'s worth it.', memory: null },
+      { status: 500 }
+    )
   }
 }
