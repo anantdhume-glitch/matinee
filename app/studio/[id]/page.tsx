@@ -231,7 +231,7 @@ export default function FilmStudio() {
         return
       }
 
-      const openingText = `I\'ve spent time with your script.\n\nThe Film Memory is built. I know your story, your characters, the decisions already made, and what still needs to be found.\n\nBefore we go anywhere — what made you say yes to this one?`
+      const openingText = `I've spent time with your script.\n\nThe Film Memory is built. I know your story, your characters, the decisions already made, and what still needs to be found.\n\nBefore we go anywhere — what made you say yes to this one?`
       const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
       await supabase.from('messages').insert(matineeMessage)
 
@@ -250,7 +250,7 @@ export default function FilmStudio() {
       }
 
     } catch {
-      setUploadError("The script couldn\'t be read. Try again — it\'s worth it.")
+      setUploadError("The script couldn't be read. Try again — it's worth it.")
       if (!wasInConversation) setEntryMode('choice')
       else setThinking(false)
     }
