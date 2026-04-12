@@ -427,7 +427,35 @@ export default function FilmStudio() {
           padding: '1.5rem 2rem', borderBottom: '1px solid #1a1a1a'
         }}>
           <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.8rem' }}>MATINEE</span>
-          <span style={{ color: '#555', fontSize: '0.8rem', fontStyle: 'italic' }}>{film?.title}</span>
+          <span
+  contentEditable
+  suppressContentEditableWarning
+  onBlur={async (e) => {
+    const newTitle = e.currentTarget.textContent?.trim()
+    if (!newTitle || newTitle === film?.title) return
+    setFilm(prev => prev ? { ...prev, title: newTitle } : null)
+    await supabase.from('films').update({ title: newTitle }).eq('id', filmId)
+  }}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.currentTarget.blur()
+    }
+  }}
+  style={{
+    color: '#555',
+    fontSize: '0.8rem',
+    fontStyle: 'italic',
+    outline: 'none',
+    cursor: 'text',
+    borderBottom: '1px solid transparent',
+    transition: 'border-color 0.2s'
+  }}
+  onFocus={e => e.currentTarget.style.borderBottom = '1px solid #333'}
+  onBlurCapture={e => e.currentTarget.style.borderBottom = '1px solid transparent'}
+>
+  {film?.title}
+</span>
         </nav>
 
         <div style={{
