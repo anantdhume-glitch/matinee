@@ -4,78 +4,60 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
-type Message = {
-  id: string
-  role: string
-  content: string
-}
-
+type Message = { id: string; role: string; content: string }
 type FilmMemory = {
-  id?: string
-  film_id?: string
-  emotional_core?: string
-  characters?: any
-  decisions_made?: string
-  filmmakers_words?: string
-  unresolved_threads?: string
-  raw_memory?: string
-  updated_at?: string
+  id?: string; film_id?: string; emotional_core?: string; characters?: any
+  decisions_made?: string; filmmakers_words?: string; unresolved_threads?: string
+  raw_memory?: string; updated_at?: string
 }
-
-type DirectEditState = {
-  field: string | null
-  value: string
-  saving: boolean
-}
-
+type DirectEditState = { field: string | null; value: string; saving: boolean }
 type EntryMode = 'choice' | 'uploading' | 'soul' | 'conversation'
 
+// ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
+const gold = '#c9a96e'
+const goldDim = '#6B5A38'
+const text = '#e8e0d0'
+const textDim = '#555'
+const textFaint = '#333'
+const border = '#1e1e1e'
+const borderMid = '#2a2a2a'
+const bg = '#0a0a0a'
+const serif = 'Georgia, serif'
+
+const btnPrimary: React.CSSProperties = {
+  background: 'transparent', border: `1px solid ${gold}`, color: gold,
+  padding: '0.7rem 1.5rem', fontSize: '0.75rem', letterSpacing: '0.12em',
+  cursor: 'pointer', fontFamily: serif, transition: 'all 0.2s'
+}
+const btnSecondary: React.CSSProperties = {
+  background: 'transparent', border: `1px solid ${borderMid}`, color: textDim,
+  padding: '0.7rem 1.5rem', fontSize: '0.75rem', letterSpacing: '0.1em',
+  cursor: 'pointer', fontFamily: serif, transition: 'all 0.2s'
+}
+const btnSmall: React.CSSProperties = {
+  background: 'transparent', border: `1px solid ${borderMid}`, color: textDim,
+  padding: '4px 10px', fontSize: '0.62rem', letterSpacing: '0.1em',
+  cursor: 'pointer', fontFamily: serif, transition: 'all 0.2s'
+}
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const EMPTY_PHRASES = ['none yet', 'none', 'not yet', 'n/a', 'tbd', 'unknown', 'nothing yet']
 
-const FIELDS: Array<{
-  key: keyof FilmMemory
-  label: string
-  question: string
-  prompt: string
-}> = [
-  {
-    key: 'emotional_core',
-    label: 'What the film is becoming',
-    question: 'What is the film trying to leave behind in the people who see it? Not the story — the feeling.',
-    prompt: "I want to think about what my film is really trying to say — the feeling it wants to leave behind."
-  },
-  {
-    key: 'characters',
-    label: 'Who the characters are becoming',
-    question: 'Who is this film about? Not the subject — the person we follow.',
-    prompt: "I want to find who the characters of my film really are — not their descriptions, but who they actually are."
-  },
-  {
-    key: 'decisions_made',
-    label: 'The decisions made',
-    question: 'What has this film chosen to be — and what did it set aside to get there?',
-    prompt: "Let's talk about the decisions I've made for this film — what I've chosen and what I've left behind."
-  },
-  {
-    key: 'filmmakers_words',
-    label: "The filmmaker's own words",
-    question: "What phrase have you used that felt exactly right — words you couldn't improve?",
-    prompt: "I want to find the words that feel exactly right for my film — the phrases only I could say."
-  },
-  {
-    key: 'unresolved_threads',
-    label: 'What is still unresolved',
-    question: "What part of the film keeps you up at night — the thing you haven't found yet?",
-    prompt: "I want to talk about what's still unresolved in my film — the thread I haven't pulled yet."
-  }
+const FIELDS: Array<{ key: keyof FilmMemory; label: string; question: string; prompt: string }> = [
+  { key: 'emotional_core', label: 'What the film is becoming', question: 'What is the film trying to leave behind in the people who see it? Not the story — the feeling.', prompt: "I want to think about what my film is really trying to say — the feeling it wants to leave behind." },
+  { key: 'characters', label: 'Who the characters are becoming', question: 'Who is this film about? Not the subject — the person we follow.', prompt: "I want to find who the characters of my film really are — not their descriptions, but who they actually are." },
+  { key: 'decisions_made', label: 'The decisions made', question: 'What has this film chosen to be — and what did it set aside to get there?', prompt: "Let's talk about the decisions I've made for this film — what I've chosen and what I've left behind." },
+  { key: 'filmmakers_words', label: "The filmmaker's own words", question: "What phrase have you used that felt exactly right — words you couldn't improve?", prompt: "I want to find the words that feel exactly right for my film — the phrases only I could say." },
+  { key: 'unresolved_threads', label: 'What is still unresolved', question: "What part of the film keeps you up at night — the thing you haven't found yet?", prompt: "I want to talk about what's still unresolved in my film — the thread I haven't pulled yet." }
 ]
 
+// ── HELPERS ───────────────────────────────────────────────────────────────────
 function isFieldEmpty(value: any): boolean {
   if (!value) return true
   if (typeof value === 'string') {
-    const trimmed = value.trim()
-    if (trimmed.length < 5) return true
-    if (EMPTY_PHRASES.includes(trimmed.toLowerCase())) return true
+    const t = value.trim()
+    if (t.length < 5) return true
+    if (EMPTY_PHRASES.includes(t.toLowerCase())) return true
   }
   if (Array.isArray(value) && value.length === 0) return true
   return false
@@ -85,28 +67,14 @@ function renderFieldValue(key: string, value: any): string {
   if (!value) return ''
   if (key === 'characters') {
     if (typeof value === 'string') return value
-    if (Array.isArray(value)) {
-      return value
-        .map((c: any) => {
-          if (typeof c === 'string') return c
-          return [c.name, c.description].filter(Boolean).join(' — ')
-        })
-        .join('\n\n')
-    }
+    if (Array.isArray(value)) return value.map((c: any) => typeof c === 'string' ? c : [c.name, c.description].filter(Boolean).join(' — ')).join('\n\n')
     return JSON.stringify(value, null, 2)
   }
   if (key === 'filmmakers_words') {
     let phrases: string[] = []
-    if (Array.isArray(value)) {
-      phrases = value
-    } else if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value)
-        if (Array.isArray(parsed)) phrases = parsed
-        else phrases = [value]
-      } catch {
-        phrases = [value]
-      }
+    if (Array.isArray(value)) phrases = value
+    else if (typeof value === 'string') {
+      try { const p = JSON.parse(value); phrases = Array.isArray(p) ? p : [value] } catch { phrases = [value] }
     }
     return phrases.map(p => `"${p}"`).join('\n\n')
   }
@@ -114,48 +82,25 @@ function renderFieldValue(key: string, value: any): string {
 }
 
 function formatDate(ts: string): string {
-  const date = new Date(ts)
-  return (
-    date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) +
-    ' · ' +
-    date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  )
+  const d = new Date(ts)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-const btnBase: React.CSSProperties = {
-  background: 'none',
-  fontFamily: 'Georgia, serif',
-  fontSize: '0.62rem',
-  letterSpacing: '0.1em',
-  padding: '5px 12px',
-  cursor: 'pointer',
-  borderRadius: '2px',
-  transition: 'all 0.2s'
-}
-
+// ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function FilmStudio() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [thinking, setThinking] = useState(false)
   const [film, setFilm] = useState<{ title: string } | null>(null)
-
-  // Entry flow
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
   const [scriptSoul, setScriptSoul] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Portrait state
   const [portraitOpen, setPortraitOpen] = useState(false)
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
-  const [portraitLoading, setPortraitLoading] = useState(false)
-  const [directEdit, setDirectEdit] = useState<DirectEditState>({
-    field: null,
-    value: '',
-    saving: false
-  })
+  const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -168,50 +113,38 @@ export default function FilmStudio() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
-
-      const { data: filmData } = await supabase
-        .from('films').select('*').eq('id', filmId).single()
+      const { data: filmData } = await supabase.from('films').select('*').eq('id', filmId).single()
       if (!filmData) { router.push('/studio'); return }
       setFilm(filmData)
-
-      const { data: msgData } = await supabase
-        .from('messages').select('*').eq('film_id', filmId).order('created_at')
-
-      if (msgData && msgData.length > 0) {
-        setMessages(msgData)
-        setEntryMode('conversation')
-      } else {
-        // First session — show entry choice
-        setEntryMode('choice')
-      }
+      const { data: msgData } = await supabase.from('messages').select('*').eq('film_id', filmId).order('created_at')
+      if (msgData && msgData.length > 0) { setMessages(msgData); setEntryMode('conversation') }
+      else setEntryMode('choice')
       setLoading(false)
     }
     init()
   }, [])
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  const refreshPortrait = async () => {
+    const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+    setFilmMemory(memoryData)
+    setPortraitRefreshedAt(new Date().toISOString())
+  }
+
+  const togglePortrait = async () => {
+    if (!portraitOpen && !portraitRefreshedAt) await refreshPortrait()
+    setPortraitOpen(p => !p)
+  }
 
   const openingMessage = async (title: string) => {
-    const { data: memoryData } = await supabase
-      .from('film_memory').select('*').eq('film_id', filmId).single()
-
+    const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filmId,
-        messages: [],
-        filmMemory: memoryData,
-        sessionType: 'FIRST',
-        filmTitle: title
-      })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filmId, messages: [], filmMemory: memoryData, sessionType: 'FIRST', filmTitle: title })
     })
-
     const data = await response.json()
-    const matineeMessage = { role: 'assistant', content: data.content, film_id: filmId }
-    await supabase.from('messages').insert(matineeMessage)
+    await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId })
     setMessages([{ id: 'opening', role: 'assistant', content: data.content }])
   }
 
@@ -222,7 +155,6 @@ export default function FilmStudio() {
 
   const handleScriptUpload = async (file: File) => {
     setUploadError(null)
-    // If already in conversation, stay there but show a thinking state
     const wasInConversation = entryMode === 'conversation'
     if (!wasInConversation) setEntryMode('uploading')
     else setThinking(true)
@@ -232,11 +164,7 @@ export default function FilmStudio() {
     formData.append('filmId', filmId)
 
     try {
-      const response = await fetch('/api/parse-script', {
-        method: 'POST',
-        body: formData
-      })
-
+      const response = await fetch('/api/parse-script', { method: 'POST', body: formData })
       const data = await response.json()
 
       if (!response.ok || data.error) {
@@ -246,42 +174,31 @@ export default function FilmStudio() {
         return
       }
 
-      const { data: freshMemory } = await supabase
-      .from('film_memory').select('*').eq('film_id', filmId).single()
-
-    const openingResponse = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filmId,
-        messages: [],
-        filmMemory: freshMemory,
-        sessionType: 'RETURNING',
-        filmTitle: film?.title
+      const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+      const openingResponse = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filmId, messages: [], filmMemory: freshMemory, sessionType: 'RETURNING', filmTitle: film?.title })
       })
-    })
-    const openingData = await openingResponse.json()
-    const openingText = openingData.content
+      const openingData = await openingResponse.json()
+      const openingText = openingData.content
 
-    const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
-    await supabase.from('messages').insert(matineeMessage)
+      await supabase.from('messages').insert({ role: 'assistant', content: openingText, film_id: filmId })
 
-    if (wasInConversation) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: openingText }])
-      setThinking(false)
-      await refreshPortrait()
-      setPortraitOpen(true)
-    } else {
-      setScriptSoul(data.emotional_core)
-      setEntryMode('soul')
-      setTimeout(async () => {
-        setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
-        setEntryMode('conversation')
+      if (wasInConversation) {
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: openingText }])
+        setThinking(false)
         await refreshPortrait()
         setPortraitOpen(true)
-      }, 3000)
-    }
-
+      } else {
+        setScriptSoul(data.emotional_core)
+        setEntryMode('soul')
+        setTimeout(async () => {
+          setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
+          setEntryMode('conversation')
+          await refreshPortrait()
+          setPortraitOpen(true)
+        }, 3000)
+      }
     } catch {
       setUploadError("The script couldn't be read. Try again — it's worth it.")
       if (!wasInConversation) setEntryMode('choice')
@@ -290,75 +207,35 @@ export default function FilmStudio() {
   }
 
   const sendMessage = async (overrideText?: string) => {
-    const text = (overrideText ?? input).trim()
-    if (!text || thinking) return
-
+    const t = (overrideText ?? input).trim()
+    if (!t || thinking) return
     setInput('')
     setThinking(true)
 
-    const userMessage = { role: 'user', content: text, film_id: filmId }
+    const userMessage = { role: 'user', content: t, film_id: filmId }
     await supabase.from('messages').insert(userMessage)
-    const updatedMessages = [
-      ...messages,
-      { id: Date.now().toString(), role: 'user', content: text }
-    ]
-    setMessages(updatedMessages)
+    const updated = [...messages, { id: Date.now().toString(), role: 'user', content: t }]
+    setMessages(updated)
 
-    const { data: memoryData } = await supabase
-      .from('film_memory').select('*').eq('film_id', filmId).single()
-
+    const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filmId,
-        messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
-        filmMemory: memoryData,
-        sessionType: 'RETURNING',
-        filmTitle: film?.title
-      })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title })
     })
-
     const data = await response.json()
-    const matineeMessage = { role: 'assistant', content: data.content, film_id: filmId }
-    await supabase.from('messages').insert(matineeMessage)
-    setMessages(prev => [
-      ...prev,
-      { id: Date.now().toString(), role: 'assistant', content: data.content }
-    ])
+
+    await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId })
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content }])
 
     if (data.memory) {
-      const { data: existing } = await supabase
-        .from('film_memory').select('id').eq('film_id', filmId).single()
-      if (existing) {
-        await supabase
-          .from('film_memory')
-          .update({ ...data.memory, updated_at: new Date().toISOString() })
-          .eq('film_id', filmId)
-      } else {
-        await supabase
-          .from('film_memory')
-          .insert({ ...data.memory, film_id: filmId })
-      }
+      const { data: existing } = await supabase.from('film_memory').select('id').eq('film_id', filmId).single()
+      if (existing) await supabase.from('film_memory').update({ ...data.memory, updated_at: new Date().toISOString() }).eq('film_id', filmId)
+      else await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId })
+      // Auto-refresh portrait if open
+      if (portraitOpen) await refreshPortrait()
     }
 
     setThinking(false)
-  }
-
-  const refreshPortrait = async () => {
-    setPortraitLoading(true)
-    const { data: memoryData } = await supabase
-      .from('film_memory').select('*').eq('film_id', filmId).single()
-    setFilmMemory(memoryData)
-    setPortraitRefreshedAt(new Date().toISOString())
-    setPortraitLoading(false)
-  }
-
-  const togglePortrait = async () => {
-    if (!portraitOpen && !portraitRefreshedAt) {
-      await refreshPortrait()
-    }
-    setPortraitOpen(p => !p)
   }
 
   const exploreWithMatinee = (prompt: string) => {
@@ -374,340 +251,165 @@ export default function FilmStudio() {
   const saveDirectEdit = async () => {
     if (!directEdit.field || directEdit.saving) return
     setDirectEdit(prev => ({ ...prev, saving: true }))
-
-    const { data: existing } = await supabase
-      .from('film_memory').select('*').eq('film_id', filmId).single()
-
+    const { data: existing } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     let rawMemory: any = {}
-    if (existing?.raw_memory) {
-      try { rawMemory = JSON.parse(existing.raw_memory) } catch {}
-    }
+    if (existing?.raw_memory) { try { rawMemory = JSON.parse(existing.raw_memory) } catch {} }
     const directEdits: any[] = rawMemory.direct_edits || []
-    directEdits.push({
-      field: directEdit.field,
-      edited_at: new Date().toISOString(),
-      note: 'Added directly by the filmmaker. Not discovered through conversation.'
-    })
+    directEdits.push({ field: directEdit.field, edited_at: new Date().toISOString(), note: 'Added directly by the filmmaker.' })
     rawMemory.direct_edits = directEdits
-
-    const updatePayload: any = {
-      [directEdit.field]: directEdit.value,
-      raw_memory: JSON.stringify(rawMemory),
-      updated_at: new Date().toISOString()
-    }
-
-    if (existing) {
-      await supabase.from('film_memory').update(updatePayload).eq('film_id', filmId)
-    } else {
-      await supabase.from('film_memory').insert({ ...updatePayload, film_id: filmId })
-    }
-
-    setFilmMemory(prev =>
-      prev ? { ...prev, [directEdit.field!]: directEdit.value } : null
-    )
+    const payload: any = { [directEdit.field]: directEdit.value, raw_memory: JSON.stringify(rawMemory), updated_at: new Date().toISOString() }
+    if (existing) await supabase.from('film_memory').update(payload).eq('film_id', filmId)
+    else await supabase.from('film_memory').insert({ ...payload, film_id: filmId })
+    setFilmMemory(prev => prev ? { ...prev, [directEdit.field!]: directEdit.value } : null)
     setDirectEdit({ field: null, value: '', saving: false })
   }
 
+  // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) return (
-    <main style={{
-      backgroundColor: '#0a0a0a', minHeight: '100vh',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#c9a96e', fontFamily: 'Georgia, serif', letterSpacing: '0.2em'
-    }}>
+    <main style={{ backgroundColor: bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: gold, fontFamily: serif, letterSpacing: '0.2em', fontSize: '0.85rem' }}>
       Setting the scene...
     </main>
   )
 
-  // ── ENTRY SCREENS ─────────────────────────────────────────────────────────
+  // ── ENTRY SCREENS ──────────────────────────────────────────────────────────
   if (entryMode !== 'conversation') {
     return (
-      <main style={{
-        backgroundColor: '#0a0a0a', minHeight: '100vh',
-        display: 'flex', flexDirection: 'column',
-        fontFamily: 'Georgia, serif', color: '#e8e0d0'
-      }}>
-        <nav style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '1.5rem 2rem', borderBottom: '1px solid #1a1a1a'
-        }}>
-          <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.8rem' }}>MATINEE</span>
-          <span
-  contentEditable
-  suppressContentEditableWarning
-  onBlur={async (e) => {
-    const newTitle = e.currentTarget.textContent?.trim()
-    if (!newTitle || newTitle === film?.title) return
-    setFilm(prev => prev ? { ...prev, title: newTitle } : null)
-    await supabase.from('films').update({ title: newTitle }).eq('id', filmId)
-  }}
-  onKeyDown={(e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      e.currentTarget.blur()
-    }
-  }}
-  style={{
-    color: '#555',
-    fontSize: '0.8rem',
-    fontStyle: 'italic',
-    outline: 'none',
-    cursor: 'text',
-    borderBottom: '1px solid transparent',
-    transition: 'border-color 0.2s'
-  }}
-  onFocus={e => e.currentTarget.style.borderBottom = '1px solid #333'}
-  onBlurCapture={e => e.currentTarget.style.borderBottom = '1px solid transparent'}
->
-  {film?.title}
-</span>
+      <main style={{ backgroundColor: bg, minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: serif, color: text }}>
+        <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.75rem 2.5rem', borderBottom: `1px solid ${border}` }}>
+          <span style={{ color: gold, letterSpacing: '0.3em', fontSize: '0.85rem' }}>MATINEE</span>
+          <span style={{ color: textDim, fontSize: '0.8rem', fontStyle: 'italic' }}>{film?.title}</span>
         </nav>
 
-        <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          padding: '3rem 2rem', maxWidth: '560px', margin: '0 auto', width: '100%'
-        }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 2rem' }}>
+          <div style={{ width: '100%', maxWidth: '480px' }}>
 
-          {/* CHOICE */}
-          {entryMode === 'choice' && (
-  <div style={{ width: '100%', maxWidth: '560px' }}>
-    <p style={{
-      fontSize: '1.5rem', lineHeight: 1.75, color: '#e8e0d0',
-      textAlign: 'center', marginBottom: '0.75rem', fontWeight: 300
-    }}>
-      Where are you in this film's journey?
-    </p>
-    <p style={{
-      fontSize: '0.8rem', color: '#444', textAlign: 'center',
-      marginBottom: '3.5rem', letterSpacing: '0.04em', lineHeight: 1.6
-    }}>
-      How you arrive shapes how we begin.
-    </p>
+            {/* CHOICE */}
+            {entryMode === 'choice' && (
+              <>
+                <p style={{ fontSize: '1.3rem', lineHeight: 1.8, color: text, textAlign: 'center', marginBottom: '0.6rem', fontWeight: 300 }}>
+                  Where are you in this film's journey?
+                </p>
+                <p style={{ fontSize: '0.78rem', color: textFaint, textAlign: 'center', marginBottom: '3rem', letterSpacing: '0.03em', lineHeight: 1.6 }}>
+                  How you arrive shapes how we begin.
+                </p>
 
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
-      <button
-        onClick={beginFromConversation}
-        style={{
-          background: 'none',
-          border: '1px solid #3a3a3a',
-          color: '#e8e0d0',
-          padding: '1.5rem 2rem',
-          fontSize: '0.9rem',
-          textAlign: 'left',
-          letterSpacing: '0.03em',
-          cursor: 'pointer',
-          fontFamily: 'Georgia, serif',
-          borderRadius: '2px',
-          lineHeight: 1.6,
-          transition: 'border-color 0.2s, background 0.2s'
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = '#555'
-          ;(e.currentTarget as HTMLElement).style.background = '#0f0f0f'
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = '#3a3a3a'
-          ;(e.currentTarget as HTMLElement).style.background = 'none'
-        }}
-      >
-        <div style={{ fontSize: '0.95rem', marginBottom: '0.4rem' }}>
-          I have an idea.
-        </div>
-        <div style={{ fontSize: '0.75rem', color: '#555', letterSpacing: '0.04em' }}>
-          Let's find the film together through conversation.
-        </div>
-      </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <button
+                    onClick={beginFromConversation}
+                    style={{ ...btnSecondary, padding: '1.25rem 1.75rem', textAlign: 'left', width: '100%', lineHeight: 1.6 }}
+                  >
+                    <div style={{ fontSize: '0.9rem', color: text, marginBottom: '0.3rem' }}>I have an idea.</div>
+                    <div style={{ fontSize: '0.72rem', color: textDim, letterSpacing: '0.04em' }}>Let's find the film together through conversation.</div>
+                  </button>
 
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        style={{
-          background: 'none',
-          border: '1px solid #6B5A38',
-          color: '#c9a96e',
-          padding: '1.5rem 2rem',
-          fontSize: '0.9rem',
-          textAlign: 'left',
-          letterSpacing: '0.03em',
-          cursor: 'pointer',
-          fontFamily: 'Georgia, serif',
-          borderRadius: '2px',
-          lineHeight: 1.6,
-          transition: 'border-color 0.2s, background 0.2s'
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = '#c9a96e'
-          ;(e.currentTarget as HTMLElement).style.background = '#0f0d09'
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = '#6B5A38'
-          ;(e.currentTarget as HTMLElement).style.background = 'none'
-        }}
-      >
-        <div style={{ fontSize: '0.95rem', marginBottom: '0.4rem' }}>
-          I have a script.
-        </div>
-        <div style={{ fontSize: '0.75rem', color: '#6B5A38', letterSpacing: '0.04em' }}>
-          Let Matinee read it first. PDF or Word document.
-        </div>
-      </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ ...btnPrimary, padding: '1.25rem 1.75rem', textAlign: 'left', width: '100%', lineHeight: 1.6 }}
+                  >
+                    <div style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>I have a script.</div>
+                    <div style={{ fontSize: '0.72rem', color: goldDim, letterSpacing: '0.04em' }}>Let Matinee read it first. PDF or Word document.</div>
+                  </button>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.doc,.docx"
-        style={{ display: 'none' }}
-        onChange={e => {
-          const file = e.target.files?.[0]
-          if (file) handleScriptUpload(file)
-        }}
-      />
-    </div>
+                  <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleScriptUpload(f) }} />
+                </div>
 
-    {uploadError && (
-      <p style={{
-        marginTop: '1.5rem', fontSize: '0.8rem',
-        color: '#6B3333', fontStyle: 'italic', textAlign: 'center'
-      }}>
-        {uploadError}
-      </p>
-    )}
+                {uploadError && (
+                  <p style={{ marginTop: '1.25rem', fontSize: '0.8rem', color: '#7a3333', fontStyle: 'italic', textAlign: 'center' }}>{uploadError}</p>
+                )}
 
-    <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
-      <span
-        onClick={async () => {
-          await supabase.from('messages').delete().eq('film_id', filmId)
-          await supabase.from('film_memory').delete().eq('film_id', filmId)
-          await supabase.from('films').delete().eq('id', filmId)
-          router.push('/studio')
-        }}
-        style={{
-          fontSize: '0.72rem', color: '#2e2e2e',
-          letterSpacing: '0.08em', cursor: 'pointer',
-          textTransform: 'uppercase', transition: 'color 0.2s'
-        }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#555'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2e2e2e'}
-      >
-        Cancel — return to the Studio
-      </span>
-    </div>
-  </div>
-)}
+                <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
+                  <span
+                    onClick={async () => {
+                      await supabase.from('messages').delete().eq('film_id', filmId)
+                      await supabase.from('film_memory').delete().eq('film_id', filmId)
+                      await supabase.from('films').delete().eq('id', filmId)
+                      router.push('/studio')
+                    }}
+                    style={{ fontSize: '0.7rem', color: textFaint, letterSpacing: '0.08em', cursor: 'pointer', textTransform: 'uppercase' }}
+                  >
+                    Cancel — return to the Studio
+                  </span>
+                </div>
+              </>
+            )}
 
-          {/* SOUL DISPLAY */}
-          {entryMode === 'soul' && scriptSoul && (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{
-                fontSize: '0.62rem', letterSpacing: '0.2em',
-                color: '#6B5A38', textTransform: 'uppercase', marginBottom: '1.5rem'
-              }}>
-                What the film is becoming
-              </p>
-              <p style={{
-                fontSize: '1.5rem', lineHeight: 1.75,
-                color: '#e8e0d0', fontWeight: 300, marginBottom: '2.5rem'
-              }}>
-                {scriptSoul}
-              </p>
-              <p style={{
-                fontSize: '0.75rem', color: '#2e2e2e',
-                letterSpacing: '0.06em', fontStyle: 'italic'
-              }}>
-                The Film Memory is built. Stepping into the Studio...
-              </p>
-            </div>
-          )}
+            {/* UPLOADING */}
+            {entryMode === 'uploading' && (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '1.1rem', color: textDim, fontStyle: 'italic', lineHeight: 1.7, marginBottom: '0.75rem' }}>
+                  Reading your script...
+                </p>
+                <p style={{ fontSize: '0.75rem', color: textFaint, letterSpacing: '0.06em' }}>
+                  Building the Film Memory. This takes a moment.
+                </p>
+              </div>
+            )}
 
+            {/* SOUL */}
+            {entryMode === 'soul' && scriptSoul && (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '0.62rem', letterSpacing: '0.2em', color: goldDim, textTransform: 'uppercase', marginBottom: '1.5rem' }}>
+                  What the film is becoming
+                </p>
+                <p style={{ fontSize: '1.4rem', lineHeight: 1.8, color: text, fontWeight: 300, marginBottom: '2.5rem' }}>
+                  {scriptSoul}
+                </p>
+                <p style={{ fontSize: '0.72rem', color: textFaint, letterSpacing: '0.06em', fontStyle: 'italic' }}>
+                  The Film Memory is built. Stepping into the Studio...
+                </p>
+              </div>
+            )}
+
+          </div>
         </div>
       </main>
     )
   }
 
-  // ── MAIN STUDIO ───────────────────────────────────────────────────────────
+  // ── MAIN STUDIO ────────────────────────────────────────────────────────────
   return (
-    <main style={{
-      backgroundColor: '#0a0a0a', height: '100vh',
-      display: 'flex', flexDirection: 'column',
-      fontFamily: 'Georgia, serif', color: '#e8e0d0', overflow: 'hidden'
-    }}>
+    <main style={{ backgroundColor: bg, height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: serif, color: text, overflow: 'hidden' }}>
 
-      {/* NAV */}
-      <nav style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '1.5rem 2rem', borderBottom: '1px solid #1a1a1a', flexShrink: 0
-      }}>
-        <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.8rem' }}>MATINEE</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+      {/* NAV — simplified */}
+      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 2.5rem', borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
+        <span onClick={() => router.push('/studio')} style={{ color: gold, letterSpacing: '0.3em', fontSize: '0.85rem', cursor: 'pointer' }}>
+          MATINEE
+        </span>
+
+        {/* Film title — center, editable */}
         <span
-  contentEditable
-  suppressContentEditableWarning
-  onBlur={async (e) => {
-    const newTitle = e.currentTarget.textContent?.trim()
-    if (!newTitle || newTitle === film?.title) return
-    setFilm(prev => prev ? { ...prev, title: newTitle } : null)
-    await supabase.from('films').update({ title: newTitle }).eq('id', filmId)
-  }}
-  onKeyDown={(e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      e.currentTarget.blur()
-    }
-  }}
-  style={{
-    color: '#555', fontSize: '0.8rem', fontStyle: 'italic',
-    outline: 'none', cursor: 'text',
-    borderBottom: '1px solid transparent', transition: 'border-color 0.2s'
-  }}
-  onFocus={e => e.currentTarget.style.borderBottom = '1px solid #333'}
-  onBlurCapture={e => e.currentTarget.style.borderBottom = '1px solid transparent'}
->
-  {film?.title}
-</span>
-          <span
-            onClick={() => router.push('/studio')}
-            style={{ color: '#444', fontSize: '0.7rem', cursor: 'pointer', letterSpacing: '0.1em' }}
-          >
-            THE STUDIO
-          </span>
-          <label
-            style={{
-              ...btnBase,
-              border: '1px solid #2a2a2a',
-              color: '#444',
-              fontSize: '0.7rem',
-              cursor: 'pointer',
-              display: 'inline-block'
-            }}
-          >
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={async (e) => {
+            const newTitle = e.currentTarget.textContent?.trim()
+            if (!newTitle || newTitle === film?.title) return
+            setFilm(prev => prev ? { ...prev, title: newTitle } : null)
+            await supabase.from('films').update({ title: newTitle }).eq('id', filmId)
+          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+          style={{ color: textDim, fontSize: '0.82rem', fontStyle: 'italic', outline: 'none', cursor: 'text', borderBottom: '1px solid transparent', transition: 'border-color 0.2s', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}
+          onFocus={e => (e.currentTarget.style.borderBottomColor = borderMid)}
+          onBlurCapture={e => (e.currentTarget.style.borderBottomColor = 'transparent')}
+        >
+          {film?.title}
+        </span>
+
+        {/* Right controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <label style={{ ...btnSecondary, fontSize: '0.68rem', cursor: 'pointer', display: 'inline-block' }}>
             UPLOAD SCRIPT
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx"
-              style={{ display: 'none' }}
-              onChange={e => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  e.target.value = ''
-                  handleScriptUpload(file)
-                }
-              }}
-            />
+            <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }} />
           </label>
           <button
             onClick={togglePortrait}
-            style={{
-              ...btnBase,
-              border: `1px solid ${portraitOpen ? '#6B5A38' : '#2a2a2a'}`,
-              color: portraitOpen ? '#c9a96e' : '#555',
-              fontSize: '0.7rem'
-            }}
+            style={{ ...portraitOpen ? btnPrimary : btnSecondary, fontSize: '0.68rem' }}
           >
             FILM PORTRAIT
           </button>
         </div>
       </nav>
-
-
 
       {/* BODY */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -715,96 +417,90 @@ export default function FilmStudio() {
         {/* CONVERSATION */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
-            <div style={{
-              maxWidth: '640px', margin: '0 auto',
-              display: 'flex', flexDirection: 'column', gap: '2.5rem'
-            }}>
+            <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
               {messages.map((msg, i) => (
                 <div key={i}>
                   {msg.role === 'assistant' ? (
-                    <p style={{ fontSize: '1.15rem', lineHeight: '1.85', color: '#e8e0d0', fontWeight: 300 }}>
+                    <p style={{ fontSize: '1.15rem', lineHeight: '1.9', color: text, fontWeight: 300 }}>
                       {msg.content}
                     </p>
                   ) : (
-                    <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid #1a1a1a' }}>
-                      <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#666' }}>
+                    <div style={{ paddingLeft: '1.5rem', borderLeft: `1px solid ${border}` }}>
+                      <p style={{ fontSize: '0.9rem', lineHeight: '1.75', color: '#5a5a5a' }}>
                         {msg.content}
                       </p>
                     </div>
                   )}
                 </div>
               ))}
+
+              {/* THINKING — animated dots */}
               {thinking && (
-                <p style={{ color: '#333', fontSize: '0.9rem', fontStyle: 'italic' }}>...</p>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingTop: '0.25rem' }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{
+                      width: '5px', height: '5px', borderRadius: '50%',
+                      backgroundColor: goldDim, display: 'inline-block',
+                      animation: 'matineePulse 1.4s ease-in-out infinite',
+                      animationDelay: `${i * 0.2}s`
+                    }} />
+                  ))}
+                </div>
               )}
+
               <div ref={bottomRef} />
             </div>
           </div>
 
           {/* INPUT */}
-          <div style={{ borderTop: '1px solid #1a1a1a', padding: '1.25rem 3rem 1.5rem', flexShrink: 0 }}>
-            <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ borderTop: `1px solid ${border}`, padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
+            <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <input
                 ref={inputRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendMessage()}
                 placeholder="Speak..."
-                style={{
-                  flex: 1, background: 'transparent', border: 'none',
-                  color: '#e8e0d0', fontSize: '0.95rem', outline: 'none',
-                  fontFamily: 'Georgia, serif'
-                }}
+                style={{ flex: 1, background: 'transparent', border: 'none', color: text, fontSize: '0.95rem', outline: 'none', fontFamily: serif }}
               />
-              <span onClick={() => sendMessage()} style={{ color: '#444', cursor: 'pointer', fontSize: '1.1rem' }}>→</span>
+              <span
+                onClick={() => sendMessage()}
+                style={{ color: input.trim() ? gold : textFaint, cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
+              >
+                →
+              </span>
             </div>
           </div>
         </div>
 
         {/* FILM PORTRAIT PANEL */}
         <div style={{
-          width: portraitOpen ? '380px' : '0px',
-          overflow: 'hidden',
-          transition: 'width 0.35s ease',
-          borderLeft: portraitOpen ? '1px solid #1a1a1a' : 'none',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column'
+          width: portraitOpen ? '360px' : '0px', overflow: 'hidden',
+          transition: 'width 0.3s ease', borderLeft: portraitOpen ? `1px solid ${border}` : 'none',
+          flexShrink: 0, display: 'flex', flexDirection: 'column'
         }}>
           {portraitOpen && (
-            <div style={{ width: '380px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ width: '360px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
               {/* PORTRAIT HEADER */}
-              <div style={{ padding: '1.25rem 1.75rem 1rem', borderBottom: '1px solid #141414', flexShrink: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                  <span style={{ fontSize: '0.62rem', letterSpacing: '0.2em', color: '#3a3a3a', textTransform: 'uppercase' }}>
+              <div style={{ padding: '1.25rem 1.75rem 1rem', borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '0.6rem', letterSpacing: '0.2em', color: goldDim, textTransform: 'uppercase' }}>
                     Film Portrait
                   </span>
-                  <button
-                    onClick={refreshPortrait}
-                    disabled={portraitLoading}
-                    style={{
-                      ...btnBase,
-                      border: '1px solid #2a2a2a',
-                      color: portraitLoading ? '#333' : '#555',
-                      cursor: portraitLoading ? 'default' : 'pointer'
-                    }}
-                  >
-                    {portraitLoading ? 'Updating...' : 'Update Portrait'}
-                  </button>
                 </div>
                 {portraitRefreshedAt && (
-                  <p style={{ fontSize: '0.62rem', color: '#2e2e2e', letterSpacing: '0.04em' }}>
+                  <p style={{ fontSize: '0.6rem', color: textFaint, letterSpacing: '0.03em' }}>
                     Last updated {formatDate(portraitRefreshedAt)}
                   </p>
                 )}
               </div>
 
               {/* PORTRAIT FIELDS */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1.25rem 2rem 1.75rem' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1.5rem 2rem 1.75rem' }}>
                 {!filmMemory ? (
-                  <p style={{ color: '#2e2e2e', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: 1.7 }}>
-                    The portrait is still taking shape. Keep the conversation going — then update the portrait to see what has been found.
+                  <p style={{ color: textFaint, fontSize: '0.85rem', fontStyle: 'italic', lineHeight: 1.7 }}>
+                    The portrait is still taking shape. Keep the conversation going and it will fill in.
                   </p>
                 ) : (
                   FIELDS.map((field, idx) => {
@@ -815,22 +511,15 @@ export default function FilmStudio() {
                     return (
                       <div key={field.key}>
                         <div style={{ marginBottom: '1.75rem' }}>
-                          <p style={{
-                            fontSize: '0.6rem', letterSpacing: '0.18em',
-                            color: '#6B5A38', textTransform: 'uppercase', marginBottom: '0.65rem'
-                          }}>
+                          <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: goldDim, textTransform: 'uppercase', marginBottom: '0.6rem' }}>
                             {field.label}
                           </p>
 
                           {isEmpty ? (
-                            <div style={{ border: '1px solid #161616', borderRadius: '2px', padding: '0.9rem 1rem' }}>
-                              <p style={{
-                                fontSize: '0.875rem', lineHeight: 1.7,
-                                color: '#383838', fontStyle: 'italic', marginBottom: '0.85rem'
-                              }}>
+                            <div style={{ borderLeft: `1px solid ${border}`, paddingLeft: '0.75rem' }}>
+                              <p style={{ fontSize: '0.82rem', lineHeight: 1.7, color: textFaint, fontStyle: 'italic', marginBottom: '0.75rem' }}>
                                 {field.question}
                               </p>
-
                               {isEditing ? (
                                 <div>
                                   <textarea
@@ -838,57 +527,41 @@ export default function FilmStudio() {
                                     onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
                                     placeholder="Write here..."
                                     style={{
-                                      width: '100%', background: '#0d0d0d',
-                                      border: '1px solid #2a2a2a', color: '#e8e0d0',
-                                      fontFamily: 'Georgia, serif', fontSize: '0.85rem',
-                                      lineHeight: 1.6, padding: '0.6rem 0.75rem',
-                                      resize: 'vertical', minHeight: '80px',
-                                      outline: 'none', borderRadius: '2px',
-                                      marginBottom: '0.6rem', boxSizing: 'border-box'
+                                      width: '100%', background: 'transparent',
+                                      border: 'none', borderBottom: `1px solid ${borderMid}`,
+                                      color: text, fontFamily: serif, fontSize: '0.82rem',
+                                      lineHeight: 1.6, padding: '0.4rem 0',
+                                      resize: 'vertical', minHeight: '70px',
+                                      outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
                                     }}
                                   />
                                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button
-                                      onClick={saveDirectEdit}
-                                      disabled={directEdit.saving}
-                                      style={{ ...btnBase, border: '1px solid #6B5A38', color: '#c9a96e' }}
-                                    >
+                                    <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
                                       {directEdit.saving ? 'Saving...' : 'Save'}
                                     </button>
-                                    <button
-                                      onClick={() => setDirectEdit({ field: null, value: '', saving: false })}
-                                      style={{ ...btnBase, border: '1px solid #2a2a2a', color: '#555' }}
-                                    >
-                                      Cancel
-                                    </button>
+                                    <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
                                   </div>
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                  <button
-                                    onClick={() => exploreWithMatinee(field.prompt)}
-                                    style={{ ...btnBase, border: '1px solid #6B5A38', color: '#c9a96e' }}
-                                  >
+                                  <button onClick={() => exploreWithMatinee(field.prompt)} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
                                     Explore with Matinee
                                   </button>
-                                  <button
-                                    onClick={() => openDirectEdit(field.key)}
-                                    style={{ ...btnBase, border: '1px solid #2a2a2a', color: '#555' }}
-                                  >
+                                  <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>
                                     Write directly
                                   </button>
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <p style={{ fontSize: '0.9rem', lineHeight: 1.8, color: '#b8af9f', whiteSpace: 'pre-wrap' }}>
+                            <p style={{ fontSize: '0.875rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
                               {renderFieldValue(field.key, value)}
                             </p>
                           )}
                         </div>
 
                         {idx < FIELDS.length - 1 && (
-                          <div style={{ height: '1px', background: '#111', marginBottom: '1.75rem' }} />
+                          <div style={{ height: '1px', background: border, marginBottom: '1.75rem' }} />
                         )}
                       </div>
                     )
@@ -899,6 +572,14 @@ export default function FilmStudio() {
           )}
         </div>
       </div>
+
+      {/* PULSE ANIMATION */}
+      <style>{`
+        @keyframes matineePulse {
+          0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+          40% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </main>
   )
 }
