@@ -470,83 +470,129 @@ export default function FilmStudio() {
 
           {/* CHOICE */}
           {entryMode === 'choice' && (
-            <>
-              <p style={{
-                fontSize: '1.4rem', lineHeight: 1.75, color: '#e8e0d0',
-                textAlign: 'center', marginBottom: '3.5rem', fontWeight: 300
-              }}>
-                Where are you in this film's journey?
-              </p>
+  <div style={{ width: '100%', maxWidth: '560px' }}>
+    <p style={{
+      fontSize: '1.5rem', lineHeight: 1.75, color: '#e8e0d0',
+      textAlign: 'center', marginBottom: '0.75rem', fontWeight: 300
+    }}>
+      Where are you in this film's journey?
+    </p>
+    <p style={{
+      fontSize: '0.8rem', color: '#444', textAlign: 'center',
+      marginBottom: '3.5rem', letterSpacing: '0.04em', lineHeight: 1.6
+    }}>
+      How you arrive shapes how we begin.
+    </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
-                <button
-                  onClick={beginFromConversation}
-                  style={{
-                    ...btnBase,
-                    border: '1px solid #2a2a2a', color: '#888',
-                    padding: '1.1rem 2rem', fontSize: '0.8rem',
-                    textAlign: 'left', letterSpacing: '0.05em', width: '100%'
-                  }}
-                >
-                  I have an idea. Let's find the film together.
-                </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+      <button
+        onClick={beginFromConversation}
+        style={{
+          background: 'none',
+          border: '1px solid #3a3a3a',
+          color: '#e8e0d0',
+          padding: '1.5rem 2rem',
+          fontSize: '0.9rem',
+          textAlign: 'left',
+          letterSpacing: '0.03em',
+          cursor: 'pointer',
+          fontFamily: 'Georgia, serif',
+          borderRadius: '2px',
+          lineHeight: 1.6,
+          transition: 'border-color 0.2s, background 0.2s'
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = '#555'
+          ;(e.currentTarget as HTMLElement).style.background = '#0f0f0f'
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = '#3a3a3a'
+          ;(e.currentTarget as HTMLElement).style.background = 'none'
+        }}
+      >
+        <div style={{ fontSize: '0.95rem', marginBottom: '0.4rem' }}>
+          I have an idea.
+        </div>
+        <div style={{ fontSize: '0.75rem', color: '#555', letterSpacing: '0.04em' }}>
+          Let's find the film together through conversation.
+        </div>
+      </button>
 
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    ...btnBase,
-                    border: '1px solid #6B5A38', color: '#c9a96e',
-                    padding: '1.1rem 2rem', fontSize: '0.8rem',
-                    textAlign: 'left', letterSpacing: '0.05em', width: '100%'
-                  }}
-                >
-                  I have a script. Let Matinee read it first.
-                </button>
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          background: 'none',
+          border: '1px solid #6B5A38',
+          color: '#c9a96e',
+          padding: '1.5rem 2rem',
+          fontSize: '0.9rem',
+          textAlign: 'left',
+          letterSpacing: '0.03em',
+          cursor: 'pointer',
+          fontFamily: 'Georgia, serif',
+          borderRadius: '2px',
+          lineHeight: 1.6,
+          transition: 'border-color 0.2s, background 0.2s'
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = '#c9a96e'
+          ;(e.currentTarget as HTMLElement).style.background = '#0f0d09'
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = '#6B5A38'
+          ;(e.currentTarget as HTMLElement).style.background = 'none'
+        }}
+      >
+        <div style={{ fontSize: '0.95rem', marginBottom: '0.4rem' }}>
+          I have a script.
+        </div>
+        <div style={{ fontSize: '0.75rem', color: '#6B5A38', letterSpacing: '0.04em' }}>
+          Let Matinee read it first. PDF or Word document.
+        </div>
+      </button>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files?.[0]
-                    if (file) handleScriptUpload(file)
-                  }}
-                />
-              </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx"
+        style={{ display: 'none' }}
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) handleScriptUpload(file)
+        }}
+      />
+    </div>
 
-              {uploadError && (
-                <p style={{
-                  marginTop: '1.5rem', fontSize: '0.8rem',
-                  color: '#6B3333', fontStyle: 'italic', textAlign: 'center'
-                }}>
-                  {uploadError}
-                </p>
-              )}
+    {uploadError && (
+      <p style={{
+        marginTop: '1.5rem', fontSize: '0.8rem',
+        color: '#6B3333', fontStyle: 'italic', textAlign: 'center'
+      }}>
+        {uploadError}
+      </p>
+    )}
 
-              <p style={{
-                marginTop: '2rem', fontSize: '0.72rem',
-                color: '#2e2e2e', letterSpacing: '0.04em', textAlign: 'center'
-              }}>
-                PDF or Word document · Your script is never stored
-              </p>
-            </>
-          )}
-
-          {/* UPLOADING */}
-          {entryMode === 'uploading' && (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{
-                fontSize: '1.1rem', color: '#555',
-                fontStyle: 'italic', lineHeight: 1.7, marginBottom: '0.75rem'
-              }}>
-                Reading your script...
-              </p>
-              <p style={{ fontSize: '0.75rem', color: '#2e2e2e', letterSpacing: '0.06em' }}>
-                Building the Film Memory. This takes a moment.
-              </p>
-            </div>
-          )}
+    <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
+      <span
+        onClick={async () => {
+          await supabase.from('messages').delete().eq('film_id', filmId)
+          await supabase.from('film_memory').delete().eq('film_id', filmId)
+          await supabase.from('films').delete().eq('id', filmId)
+          router.push('/studio')
+        }}
+        style={{
+          fontSize: '0.72rem', color: '#2e2e2e',
+          letterSpacing: '0.08em', cursor: 'pointer',
+          textTransform: 'uppercase', transition: 'color 0.2s'
+        }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#555'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2e2e2e'}
+      >
+        Cancel — return to the Studio
+      </span>
+    </div>
+  </div>
+)}
 
           {/* SOUL DISPLAY */}
           {entryMode === 'soul' && scriptSoul && (
