@@ -95,6 +95,21 @@ function renderFieldValue(key: string, value: any): string {
     }
     return JSON.stringify(value, null, 2)
   }
+  if (key === 'filmmakers_words') {
+    let phrases: string[] = []
+    if (Array.isArray(value)) {
+      phrases = value
+    } else if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        if (Array.isArray(parsed)) phrases = parsed
+        else phrases = [value]
+      } catch {
+        phrases = [value]
+      }
+    }
+    return phrases.map(p => `"${p}"`).join('\n\n')
+  }
   return String(value)
 }
 
@@ -231,23 +246,37 @@ export default function FilmStudio() {
         return
       }
 
-      const openingText = `I've spent time with your script.\n\nThe Film Memory is built. I know your story, your characters, the decisions already made, and what still needs to be found.\n\nBefore we go anywhere — what made you say yes to this one?`
-      const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
-      await supabase.from('messages').insert(matineeMessage)
+      const { data: freshMemory } = await supabase
+      .from('film_memory').select('*').eq('film_id', filmId).single()
 
-      if (wasInConversation) {
-        // Stay in conversation, append Matinee's message
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: openingText }])
-        setThinking(false)
-      } else {
-        // Show soul screen first, then enter conversation
-        setScriptSoul(data.emotional_core)
-        setEntryMode('soul')
-        setTimeout(async () => {
-          setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
-          setEntryMode('conversation')
-        }, 3000)
-      }
+    const openingResponse = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filmId,
+        messages: [],
+        filmMemory: freshMemory,
+        sessionType: 'RETURNING',
+        filmTitle: film?.title
+      })
+    })
+    const openingData = await openingResponse.json()
+    const openingText = openingData.content
+
+    const matineeMessage = { role: 'assistant', content: openingText, film_id: filmId }
+    await supabase.from('messages').insert(matineeMessage)
+
+    if (wasInConversation) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: openingText }])
+      setThinking(false)
+    } else {
+      setScriptSoul(data.emotional_core)
+      setEntryMode('soul')
+      setTimeout(async () => {
+        setMessages([{ id: 'opening', role: 'assistant', content: openingText }])
+        setEntryMode('conversation')
+      }, 3000)
+    }
 
     } catch {
       setUploadError("The script couldn't be read. Try again — it's worth it.")
