@@ -102,8 +102,17 @@ function mergeMemory(existing: any, extracted: any): any {
   const ew = (existing?.filmmakers_words || '') as string
   const nw = (extracted?.filmmakers_words || '') as string
   if (!ew) merged.filmmakers_words = nw
-  else if (!nw || nw === ew) merged.filmmakers_words = ew
-  else merged.filmmakers_words = ew + '\n\n' + nw
+  else if (!nw) merged.filmmakers_words = ew
+  else {
+    const existingPhrases = ew.split('|').map(p => p.trim()).filter(Boolean)
+    const newPhrases = nw.split('|').map(p => p.trim()).filter(Boolean)
+    for (const phrase of newPhrases) {
+      if (!existingPhrases.some(p => p.toLowerCase().includes(phrase.toLowerCase()) || phrase.toLowerCase().includes(p.toLowerCase()))) {
+        existingPhrases.push(phrase)
+      }
+    }
+    merged.filmmakers_words = existingPhrases.join(' | ')
+  }
 
   return merged
 }
