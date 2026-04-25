@@ -86,6 +86,28 @@ function formatDate(ts: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
+function mergeMemory(existing: any, extracted: any): any {
+  const merged: any = {}
+
+  for (const field of ['emotional_core', 'decisions_made', 'unresolved_threads']) {
+    const e = (existing?.[field] || '') as string
+    const n = (extracted?.[field] || '') as string
+    merged[field] = n.length > e.length ? n : (e || n)
+  }
+
+  const ec = existing?.characters || []
+  const nc = extracted?.characters || []
+  merged.characters = JSON.stringify(nc).length > JSON.stringify(ec).length ? nc : ec
+
+  const ew = (existing?.filmmakers_words || '') as string
+  const nw = (extracted?.filmmakers_words || '') as string
+  if (!ew) merged.filmmakers_words = nw
+  else if (!nw || nw === ew) merged.filmmakers_words = ew
+  else merged.filmmakers_words = ew + '\n\n' + nw
+
+  return merged
+}
+
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function FilmStudio() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -228,10 +250,9 @@ export default function FilmStudio() {
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content }])
 
     if (data.memory) {
-      const { data: existing } = await supabase.from('film_memory').select('id').eq('film_id', filmId).single()
-      if (existing) await supabase.from('film_memory').update({ ...data.memory, updated_at: new Date().toISOString() }).eq('film_id', filmId)
-      else await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId })
-      // Auto-refresh portrait if open
+      const merged = mergeMemory(memoryData, data.memory)
+      if (memoryData) await supabase.from('film_memory').update({ ...merged, updated_at: new Date().toISOString() }).eq('film_id', filmId)
+      else await supabase.from('film_memory').insert({ ...merged, film_id: filmId })
       if (portraitOpen) await refreshPortrait()
     }
 

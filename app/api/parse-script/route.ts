@@ -8,6 +8,28 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function mergeMemory(existing: any, extracted: any): any {
+  const merged: any = {}
+
+  for (const field of ['emotional_core', 'decisions_made', 'unresolved_threads']) {
+    const e = (existing?.[field] || '') as string
+    const n = (extracted?.[field] || '') as string
+    merged[field] = n.length > e.length ? n : (e || n)
+  }
+
+  const ec = existing?.characters || []
+  const nc = extracted?.characters || []
+  merged.characters = JSON.stringify(nc).length > JSON.stringify(ec).length ? nc : ec
+
+  const ew = (existing?.filmmakers_words || '') as string
+  const nw = (extracted?.filmmakers_words || '') as string
+  if (!ew) merged.filmmakers_words = nw
+  else if (!nw || nw === ew) merged.filmmakers_words = ew
+  else merged.filmmakers_words = ew + '\n\n' + nw
+
+  return merged
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -28,6 +50,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const { data: existingMemory } = await supabaseAdmin
+      .from('film_memory').select('*').eq('film_id', filmId).single()
+
+    const existingMemoryBlock = existingMemory
+      ? `WHAT YOU ALREADY KNOW ABOUT THIS FILM:
+- Emotional core: ${existingMemory.emotional_core || 'Nothing yet'}
+- Characters: ${existingMemory.characters ? JSON.stringify(existingMemory.characters) : 'Not yet discovered'}
+- Decisions made: ${existingMemory.decisions_made || 'None yet'}
+- The filmmaker's own words: ${existingMemory.filmmakers_words || 'None captured yet'}
+- What is still unresolved: ${existingMemory.unresolved_threads || 'Everything is open'}
+
+`
+      : ''
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
@@ -62,6 +98,8 @@ export async function POST(request: NextRequest) {
                 {
                   type: 'text',
                   text: `You are reading a film script to extract its creative essence for a filmmaker's companion. Study it carefully. Return ONLY valid JSON with no preamble, no explanation, no markdown fences, no backticks.
+
+${existingMemoryBlock}Now read the script. For each field, synthesise what the script reveals with what you already know. Never discard existing content. If the script adds depth or specificity, incorporate it. If a field already holds richer content than the script reveals, carry forward the existing content. For filmmakers_words: add powerful phrases from the script to any existing ones — never remove, only accumulate. Never replace a richer value with a thinner one.
 
 {
   "emotional_core": "The emotional heart of this film — what it is trying to make the audience feel. Not the plot. The feeling it wants to leave behind. 2-3 sentences.",
@@ -104,6 +142,8 @@ export async function POST(request: NextRequest) {
               role: 'user',
               content: `You are reading a film script to extract its creative essence. Return ONLY valid JSON, no preamble, no backticks.
 
+${existingMemoryBlock}Now read the script. For each field, synthesise what the script reveals with what you already know. Never discard existing content. If the script adds depth or specificity, incorporate it. If a field already holds richer content than the script reveals, carry forward the existing content. For filmmakers_words: add powerful phrases from the script to any existing ones — never remove, only accumulate. Never replace a richer value with a thinner one.
+
 {
   "emotional_core": "The emotional heart of this film. 2-3 sentences.",
   "characters": [{"name": "name", "description": "emotional truth of this character"}],
@@ -136,19 +176,10 @@ ${docText}`
       return NextResponse.json({ error: 'Something went wrong reading your script. Try again.' }, { status: 500 })
     }
 
-    const memoryPayload = {
-      emotional_core: extracted.emotional_core || '',
-      characters: extracted.characters || [],
-      decisions_made: extracted.decisions_made || '',
-      filmmakers_words: extracted.filmmakers_words || '',
-      unresolved_threads: extracted.unresolved_threads || '',
-      updated_at: new Date().toISOString()
-    }
+    const merged = mergeMemory(existingMemory, extracted)
+    const memoryPayload = { ...merged, updated_at: new Date().toISOString() }
 
-    const { data: existing } = await supabaseAdmin
-      .from('film_memory').select('id').eq('film_id', filmId).single()
-
-    if (existing) {
+    if (existingMemory) {
       await supabaseAdmin.from('film_memory').update(memoryPayload).eq('film_id', filmId)
     } else {
       await supabaseAdmin.from('film_memory').insert({ ...memoryPayload, film_id: filmId })
