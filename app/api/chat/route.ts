@@ -51,7 +51,7 @@ After every exchange, return a JSON memory update. This is invisible to the film
 - Read what already exists in the Film Memory above. Carry it forward unless this exchange meaningfully deepens or changes it.
 - If this exchange adds depth, specificity, or new truth to a field, incorporate it with the existing content. Never discard existing content.
 - If a field was not touched in this exchange, return it exactly as it appears in the Film Memory above — unchanged.
-- For filmmakers_words: add any new exact phrases the filmmaker used in this exchange. Never remove existing phrases. Only ever accumulate.
+- For filmmakers_words: extract only genuinely distinctive phrases the filmmaker used in THIS exchange — sentences or fragments that carry creative weight, reveal emotional truth, or name something specific about the film. Return them as a pipe-separated list: phrase one | phrase two | phrase three. Do not repeat phrases already in the existing filmmakers_words above. If no new distinctive phrases were spoken in this exchange, return the existing filmmakers_words value unchanged.
 - Never replace a richer, more specific value with a thinner, more generic one.
 - Never invent or assume content that was not genuinely present in this exchange.
 
