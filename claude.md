@@ -47,22 +47,34 @@ Five fields extracted silently after every conversation exchange:
 
 ## Current Build State
 Phase 1 complete and live. Phase 2 in progress.
-Current task: Story 1.1 — Film Memory Loop.
 
-## Story 1.1 — Film Memory Loop (CURRENT TASK)
-Goal: Every exchange in every context feeds Film Memory continuously.
-Extraction must READ existing Film Memory before WRITING new content.
-New content synthesises with existing content — never appends blindly on top.
-One unified extraction function — not two separate paths for script vs conversation.
+| Story | Name                           | Status                              |
+|-------|--------------------------------|-------------------------------------|
+| 1.1   | Film Memory Loop               | COMPLETE — deployed Apr 26          |
+| 1.2   | 14-Field Film Portrait Schema  | COMPLETE — deployed Apr 30          |
+| 2.1   | Field-Aware Extraction Prompts | NEXT — start here                   |
 
-Before writing any code, answer these four questions:
-1. Where in the codebase does film_memory get written to Supabase?
-   Find every location. There should be at most two.
-2. What does the extraction prompt currently say?
-   Does it include existing Film Memory content before generating new content?
-3. Are script upload extraction and conversation extraction the same function
-   or separate code paths?
-4. When extraction writes to Supabase — does it merge field by field
-   or overwrite the entire film_memory record?
+## Film Portrait Schema
+14 portrait columns on the film_memory table, all JSONB, all nullable.
+Each holds a PortraitField object: { value, created_by, created_in_mode, updated_at }.
+Exception: portrait_unresolved_questions holds a PortraitUnresolvedField
+where value is an array of { question, category, added_at }.
 
-Paste the answers before writing any code.
+Column names:
+- portrait_logline
+- portrait_emotional_core
+- portrait_story
+- portrait_world
+- portrait_subjects
+- portrait_themes
+- portrait_approach
+- portrait_tone
+- portrait_visual_world
+- portrait_audience
+- portrait_directors_intent
+- portrait_unresolved_questions
+- portrait_comparable_films
+- portrait_target_length
+
+Migration file: migrations/001_film_portrait_schema.sql
+TypeScript types: PortraitField, PortraitUnresolvedField, UnresolvedQuestion — defined in app/studio/[id]/page.tsx
