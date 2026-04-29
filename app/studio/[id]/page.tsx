@@ -5,10 +5,50 @@ import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
 type Message = { id: string; role: string; content: string }
+type PortraitField = {
+  value: string
+  created_by: string
+  created_in_mode: string
+  updated_at: string
+}
+
+type UnresolvedQuestion = {
+  question: string
+  category: 'Historical' | 'Narrative' | 'Strategic'
+  added_at: string
+}
+
+type PortraitUnresolvedField = {
+  value: UnresolvedQuestion[]
+  created_by: string
+  created_in_mode: string
+  updated_at: string
+}
+
 type FilmMemory = {
-  id?: string; film_id?: string; emotional_core?: string; characters?: any
-  decisions_made?: string; filmmakers_words?: string; unresolved_threads?: string
-  raw_memory?: string; updated_at?: string
+  id?: string
+  film_id?: string
+  emotional_core?: string
+  characters?: any
+  decisions_made?: string
+  filmmakers_words?: string
+  unresolved_threads?: string
+  raw_memory?: string
+  updated_at?: string
+  portrait_logline?:              PortraitField | null
+  portrait_emotional_core?:       PortraitField | null
+  portrait_story?:                PortraitField | null
+  portrait_world?:                PortraitField | null
+  portrait_subjects?:             PortraitField | null
+  portrait_themes?:               PortraitField | null
+  portrait_approach?:             PortraitField | null
+  portrait_tone?:                 PortraitField | null
+  portrait_visual_world?:         PortraitField | null
+  portrait_audience?:             PortraitField | null
+  portrait_directors_intent?:     PortraitField | null
+  portrait_unresolved_questions?: PortraitUnresolvedField | null
+  portrait_comparable_films?:     PortraitField | null
+  portrait_target_length?:        PortraitField | null
 }
 type DirectEditState = { field: string | null; value: string; saving: boolean }
 type EntryMode = 'choice' | 'uploading' | 'soul' | 'conversation'
