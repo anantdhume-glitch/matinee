@@ -126,35 +126,98 @@ function formatDate(ts: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-function mergeMemory(existing: any, extracted: any): any {
-  const merged: any = {}
+function mergeFilmakersWords(nw?: string, ew?: string): string {
+  if (!ew) return nw ?? ''
+  if (!nw) return ew
+  const existingPhrases = ew.split('|').map(p => p.trim()).filter(Boolean)
+  const newPhrases = nw.split('|').map(p => p.trim()).filter(Boolean)
+  for (const phrase of newPhrases) {
+    if (!existingPhrases.some(p => p.toLowerCase().includes(phrase.toLowerCase()) || phrase.toLowerCase().includes(p.toLowerCase()))) {
+      existingPhrases.push(phrase)
+    }
+  }
+  return existingPhrases.join(' | ')
+}
 
-  for (const field of ['emotional_core', 'decisions_made', 'unresolved_threads']) {
-    const e = (existing?.[field] || '') as string
-    const n = (extracted?.[field] || '') as string
-    merged[field] = n.length > e.length ? n : (e || n)
+async function mergeMemory(
+  extracted: any,
+  portrait: any,
+  existing: FilmMemory,
+  filmId: string,
+  supabase: any
+) {
+  const longer = (a?: string, b?: string) =>
+    (a?.length ?? 0) >= (b?.length ?? 0) ? a : b
+
+  const mergedMemory = {
+    emotional_core:     longer(extracted?.emotional_core,     existing?.emotional_core),
+    decisions_made:     longer(extracted?.decisions_made,     existing?.decisions_made),
+    unresolved_threads: longer(extracted?.unresolved_threads, existing?.unresolved_threads),
+    characters: (JSON.stringify(extracted?.characters)?.length ?? 0) >=
+                (JSON.stringify(existing?.characters)?.length ?? 0)
+                ? extracted?.characters : existing?.characters,
+    filmmakers_words: mergeFilmakersWords(extracted?.filmmakers_words, existing?.filmmakers_words),
+    updated_at: new Date().toISOString(),
   }
 
-  const ec = existing?.characters || []
-  const nc = extracted?.characters || []
-  merged.characters = JSON.stringify(nc).length > JSON.stringify(ec).length ? nc : ec
+  const portraitUpdates: Record<string, any> = {}
+  const now = new Date().toISOString()
 
-  const ew = (existing?.filmmakers_words || '') as string
-  const nw = (extracted?.filmmakers_words || '') as string
-  if (!ew) merged.filmmakers_words = nw
-  else if (!nw) merged.filmmakers_words = ew
-  else {
-    const existingPhrases = ew.split('|').map(p => p.trim()).filter(Boolean)
-    const newPhrases = nw.split('|').map(p => p.trim()).filter(Boolean)
-    for (const phrase of newPhrases) {
-      if (!existingPhrases.some(p => p.toLowerCase().includes(phrase.toLowerCase()) || phrase.toLowerCase().includes(p.toLowerCase()))) {
-        existingPhrases.push(phrase)
+  const PORTRAIT_TEXT_FIELDS = [
+    'portrait_logline',
+    'portrait_emotional_core',
+    'portrait_story',
+    'portrait_world',
+    'portrait_subjects',
+    'portrait_themes',
+    'portrait_approach',
+    'portrait_tone',
+    'portrait_visual_world',
+    'portrait_audience',
+    'portrait_comparable_films',
+    'portrait_target_length',
+  ]
+
+  for (const field of PORTRAIT_TEXT_FIELDS) {
+    const extracted_value = portrait?.[field]
+    if (!extracted_value) continue
+
+    const existing_field = (existing as any)?.[field]
+
+    if (!existing_field) {
+      portraitUpdates[field] = {
+        value: extracted_value,
+        created_by: 'studio',
+        created_in_mode: 'discovery',
+        updated_at: now,
+      }
+    } else {
+      const existing_value = existing_field?.value ?? ''
+      if (extracted_value.length > existing_value.length) {
+        portraitUpdates[field] = {
+          value: extracted_value,
+          created_by: 'studio',
+          created_in_mode: 'discovery',
+          updated_at: now,
+        }
       }
     }
-    merged.filmmakers_words = existingPhrases.join(' | ')
   }
 
-  return merged
+  const extracted_questions = portrait?.portrait_unresolved_questions
+  if (extracted_questions && Array.isArray(extracted_questions) && extracted_questions.length > 0) {
+    portraitUpdates['portrait_unresolved_questions'] = {
+      value: extracted_questions,
+      created_by: 'studio',
+      created_in_mode: 'discovery',
+      updated_at: now,
+    }
+  }
+
+  await supabase
+    .from('film_memory')
+    .update({ ...mergedMemory, ...portraitUpdates })
+    .eq('film_id', filmId)
 }
 
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
@@ -299,9 +362,11 @@ export default function FilmStudio() {
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content }])
 
     if (data.memory) {
-      const merged = mergeMemory(memoryData, data.memory)
-      if (memoryData) await supabase.from('film_memory').update({ ...merged, updated_at: new Date().toISOString() }).eq('film_id', filmId)
-      else await supabase.from('film_memory').insert({ ...merged, film_id: filmId })
+      if (memoryData) {
+        await mergeMemory(data.memory, data.portrait ?? {}, memoryData, filmId, supabase)
+      } else {
+        await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId, updated_at: new Date().toISOString() })
+      }
       if (portraitOpen) await refreshPortrait()
     }
 
