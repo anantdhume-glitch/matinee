@@ -83,7 +83,7 @@ const btnSmall: React.CSSProperties = {
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const EMPTY_PHRASES = ['none yet', 'none', 'not yet', 'n/a', 'tbd', 'unknown', 'nothing yet']
 
-const FIELDS: Array<{ key: keyof FilmMemory; label: string; question: string; prompt: string }> = [
+const LEGACY_FIELDS: Array<{ key: keyof FilmMemory; label: string; question: string; prompt: string }> = [
   { key: 'emotional_core', label: 'What the film is becoming', question: 'What is the film trying to leave behind in the people who see it? Not the story — the feeling.', prompt: "I want to think about what my film is really trying to say — the feeling it wants to leave behind." },
   { key: 'characters', label: 'Who the characters are becoming', question: 'Who is this film about? Not the subject — the person we follow.', prompt: "I want to find who the characters of my film really are — not their descriptions, but who they actually are." },
   { key: 'decisions_made', label: 'The decisions made', question: 'What has this film chosen to be — and what did it set aside to get there?', prompt: "Let's talk about the decisions I've made for this film — what I've chosen and what I've left behind." },
@@ -91,9 +91,40 @@ const FIELDS: Array<{ key: keyof FilmMemory; label: string; question: string; pr
   { key: 'unresolved_threads', label: 'What is still unresolved', question: "What part of the film keeps you up at night — the thing you haven't found yet?", prompt: "I want to talk about what's still unresolved in my film — the thread I haven't pulled yet." }
 ]
 
+const PORTRAIT_FIELDS: Array<{
+  key: keyof FilmMemory;
+  label: string;
+  question: string;
+  special?: 'directors_intent' | 'unresolved_questions';
+}> = [
+  { key: 'portrait_logline', label: 'The Logline', question: 'What is this film, in one sentence?' },
+  { key: 'portrait_emotional_core', label: 'The Emotional Core', question: "What does this film do to an audience — not what it's about, but what it makes them feel?" },
+  { key: 'portrait_story', label: 'The Story', question: 'Where does it begin, where does it turn, and where does it end?' },
+  { key: 'portrait_world', label: 'The World', question: 'Where does this film live — physically, atmospherically, historically?' },
+  { key: 'portrait_subjects', label: 'The Subjects', question: 'Who are the people at the centre of this film, and why do they matter?' },
+  { key: 'portrait_themes', label: 'The Themes', question: 'What does this film argue — beneath the story, beneath the subject?' },
+  { key: 'portrait_approach', label: 'The Approach', question: 'How are you telling this — observation, testimony, reconstruction, something else?' },
+  { key: 'portrait_tone', label: 'The Tone', question: 'What is the emotional temperature of this film?' },
+  { key: 'portrait_visual_world', label: 'The Visual World', question: 'What does this film look like — light, palette, camera relationship?' },
+  { key: 'portrait_audience', label: 'The Audience', question: 'Who is this for, and where will they watch it?' },
+  { key: 'portrait_directors_intent', label: "The Director's Intent", question: 'In your own words — what are you trying to make, and why does it matter to you?', special: 'directors_intent' },
+  { key: 'portrait_unresolved_questions', label: 'Unresolved Questions', question: 'No open questions yet. They will surface as the film develops.', special: 'unresolved_questions' },
+  { key: 'portrait_comparable_films', label: 'Comparable Films', question: 'Which films — in tone, approach, or visual world — does this feel closest to?' },
+  { key: 'portrait_target_length', label: 'Target Length', question: 'How long should this film be?' },
+]
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function isFieldEmpty(value: any): boolean {
+function isFieldEmpty(value: unknown): boolean {
   if (!value) return true
+  // JSONB portrait field objects
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    const inner = (value as { value: unknown }).value
+    if (!inner) return true
+    if (typeof inner === 'string' && inner.trim() === '') return true
+    if (Array.isArray(inner) && inner.length === 0) return true
+    return false
+  }
+  // Legacy string handling
   if (typeof value === 'string') {
     const t = value.trim()
     if (t.length < 5) return true
@@ -101,6 +132,13 @@ function isFieldEmpty(value: any): boolean {
   }
   if (Array.isArray(value) && value.length === 0) return true
   return false
+}
+
+function getPortraitValue(raw: unknown): string | Array<{ question: string; category: string; added_at: string }> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const field = raw as { value?: unknown }
+  if (!field.value) return null
+  return field.value as string | Array<{ question: string; category: string; added_at: string }>
 }
 
 function renderFieldValue(key: string, value: any): string {
@@ -378,8 +416,17 @@ export default function FilmStudio() {
     setTimeout(() => inputRef.current?.focus(), 50)
   }
 
+  const isPortraitField = (field: string) => field.startsWith('portrait_')
+
   const openDirectEdit = (field: string) => {
-    const current = filmMemory ? renderFieldValue(field, (filmMemory as any)[field]) : ''
+    const raw = filmMemory ? (filmMemory as any)[field] : null
+    let current = ''
+    if (isPortraitField(field)) {
+      const v = getPortraitValue(raw)
+      current = typeof v === 'string' ? v : ''
+    } else {
+      current = filmMemory ? renderFieldValue(field, raw) : ''
+    }
     setDirectEdit({ field, value: current, saving: false })
   }
 
@@ -392,10 +439,28 @@ export default function FilmStudio() {
     const directEdits: any[] = rawMemory.direct_edits || []
     directEdits.push({ field: directEdit.field, edited_at: new Date().toISOString(), note: 'Added directly by the filmmaker.' })
     rawMemory.direct_edits = directEdits
-    const payload: any = { [directEdit.field]: directEdit.value, raw_memory: JSON.stringify(rawMemory), updated_at: new Date().toISOString() }
+
+    const now = new Date().toISOString()
+    let fieldValue: any
+    let optimisticValue: any
+
+    if (isPortraitField(directEdit.field)) {
+      fieldValue = {
+        value: directEdit.value,
+        created_by: 'filmmaker',
+        created_in_mode: 'direct',
+        updated_at: now,
+      }
+      optimisticValue = fieldValue
+    } else {
+      fieldValue = directEdit.value
+      optimisticValue = directEdit.value
+    }
+
+    const payload: any = { [directEdit.field]: fieldValue, raw_memory: JSON.stringify(rawMemory), updated_at: now }
     if (existing) await supabase.from('film_memory').update(payload).eq('film_id', filmId)
     else await supabase.from('film_memory').insert({ ...payload, film_id: filmId })
-    setFilmMemory(prev => prev ? { ...prev, [directEdit.field!]: directEdit.value } : null)
+    setFilmMemory(prev => prev ? { ...prev, [directEdit.field!]: optimisticValue } : null)
     setDirectEdit({ field: null, value: '', saving: false })
   }
 
@@ -638,9 +703,10 @@ export default function FilmStudio() {
                     The portrait is still taking shape. Keep the conversation going and it will fill in.
                   </p>
                 ) : (
-                  FIELDS.map((field, idx) => {
-                    const value = filmMemory[field.key]
-                    const isEmpty = isFieldEmpty(value)
+                  PORTRAIT_FIELDS.map((field, idx) => {
+                    const raw = filmMemory[field.key]
+                    const isEmpty = isFieldEmpty(raw)
+                    const value = getPortraitValue(raw)
                     const isEditing = directEdit.field === field.key
 
                     return (
@@ -652,50 +718,90 @@ export default function FilmStudio() {
 
                           {isEmpty ? (
                             <div style={{ borderLeft: `1px solid ${border}`, paddingLeft: '0.75rem' }}>
-                              <p style={{ fontSize: '0.82rem', lineHeight: 1.7, color: textFaint, fontStyle: 'italic', marginBottom: '0.75rem' }}>
+                              <p style={{ fontSize: '0.82rem', lineHeight: 1.7, color: textFaint, fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
                                 {field.question}
                               </p>
-                              {isEditing ? (
-                                <div>
-                                  <textarea
-                                    value={directEdit.value}
-                                    onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
-                                    placeholder="Write here..."
-                                    style={{
-                                      width: '100%', background: 'transparent',
-                                      border: 'none', borderBottom: `1px solid ${borderMid}`,
-                                      color: text, fontFamily: serif, fontSize: '0.82rem',
-                                      lineHeight: 1.6, padding: '0.4rem 0',
-                                      resize: 'vertical', minHeight: '70px',
-                                      outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
-                                    }}
-                                  />
-                                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
-                                      {directEdit.saving ? 'Saving...' : 'Save'}
-                                    </button>
-                                    <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                              {field.special === 'directors_intent' && (
+                                isEditing ? (
+                                  <div>
+                                    <textarea
+                                      value={directEdit.value}
+                                      onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
+                                      placeholder="Write here..."
+                                      style={{
+                                        width: '100%', background: 'transparent',
+                                        border: 'none', borderBottom: `1px solid ${borderMid}`,
+                                        color: text, fontFamily: serif, fontSize: '0.82rem',
+                                        lineHeight: 1.6, padding: '0.4rem 0',
+                                        resize: 'vertical', minHeight: '70px',
+                                        outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
+                                      }}
+                                    />
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                      <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
+                                        {directEdit.saving ? 'Saving...' : 'Save'}
+                                      </button>
+                                      <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                    </div>
                                   </div>
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                  <button onClick={() => exploreWithMatinee(field.prompt)} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
-                                    Explore with Matinee
+                                ) : (
+                                  <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
+                                    Write your intent
                                   </button>
-                                  <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>
-                                    Write directly
-                                  </button>
-                                </div>
+                                )
                               )}
                             </div>
                           ) : (
-                            <p style={{ fontSize: '0.875rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
-                              {renderFieldValue(field.key, value)}
-                            </p>
+                            <>
+                              {field.special === 'unresolved_questions' && Array.isArray(value) ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                  {(value as Array<{ question: string; category: string; added_at: string }>).map(item => (
+                                    <div key={item.added_at} style={{ borderLeft: `1px solid ${border}`, paddingLeft: '0.75rem' }}>
+                                      <p style={{ fontSize: '0.875rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
+                                      <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: goldDim, textTransform: 'uppercase' }}>{item.category}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : field.special === 'directors_intent' ? (
+                                <>
+                                  <p style={{ fontSize: '0.875rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>
+                                    {typeof value === 'string' ? value : ''}
+                                  </p>
+                                  {isEditing ? (
+                                    <div>
+                                      <textarea
+                                        value={directEdit.value}
+                                        onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
+                                        style={{
+                                          width: '100%', background: 'transparent',
+                                          border: 'none', borderBottom: `1px solid ${borderMid}`,
+                                          color: text, fontFamily: serif, fontSize: '0.82rem',
+                                          lineHeight: 1.6, padding: '0.4rem 0',
+                                          resize: 'vertical', minHeight: '70px',
+                                          outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
+                                        }}
+                                      />
+                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: goldDim, color: gold }}>
+                                          {directEdit.saving ? 'Saving...' : 'Save'}
+                                        </button>
+                                        <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>Edit</button>
+                                  )}
+                                </>
+                              ) : (
+                                <p style={{ fontSize: '0.875rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
+                                  {typeof value === 'string' ? value : ''}
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
 
-                        {idx < FIELDS.length - 1 && (
+                        {idx < PORTRAIT_FIELDS.length - 1 && (
                           <div style={{ height: '1px', background: border, marginBottom: '1.75rem' }} />
                         )}
                       </div>
