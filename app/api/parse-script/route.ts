@@ -8,36 +8,119 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function mergeMemory(existing: any, extracted: any): any {
-  const merged: any = {}
+const PORTRAIT_TEXT_FIELDS = [
+  'portrait_logline',
+  'portrait_emotional_core',
+  'portrait_story',
+  'portrait_world',
+  'portrait_subjects',
+  'portrait_themes',
+  'portrait_approach',
+  'portrait_tone',
+  'portrait_visual_world',
+  'portrait_audience',
+  'portrait_comparable_films',
+  'portrait_target_length',
+]
 
+function mergeMemory(existing: Record<string, any>, extracted: { memory: any; portrait: any }): Record<string, any> {
+  const merged: Record<string, any> = { ...existing }
+
+  // Legacy five fields
   for (const field of ['emotional_core', 'decisions_made', 'unresolved_threads']) {
-    const e = (existing?.[field] || '') as string
-    const n = (extracted?.[field] || '') as string
-    merged[field] = n.length > e.length ? n : (e || n)
+    const newVal = extracted.memory?.[field] as string | undefined
+    const existingVal = existing[field] as string | undefined
+    if (newVal && (!existingVal || newVal.length > existingVal.length)) {
+      merged[field] = newVal
+    }
   }
 
   const ec = existing?.characters || []
-  const nc = extracted?.characters || []
-  merged.characters = JSON.stringify(nc).length > JSON.stringify(ec).length ? nc : ec
+  const nc = extracted.memory?.characters || []
+  if (JSON.stringify(nc).length > JSON.stringify(ec).length) merged.characters = nc
 
   const ew = (existing?.filmmakers_words || '') as string
-  const nw = (extracted?.filmmakers_words || '') as string
-  if (!ew) merged.filmmakers_words = nw
-  else if (!nw) merged.filmmakers_words = ew
-  else {
+  const nw = (extracted.memory?.filmmakers_words || '') as string
+  if (!ew) {
+    merged.filmmakers_words = nw
+  } else if (nw) {
     const existingPhrases = ew.split('|').map(p => p.trim()).filter(Boolean)
     const newPhrases = nw.split('|').map(p => p.trim()).filter(Boolean)
     for (const phrase of newPhrases) {
-      if (!existingPhrases.some(p => p.toLowerCase().includes(phrase.toLowerCase()) || phrase.toLowerCase().includes(p.toLowerCase()))) {
+      if (!existingPhrases.some(p =>
+        p.toLowerCase().includes(phrase.toLowerCase()) ||
+        phrase.toLowerCase().includes(p.toLowerCase())
+      )) {
         existingPhrases.push(phrase)
       }
     }
     merged.filmmakers_words = existingPhrases.join(' | ')
   }
 
+  // Portrait text fields — longer .value wins
+  for (const field of PORTRAIT_TEXT_FIELDS) {
+    const newField = extracted.portrait?.[field]
+    if (!newField?.value) continue
+    const existingValue = (existing[field]?.value ?? '') as string
+    if (newField.value.length > existingValue.length) {
+      merged[field] = newField
+    }
+  }
+
+  // portrait_unresolved_questions — append, deduplicate by question text
+  const newQuestions: Array<{ question: string; category: string; added_at: string }> =
+    extracted.portrait?.portrait_unresolved_questions?.value ?? []
+  if (newQuestions.length > 0) {
+    const existingQField = existing.portrait_unresolved_questions
+    const existingQuestions: Array<{ question: string; category: string; added_at: string }> =
+      existingQField?.value ?? []
+    const existingTexts = new Set(existingQuestions.map(q => q.question))
+    const toAdd = newQuestions.filter(q => !existingTexts.has(q.question))
+    if (toAdd.length > 0 || !existingQField) {
+      merged.portrait_unresolved_questions = {
+        value: [...existingQuestions, ...toAdd],
+        created_by: 'script_upload',
+        created_in_mode: 'script_upload',
+        updated_at: new Date().toISOString(),
+      }
+    }
+  }
+
   return merged
 }
+
+const EXTRACTION_PROMPT = (existingMemoryBlock: string, now: string) => `You are reading a film script or treatment. Extract everything you can learn about this film and return it as a single JSON object with two keys: "memory" and "portrait".
+
+${existingMemoryBlock}The "memory" object contains these five fields:
+- emotional_core: The soul of the film — what it does to an audience emotionally, not a plot summary
+- characters: Who the key people are and what they are becoming — the emotional truth of each person
+- decisions_made: Any explicit creative choices visible in the script — form, structure, approach
+- filmmakers_words: Exact phrases or sentences from the script that feel like the filmmaker's own voice — distinctive, specific language. Return as a pipe-separated string of individual phrases.
+- unresolved_threads: What the film leaves open — unanswered questions, unresolved tensions
+
+The "portrait" object contains these thirteen fields. Each field must follow this exact shape:
+{ "value": "...", "created_by": "script_upload", "created_in_mode": "script_upload", "updated_at": "${now}" }
+
+Portrait fields to extract:
+- portrait_logline: One sentence. What the film is. Precise and specific.
+- portrait_emotional_core: The soul of the film — the thematic question it asks, what it does to an audience
+- portrait_story: The narrative arc — where it begins, where it turns, where it ends
+- portrait_world: The physical, historical, and atmospheric environment the film inhabits
+- portrait_subjects: The key people in the film and their significance
+- portrait_themes: What the film argues beneath the surface story
+- portrait_approach: How the film is being told — observation, testimony, reconstruction, argument, portrait, other
+- portrait_tone: The emotional temperature — the feeling of being inside this film
+- portrait_visual_world: Visual instincts — palette, light quality, camera relationship to subject
+- portrait_audience: Who this film is for and where they will watch it
+- portrait_unresolved_questions: An array of open questions this film has not yet answered. Use this shape: { "value": [{ "question": "...", "category": "Historical|Narrative|Strategic", "added_at": "${now}" }], "created_by": "script_upload", "created_in_mode": "script_upload", "updated_at": "${now}" }
+- portrait_comparable_films: Films that share this film's tone, approach, or visual sensibility
+- portrait_target_length: A specific number in minutes, if determinable from the script
+
+Do not extract portrait_directors_intent. That field belongs to the filmmaker alone.
+
+If you cannot determine a value for a field, omit that field from the portrait object entirely — do not return null or an empty string.
+
+Return only the JSON object. No preamble, no explanation, no markdown formatting.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,6 +157,9 @@ export async function POST(request: NextRequest) {
 `
       : ''
 
+    const now = new Date().toISOString()
+    const prompt = EXTRACTION_PROMPT(existingMemoryBlock, now)
+
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
@@ -91,7 +177,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
+          max_tokens: 8000,
           messages: [
             {
               role: 'user',
@@ -104,20 +190,7 @@ export async function POST(request: NextRequest) {
                     data: base64
                   }
                 },
-                {
-                  type: 'text',
-                  text: `You are reading a film script to extract its creative essence for a filmmaker's companion. Study it carefully. Return ONLY valid JSON with no preamble, no explanation, no markdown fences, no backticks.
-
-${existingMemoryBlock}Now read the script. For each field, synthesise what the script reveals with what you already know. Never discard existing content. If the script adds depth or specificity, incorporate it. If a field already holds richer content than the script reveals, carry forward the existing content. For filmmakers_words: add powerful phrases from the script to any existing ones — never remove, only accumulate. Never replace a richer value with a thinner one.
-
-{
-  "emotional_core": "The emotional heart of this film — what it is trying to make the audience feel. Not the plot. The feeling it wants to leave behind. 2-3 sentences.",
-  "characters": [{"name": "Character name", "description": "Who this character is — their emotional truth, what they are carrying, not just their role in the story"}],
-  "decisions_made": "The creative choices already made in the script — tone, structure, what kind of film this is and what it has decided not to be. 2-3 sentences.",
-  "filmmakers_words": "The most powerful, specific phrases from the script — dialogue or stage direction that captures the soul of the film exactly. 2-4 examples.",
-  "unresolved_threads": "What the script leaves open — tensions, questions, things a director will need to interpret and solve. 2-3 sentences."
-}`
-                }
+                { type: 'text', text: prompt }
               ]
             }
           ]
@@ -145,24 +218,11 @@ ${existingMemoryBlock}Now read the script. For each field, synthesise what the s
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
+          max_tokens: 8000,
           messages: [
             {
               role: 'user',
-              content: `You are reading a film script to extract its creative essence. Return ONLY valid JSON, no preamble, no backticks.
-
-${existingMemoryBlock}Now read the script. For each field, synthesise what the script reveals with what you already know. Never discard existing content. If the script adds depth or specificity, incorporate it. If a field already holds richer content than the script reveals, carry forward the existing content. For filmmakers_words: add powerful phrases from the script to any existing ones — never remove, only accumulate. Never replace a richer value with a thinner one.
-
-{
-  "emotional_core": "The emotional heart of this film. 2-3 sentences.",
-  "characters": [{"name": "name", "description": "emotional truth of this character"}],
-  "decisions_made": "Creative choices already made in the script. 2-3 sentences.",
-  "filmmakers_words": "Most powerful phrases from the script. 2-4 examples.",
-  "unresolved_threads": "What the script leaves open for a director to interpret. 2-3 sentences."
-}
-
-SCRIPT:
-${docText}`
+              content: `${prompt}\n\nSCRIPT:\n${docText}`
             }
           ]
         })
@@ -176,7 +236,7 @@ ${docText}`
       scriptText = aiData.content[0].text
     }
 
-    let extracted: any
+    let extracted: { memory: any; portrait: any }
     try {
       const clean = scriptText.replace(/```json|```/g, '').trim()
       extracted = JSON.parse(clean)
@@ -185,8 +245,8 @@ ${docText}`
       return NextResponse.json({ error: 'Something went wrong reading your script. Try again.' }, { status: 500 })
     }
 
-    const merged = mergeMemory(existingMemory, extracted)
-    const memoryPayload = { ...merged, updated_at: new Date().toISOString() }
+    const merged = mergeMemory(existingMemory ?? {}, extracted)
+    const memoryPayload = { ...merged, updated_at: now }
 
     if (existingMemory) {
       await supabaseAdmin.from('film_memory').update(memoryPayload).eq('film_id', filmId)
@@ -194,7 +254,7 @@ ${docText}`
       await supabaseAdmin.from('film_memory').insert({ ...memoryPayload, film_id: filmId })
     }
 
-    return NextResponse.json({ success: true, emotional_core: extracted.emotional_core })
+    return NextResponse.json({ success: true, emotional_core: extracted.memory?.emotional_core })
 
   } catch (error) {
     console.error('Parse script error:', error)
