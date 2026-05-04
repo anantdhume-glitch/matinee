@@ -554,10 +554,6 @@ export default function FilmStudio() {
     await refreshPortrait()
   }
 
-  if (typeof window !== 'undefined') {
-    ;(window as any).resolveQuestion = resolveQuestion
-  }
-
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) return (
     <main style={{ backgroundColor: bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: gold, fontFamily: serif, letterSpacing: '0.2em', fontSize: '0.85rem' }}>
