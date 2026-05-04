@@ -53,6 +53,7 @@ Phase 1 complete and live. Phase 2 in progress.
 | 1.1   | Film Memory Loop               | COMPLETE — deployed Apr 26          |
 | 1.2   | 14-Field Film Portrait Schema  | COMPLETE — deployed Apr 30          |
 | 2.1   | Field-Aware Extraction Prompts | NEXT — start here                   |
+| 2.3   | Field History                  | COMPLETE — history[] appended to all portrait fields on write. portrait_unresolved_questions replacement bug fixed. LEGACY_FIELDS deleted. |
 
 ## Film Portrait Schema
 14 portrait columns on the film_memory table, all JSONB, all nullable.
