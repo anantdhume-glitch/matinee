@@ -54,6 +54,7 @@ Phase 1 complete and live. Phase 2 in progress.
 | 1.2   | 14-Field Film Portrait Schema  | COMPLETE — deployed Apr 30          |
 | 2.1   | Field-Aware Extraction Prompts | NEXT — start here                   |
 | 2.3   | Field History                  | COMPLETE — history[] appended to all portrait fields on write. portrait_unresolved_questions replacement bug fixed. LEGACY_FIELDS deleted. |
+| 2.4   | Field 12 Special Handling      | COMPLETE — UnresolvedQuestion type updated with resolved/resolved_at fields. resolveQuestion function added. window attachment removed post-testing. |
 
 ## Film Portrait Schema
 14 portrait columns on the film_memory table, all JSONB, all nullable.
