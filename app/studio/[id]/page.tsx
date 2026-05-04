@@ -499,12 +499,10 @@ export default function FilmStudio() {
   }
 
   const resolveQuestion = async (targetAddedAt: string) => {
-    if (!film?.id) return
-
     const { data: existingRow, error: fetchError } = await supabase
       .from('film_memory')
       .select('*')
-      .eq('film_id', film.id)
+      .eq('film_id', filmId)
       .single()
 
     if (fetchError || !existingRow) {
@@ -546,7 +544,7 @@ export default function FilmStudio() {
     const { error: writeError } = await supabase
       .from('film_memory')
       .update({ portrait_unresolved_questions: updatedField })
-      .eq('film_id', film.id)
+      .eq('film_id', filmId)
 
     if (writeError) {
       console.error('resolveQuestion: failed to write', writeError)
