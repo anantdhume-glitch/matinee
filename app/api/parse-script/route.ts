@@ -83,11 +83,11 @@ function mergeMemory(existing: Record<string, any>, extracted: { memory: any; po
   }
 
   // portrait_unresolved_questions — append, deduplicate by question text
-  const newQuestions: Array<{ question: string; category: string; added_at: string }> =
+  const newQuestions: Array<{ question: string; category: string; added_at: string; resolved?: boolean; resolved_at?: string }> =
     extracted.portrait?.portrait_unresolved_questions?.value ?? []
   if (newQuestions.length > 0) {
     const existingQField = existing.portrait_unresolved_questions
-    const existingQuestions: Array<{ question: string; category: string; added_at: string }> =
+    const existingQuestions: Array<{ question: string; category: string; added_at: string; resolved?: boolean; resolved_at?: string }> =
       existingQField?.value ?? []
     const existingTexts = new Set(existingQuestions.map(q => q.question))
     const toAdd = newQuestions.filter(q => !existingTexts.has(q.question))

@@ -16,6 +16,8 @@ type UnresolvedQuestion = {
   question: string
   category: 'Historical' | 'Narrative' | 'Strategic'
   added_at: string
+  resolved?: boolean
+  resolved_at?: string
 }
 
 type PortraitUnresolvedField = {
@@ -23,6 +25,12 @@ type PortraitUnresolvedField = {
   created_by: string
   created_in_mode: string
   updated_at: string
+  history?: Array<{
+    questions_added?: UnresolvedQuestion[]
+    question_resolved?: UnresolvedQuestion
+    changed_by: string
+    changed_at: string
+  }>
 }
 
 type FilmMemory = {
@@ -488,6 +496,68 @@ export default function FilmStudio() {
     else await supabase.from('film_memory').insert({ ...payload, film_id: filmId })
     setFilmMemory(prev => prev ? { ...prev, [directEdit.field!]: optimisticValue } : null)
     setDirectEdit({ field: null, value: '', saving: false })
+  }
+
+  const resolveQuestion = async (targetAddedAt: string) => {
+    if (!film?.id) return
+
+    const { data: existingRow, error: fetchError } = await supabase
+      .from('film_memory')
+      .select('*')
+      .eq('film_id', film.id)
+      .single()
+
+    if (fetchError || !existingRow) {
+      console.error('resolveQuestion: failed to fetch existing row', fetchError)
+      return
+    }
+
+    const existingField: PortraitUnresolvedField | null =
+      existingRow.portrait_unresolved_questions ?? null
+
+    if (!existingField) return
+
+    const updatedQuestions = existingField.value.map((q: UnresolvedQuestion) =>
+      q.added_at === targetAddedAt
+        ? { ...q, resolved: true, resolved_at: new Date().toISOString() }
+        : q
+    )
+
+    const resolvedQuestion = existingField.value.find(
+      (q: UnresolvedQuestion) => q.added_at === targetAddedAt
+    )
+
+    const updatedHistory = [
+      ...(existingField.history ?? []),
+      {
+        question_resolved: resolvedQuestion,
+        changed_by: 'filmmaker',
+        changed_at: new Date().toISOString(),
+      },
+    ]
+
+    const updatedField: PortraitUnresolvedField = {
+      ...existingField,
+      value: updatedQuestions,
+      updated_at: new Date().toISOString(),
+      history: updatedHistory,
+    }
+
+    const { error: writeError } = await supabase
+      .from('film_memory')
+      .update({ portrait_unresolved_questions: updatedField })
+      .eq('film_id', film.id)
+
+    if (writeError) {
+      console.error('resolveQuestion: failed to write', writeError)
+      return
+    }
+
+    await refreshPortrait()
+  }
+
+  if (typeof window !== 'undefined') {
+    ;(window as any).resolveQuestion = resolveQuestion
   }
 
   // ── LOADING ────────────────────────────────────────────────────────────────
