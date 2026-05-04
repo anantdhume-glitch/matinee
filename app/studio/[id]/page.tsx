@@ -83,13 +83,6 @@ const btnSmall: React.CSSProperties = {
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const EMPTY_PHRASES = ['none yet', 'none', 'not yet', 'n/a', 'tbd', 'unknown', 'nothing yet']
 
-const LEGACY_FIELDS: Array<{ key: keyof FilmMemory; label: string; question: string; prompt: string }> = [
-  { key: 'emotional_core', label: 'What the film is becoming', question: 'What is the film trying to leave behind in the people who see it? Not the story — the feeling.', prompt: "I want to think about what my film is really trying to say — the feeling it wants to leave behind." },
-  { key: 'characters', label: 'Who the characters are becoming', question: 'Who is this film about? Not the subject — the person we follow.', prompt: "I want to find who the characters of my film really are — not their descriptions, but who they actually are." },
-  { key: 'decisions_made', label: 'The decisions made', question: 'What has this film chosen to be — and what did it set aside to get there?', prompt: "Let's talk about the decisions I've made for this film — what I've chosen and what I've left behind." },
-  { key: 'filmmakers_words', label: "The filmmaker's own words", question: "What phrase have you used that felt exactly right — words you couldn't improve?", prompt: "I want to find the words that feel exactly right for my film — the phrases only I could say." },
-  { key: 'unresolved_threads', label: 'What is still unresolved', question: "What part of the film keeps you up at night — the thing you haven't found yet?", prompt: "I want to talk about what's still unresolved in my film — the thread I haven't pulled yet." }
-]
 
 const PORTRAIT_FIELDS: Array<{
   key: keyof FilmMemory;
@@ -177,6 +170,21 @@ function mergeFilmakersWords(nw?: string, ew?: string): string {
   return existingPhrases.join(' | ')
 }
 
+function appendHistory(
+  existingField: { value?: string; created_by?: string; updated_at?: string; history?: Array<{ previous_value: string; changed_by: string; changed_at: string }> } | null | undefined
+): Array<{ previous_value: string; changed_by: string; changed_at: string }> {
+  const existingHistory = existingField?.history ?? [];
+  if (!existingField?.value) return existingHistory;
+  return [
+    ...existingHistory,
+    {
+      previous_value: existingField.value,
+      changed_by: existingField.created_by ?? 'unknown',
+      changed_at: existingField.updated_at ?? new Date().toISOString(),
+    },
+  ];
+}
+
 async function mergeMemory(
   extracted: any,
   portrait: any,
@@ -237,6 +245,7 @@ async function mergeMemory(
           created_by: 'studio',
           created_in_mode: 'discovery',
           updated_at: now,
+          history: appendHistory(existing_field),
         }
       }
     }
@@ -244,11 +253,27 @@ async function mergeMemory(
 
   const extracted_questions = portrait?.portrait_unresolved_questions
   if (extracted_questions && Array.isArray(extracted_questions) && extracted_questions.length > 0) {
-    portraitUpdates['portrait_unresolved_questions'] = {
-      value: extracted_questions,
-      created_by: 'studio',
-      created_in_mode: 'discovery',
-      updated_at: now,
+    const existingQField = (existing as any)?.portrait_unresolved_questions
+    const existingQuestions: Array<{ question: string; category: string; added_at: string }> =
+      existingQField?.value ?? []
+    const toAdd = extracted_questions.filter(
+      (nq: { question: string }) => !existingQuestions.some(eq => eq.question === nq.question)
+    )
+    if (toAdd.length > 0 || !existingQField) {
+      const updatedHistory = toAdd.length > 0
+        ? [...(existingQField?.history ?? []), {
+            questions_added: toAdd,
+            changed_by: 'studio',
+            changed_at: new Date().toISOString(),
+          }]
+        : (existingQField?.history ?? [])
+      portraitUpdates['portrait_unresolved_questions'] = {
+        value: [...existingQuestions, ...toAdd],
+        created_by: 'studio',
+        created_in_mode: 'discovery',
+        updated_at: now,
+        history: updatedHistory,
+      }
     }
   }
 
@@ -450,6 +475,7 @@ export default function FilmStudio() {
         created_by: 'filmmaker',
         created_in_mode: 'direct',
         updated_at: now,
+        history: appendHistory(existing?.[directEdit.field]),
       }
       optimisticValue = fieldValue
     } else {

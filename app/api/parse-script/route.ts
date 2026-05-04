@@ -23,6 +23,21 @@ const PORTRAIT_TEXT_FIELDS = [
   'portrait_target_length',
 ]
 
+function appendHistory(
+  existingField: { value?: string; created_by?: string; updated_at?: string; history?: Array<{ previous_value: string; changed_by: string; changed_at: string }> } | null | undefined
+): Array<{ previous_value: string; changed_by: string; changed_at: string }> {
+  const existingHistory = existingField?.history ?? [];
+  if (!existingField?.value) return existingHistory;
+  return [
+    ...existingHistory,
+    {
+      previous_value: existingField.value,
+      changed_by: existingField.created_by ?? 'unknown',
+      changed_at: existingField.updated_at ?? new Date().toISOString(),
+    },
+  ];
+}
+
 function mergeMemory(existing: Record<string, any>, extracted: { memory: any; portrait: any }): Record<string, any> {
   const merged: Record<string, any> = { ...existing }
 
@@ -63,7 +78,7 @@ function mergeMemory(existing: Record<string, any>, extracted: { memory: any; po
     if (!newField?.value) continue
     const existingValue = (existing[field]?.value ?? '') as string
     if (newField.value.length > existingValue.length) {
-      merged[field] = newField
+      merged[field] = { ...newField, history: appendHistory(existing[field]) }
     }
   }
 
@@ -77,11 +92,19 @@ function mergeMemory(existing: Record<string, any>, extracted: { memory: any; po
     const existingTexts = new Set(existingQuestions.map(q => q.question))
     const toAdd = newQuestions.filter(q => !existingTexts.has(q.question))
     if (toAdd.length > 0 || !existingQField) {
+      const updatedHistory = toAdd.length > 0
+        ? [...(existingQField?.history ?? []), {
+            questions_added: toAdd,
+            changed_by: 'script_upload',
+            changed_at: new Date().toISOString(),
+          }]
+        : (existingQField?.history ?? [])
       merged.portrait_unresolved_questions = {
         value: [...existingQuestions, ...toAdd],
         created_by: 'script_upload',
         created_in_mode: 'script_upload',
         updated_at: new Date().toISOString(),
+        history: updatedHistory,
       }
     }
   }
