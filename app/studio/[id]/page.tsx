@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
 type Message = { id: string; role: string; content: string }
+type GateClosed = {
+  gate: string
+  closed_at: string
+  portrait_version?: string
+}
 type PortraitField = {
   value: string
   created_by: string
@@ -297,7 +302,7 @@ export default function FilmStudio() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [thinking, setThinking] = useState(false)
-  const [film, setFilm] = useState<{ title: string } | null>(null)
+  const [film, setFilm] = useState<{ title: string; current_mode: string | null; gates_closed: GateClosed[] } | null>(null)
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
   const [scriptSoul, setScriptSoul] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
