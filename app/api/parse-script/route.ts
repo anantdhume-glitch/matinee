@@ -268,6 +268,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Something went wrong reading your script. Try again.' }, { status: 500 })
     }
 
+    if (extracted.portrait) delete extracted.portrait['portrait_directors_intent']
+
     const merged = mergeMemory(existingMemory ?? {}, extracted)
     const memoryPayload = { ...merged, updated_at: now }
 

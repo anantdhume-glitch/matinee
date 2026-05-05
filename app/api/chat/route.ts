@@ -158,6 +158,7 @@ export async function POST(req: NextRequest) {
     const parsed = extractJSON(rawContent)
 
     if (parsed) {
+      if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
       return NextResponse.json({ content: parsed.content, memory: parsed.memory, portrait: parsed.portrait ?? {} })
     }
 
