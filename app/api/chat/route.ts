@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: string) {
+function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: string, currentMode: string | null) {
   const memoryBlock = filmMemory
     ? `WHAT YOU KNOW ABOUT THIS FILM:
 - Emotional core: ${filmMemory.emotional_core || 'Still emerging'}
@@ -12,6 +12,32 @@ function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: stri
 - The filmmaker's own words: ${filmMemory.filmmakers_words || 'None captured yet'}
 - What is still unresolved: ${filmMemory.unresolved_threads || 'Everything is open'}`
     : 'No memory yet. This is the first session. Begin building it through conversation.'
+
+  const portraitBlock = currentMode === null
+    ? `FILM PORTRAIT EXTRACTION:
+In the same response, also extract what this exchange reveals about the film's portrait. The portrait fields are precise and structured — only populate a field if the conversation has genuinely revealed something specific about it. Return null for any field the conversation has not addressed. Do not invent or infer beyond what was actually said.
+
+The portrait fields to extract:
+
+- portrait_logline: One sentence. What the film is. If the filmmaker has not given you a clear logline, return null.
+- portrait_emotional_core: The soul of the film. The thematic question it is asking. Not the plot, not the logline — what it does to an audience emotionally and intellectually.
+- portrait_story: The narrative journey — where it starts, where it turns, where it ends. Only populate if the filmmaker has shared narrative arc or structure.
+- portrait_world: The physical, historical, or atmospheric environment the film lives in.
+- portrait_subjects: The key people in the film and their significance. Who they are and why they matter to this story.
+- portrait_themes: What the film is arguing beneath the surface story. The ideas it is wrestling with.
+- portrait_approach: How the film will feel to be inside it. The mode of storytelling — observational, participatory, expository, poetic, performative, reflexive, essayistic, or hybrid.
+- portrait_tone: The emotional temperature of the film. Its voice. Its pacing character.
+- portrait_visual_world: The filmmaker's visual instincts — palette, light, camera relationship, texture. Only populate if the filmmaker has spoken about how the film will look or feel visually.
+- portrait_audience: Who the film is for. How it will be watched, on what platform, in what context.
+- portrait_unresolved_questions: Questions the film has not yet answered. Return as an array. Each item must have: "question" (the question itself), "category" (one of: "Historical", "Narrative", "Strategic"), "added_at" (current ISO timestamp). If no unresolved questions emerged in this exchange, return an empty array.
+- portrait_comparable_films: Films that share this film's tone, approach, or visual world. Only populate if the filmmaker has named or implied references.
+- portrait_target_length: A specific number in minutes. Only populate if the filmmaker has stated a target length explicitly.
+
+CRITICAL — Field 11 (Director's Intent) does not exist in portrait extraction. Never attempt to extract or populate portrait_directors_intent. It is not part of your task.`
+    : `MODE: ${currentMode.toUpperCase()}
+The filmmaker is in production. They are working on a specific deliverable, not exploring the film.
+Listen for what they need in this mode. Do not attempt to extract or update portrait fields unless the filmmaker explicitly discusses something that changes what the film fundamentally is.
+In your JSON response, return "portrait": {} — an empty object. Do not populate any portrait fields.`
 
   return `You are Matinee, a filmmaker's creative companion. Not an assistant. Not a tool. A companion. The most attentive, most honest collaborator a filmmaker has ever had.
 
@@ -55,26 +81,7 @@ After every exchange, return a JSON memory update. This is invisible to the film
 - Never replace a richer, more specific value with a thinner, more generic one.
 - Never invent or assume content that was not genuinely present in this exchange.
 
-FILM PORTRAIT EXTRACTION:
-In the same response, also extract what this exchange reveals about the film's portrait. The portrait fields are precise and structured — only populate a field if the conversation has genuinely revealed something specific about it. Return null for any field the conversation has not addressed. Do not invent or infer beyond what was actually said.
-
-The portrait fields to extract:
-
-- portrait_logline: One sentence. What the film is. If the filmmaker has not given you a clear logline, return null.
-- portrait_emotional_core: The soul of the film. The thematic question it is asking. Not the plot, not the logline — what it does to an audience emotionally and intellectually.
-- portrait_story: The narrative journey — where it starts, where it turns, where it ends. Only populate if the filmmaker has shared narrative arc or structure.
-- portrait_world: The physical, historical, or atmospheric environment the film lives in.
-- portrait_subjects: The key people in the film and their significance. Who they are and why they matter to this story.
-- portrait_themes: What the film is arguing beneath the surface story. The ideas it is wrestling with.
-- portrait_approach: How the film will feel to be inside it. The mode of storytelling — observational, participatory, expository, poetic, performative, reflexive, essayistic, or hybrid.
-- portrait_tone: The emotional temperature of the film. Its voice. Its pacing character.
-- portrait_visual_world: The filmmaker's visual instincts — palette, light, camera relationship, texture. Only populate if the filmmaker has spoken about how the film will look or feel visually.
-- portrait_audience: Who the film is for. How it will be watched, on what platform, in what context.
-- portrait_unresolved_questions: Questions the film has not yet answered. Return as an array. Each item must have: "question" (the question itself), "category" (one of: "Historical", "Narrative", "Strategic"), "added_at" (current ISO timestamp). If no unresolved questions emerged in this exchange, return an empty array.
-- portrait_comparable_films: Films that share this film's tone, approach, or visual world. Only populate if the filmmaker has named or implied references.
-- portrait_target_length: A specific number in minutes. Only populate if the filmmaker has stated a target length explicitly.
-
-CRITICAL — Field 11 (Director's Intent) does not exist in portrait extraction. Never attempt to extract or populate portrait_directors_intent. It is not part of your task.
+${portraitBlock}
 
 CRITICAL INSTRUCTION — OUTPUT FORMAT:
 Your response must ALWAYS be a valid JSON object with exactly three fields: content, memory, and portrait.
@@ -83,7 +90,7 @@ You must NEVER add any text before or after the JSON.
 You must NEVER use backticks of any kind.
 Output the raw JSON object and nothing else.
 
-{
+${currentMode === null ? `{
   "content": "your response to the filmmaker here",
   "memory": {
     "emotional_core": "the feeling at the heart of the film",
@@ -107,7 +114,17 @@ Output the raw JSON object and nothing else.
     "portrait_comparable_films": "...",
     "portrait_target_length": "..."
   }
-}`
+}` : `{
+  "content": "your response to the filmmaker here",
+  "memory": {
+    "emotional_core": "the feeling at the heart of the film",
+    "characters": [],
+    "decisions_made": "key creative decisions and what was set aside",
+    "filmmakers_words": "exact phrases the filmmaker used when something became real",
+    "unresolved_threads": "what is still open, what needs to come next"
+  },
+  "portrait": {}
+}`}`
 }
 
 function extractJSON(raw: string): { content: string; memory: any; portrait: any } | null {
@@ -138,9 +155,9 @@ function extractJSON(raw: string): { content: string; memory: any; portrait: any
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, filmMemory, sessionType, filmTitle } = await req.json()
+    const { messages, filmMemory, sessionType, filmTitle, currentMode } = await req.json()
 
-    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle)
+    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode)
 
     const apiMessages = messages.length > 0
       ? messages
