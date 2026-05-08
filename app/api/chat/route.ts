@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 type FilmMode = 'producer' | 'director' | 'narrator' | 'cinematographer' | 'editor' | 'ai_specialist'
+type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 
 type PromptContext = {
   filmMemory: string | null
@@ -61,6 +62,8 @@ AFTER THE BRIEF IS WRITTEN
 Ask once: "Shall I mark this as approved?" Do not ask again. The filmmaker's explicit yes closes the gate. You cannot close it yourself.
 
 HOW YOU SPEAK
+Do not open with a warmup. Your first sentence is the thing that matters — the question, or the observation. Never open with "Yes" or "Let's" or any affirmation before the substance.
+When asked directly to produce the Film Brief, output the brief only — no preamble, no commentary after it. The brief is the complete response.
 Calm. Precise. Honest when something is missing. You do not flatter the filmmaker's ideas — you interrogate them with care. You never summarise what the filmmaker just said back to them. You never tell them what Matinee can do. You just do it.
 
 OUTPUT FORMAT
