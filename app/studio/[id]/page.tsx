@@ -351,7 +351,7 @@ export default function FilmStudio() {
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: [], filmMemory: memoryData, sessionType: 'FIRST', filmTitle: title })
+      body: JSON.stringify({ filmId, messages: [], filmMemory: memoryData, sessionType: 'FIRST', filmTitle: title, currentMode: film?.current_mode ?? null })
     })
     const data = await response.json()
     await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId })
@@ -387,7 +387,7 @@ export default function FilmStudio() {
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
       const openingResponse = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filmId, messages: [], filmMemory: freshMemory, sessionType: 'RETURNING', filmTitle: film?.title })
+        body: JSON.stringify({ filmId, messages: [], filmMemory: freshMemory, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null })
       })
       const openingData = await openingResponse.json()
       const openingText = openingData.content
@@ -430,7 +430,7 @@ export default function FilmStudio() {
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title })
+      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null })
     })
     const data = await response.json()
 
