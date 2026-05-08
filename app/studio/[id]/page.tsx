@@ -10,6 +10,7 @@ type GateClosed = {
   closed_at: string
   portrait_version?: string
 }
+type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 type PortraitField = {
   value: string
   created_by: string
@@ -118,6 +119,22 @@ const PORTRAIT_FIELDS: Array<{
   { key: 'portrait_comparable_films', label: 'Comparable Films', question: 'Which films — in tone, approach, or visual world — does this feel closest to?' },
   { key: 'portrait_target_length', label: 'Target Length', question: 'How long should this film be?' },
 ]
+
+const ARCHIVE_DOCUMENTS = [
+  { mode: 'producer', label: 'Film Brief', gateId: 'film_brief' as GateId },
+  { mode: 'director', label: 'Treatment', gateId: 'treatment' as GateId },
+  { mode: 'director', label: 'Department Briefs', gateId: 'department_briefs' as GateId },
+  { mode: 'narrator', label: 'Mode Selection Brief', gateId: 'mode_selection_brief' as GateId },
+  { mode: 'narrator', label: 'Hook Draft', gateId: 'hook_draft' as GateId },
+  { mode: 'narrator', label: 'Script Lock', gateId: 'script_lock' as GateId },
+  { mode: 'narrator', label: 'Audio Direction', gateId: 'audio_direction' as GateId },
+  { mode: 'cinematographer', label: 'Consistency Lock', gateId: 'consistency_lock' as GateId },
+  { mode: 'cinematographer', label: 'Shot List', gateId: 'shot_list' as GateId },
+  { mode: 'cinematographer', label: 'Camera & Light Plan', gateId: 'camera_light_plan' as GateId },
+  { mode: 'ai_specialist', label: 'Visual Prompt Package', gateId: 'visual_prompt_package' as GateId },
+  { mode: 'editor', label: 'Edit Plan', gateId: 'edit_plan' as GateId },
+  { mode: 'editor', label: 'Music Cue Sheet', gateId: 'music_cue_sheet' as GateId },
+] as const
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function isFieldEmpty(value: unknown): boolean {
@@ -302,12 +319,21 @@ export default function FilmStudio() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [thinking, setThinking] = useState(false)
-  const [film, setFilm] = useState<{ title: string; current_mode: string | null; gates_closed: GateClosed[] } | null>(null)
+  const [film, setFilm] = useState<{
+    title: string
+    current_mode: string | null
+    gates_closed: GateClosed[]
+    documents_generated: { document: GateId; generated_at: string }[]
+    documents_content: Partial<Record<GateId, string>>
+  } | null>(null)
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
   const [scriptSoul, setScriptSoul] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [portraitOpen, setPortraitOpen] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [openDocument, setOpenDocument] = useState<GateId | null>(null)
+  const [generating, setGenerating] = useState<GateId | null>(null)
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
@@ -344,7 +370,8 @@ export default function FilmStudio() {
 
   const togglePortrait = async () => {
     if (!portraitOpen && !portraitRefreshedAt) await refreshPortrait()
-    setPortraitOpen(p => !p)
+    setPortraitOpen(prev => !prev)
+    setArchiveOpen(false)
   }
 
   const openingMessage = async (title: string) => {
@@ -560,6 +587,62 @@ export default function FilmStudio() {
     await refreshPortrait()
   }
 
+  const approveGate = async (gateId: GateId) => {
+    const newGate: GateClosed = { gate: gateId, closed_at: new Date().toISOString() }
+    const updated = [...(film?.gates_closed ?? []), newGate]
+    await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
+    setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+  }
+
+  const reopenGate = async (gateId: GateId) => {
+    const updated = (film?.gates_closed ?? []).filter(g => g.gate !== gateId)
+    await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
+    setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+  }
+
+  const generateDocument = async (gateId: GateId, owningMode: string) => {
+    setGenerating(gateId)
+    try {
+      const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+      const docLabel = ARCHIVE_DOCUMENTS.find(d => d.gateId === gateId)?.label ?? gateId
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filmId,
+          messages: [{ role: 'user', content: `Produce the ${docLabel}.` }],
+          filmMemory: memoryData,
+          sessionType: 'RETURNING',
+          filmTitle: film?.title,
+          currentMode: owningMode,
+          gatesClosed: film?.gates_closed ?? [],
+        })
+      })
+
+      const data = await response.json()
+
+      const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: data.content }
+      const newGenerated = { document: gateId, generated_at: new Date().toISOString() }
+      const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
+
+      await supabase.from('films').update({
+        documents_content: updatedContent,
+        documents_generated: updatedGenerated,
+      }).eq('id', filmId)
+
+      setFilm(prev => prev ? {
+        ...prev,
+        documents_content: updatedContent,
+        documents_generated: updatedGenerated,
+      } : null)
+
+      setOpenDocument(gateId)
+    } finally {
+      setGenerating(null)
+    }
+  }
+
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) return (
     <main style={{ backgroundColor: bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: gold, fontFamily: serif, letterSpacing: '0.2em', fontSize: '0.85rem' }}>
@@ -708,6 +791,12 @@ export default function FilmStudio() {
             style={{ ...portraitOpen ? btnPrimary : btnSecondary, fontSize: '0.68rem' }}
           >
             FILM PORTRAIT
+          </button>
+          <button
+            onClick={() => { setArchiveOpen(prev => !prev); setPortraitOpen(false) }}
+            style={{ ...archiveOpen ? btnPrimary : btnSecondary, fontSize: '0.68rem' }}
+          >
+            ARCHIVE
           </button>
         </div>
       </nav>
@@ -913,6 +1002,104 @@ export default function FilmStudio() {
             </div>
           )}
         </div>
+
+        {/* ARCHIVE PANEL */}
+        <div style={{
+          width: archiveOpen ? '360px' : '0px',
+          flexShrink: 0,
+          transition: 'width 0.3s ease',
+          overflow: 'hidden',
+          borderLeft: archiveOpen ? '1px solid rgba(212, 175, 55, 0.15)' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+        }}>
+          {archiveOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+              {/* ARCHIVE HEADER */}
+              <div style={{ flexShrink: 0, padding: '1.5rem', borderBottom: '1px solid rgba(212, 175, 55, 0.1)' }}>
+                <div style={{ fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(212, 175, 55, 0.5)' }}>
+                  The Archive
+                </div>
+              </div>
+
+              {/* ARCHIVE CONTENT */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0' }}>
+
+                {/* Discovery state */}
+                {!film?.current_mode && (
+                  <div style={{ padding: '1.5rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.73rem', lineHeight: 1.7, fontStyle: 'italic' }}>
+                    Production documents are generated in production modes. Enter a mode to begin.
+                  </div>
+                )}
+
+                {/* Production state */}
+                {film?.current_mode && (
+                  <>
+                    {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
+                      <div key={mode} style={{ marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.35)', padding: '0.5rem 1.5rem' }}>
+                          {mode.replace('_', ' ')}
+                        </div>
+                        {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
+                          const isGenerated = film.documents_generated?.some(d => d.document === doc.gateId)
+                          const isApproved = film.gates_closed?.some(g => g.gate === doc.gateId)
+
+                          return (
+                            <div key={doc.gateId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+
+                              {/* Document name */}
+                              {isGenerated ? (
+                                <span
+                                  onClick={() => setOpenDocument(doc.gateId)}
+                                  style={{ fontSize: '0.76rem', color: isApproved ? 'rgba(212,175,55,0.85)' : 'rgba(255,255,255,0.72)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(212,175,55,0.25)' }}
+                                >
+                                  {doc.label}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>
+                                  {doc.label}
+                                </span>
+                              )}
+
+                              {/* Action button */}
+                              {!isGenerated && (
+                                <button
+                                  onClick={() => generateDocument(doc.gateId, doc.mode)}
+                                  disabled={generating === doc.gateId}
+                                  style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.55)', background: 'none', border: '1px solid rgba(212,175,55,0.2)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
+                                >
+                                  {generating === doc.gateId ? '...' : 'Generate'}
+                                </button>
+                              )}
+                              {isGenerated && !isApproved && (
+                                <button
+                                  onClick={() => approveGate(doc.gateId)}
+                                  style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0a0a0a', background: 'rgba(212,175,55,0.85)', border: 'none', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
+                                >
+                                  Approve
+                                </button>
+                              )}
+                              {isApproved && (
+                                <button
+                                  onClick={() => reopenGate(doc.gateId)}
+                                  style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.45)', background: 'none', border: '1px solid rgba(212,175,55,0.18)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
+                                >
+                                  Reopen
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* PULSE ANIMATION */}
@@ -922,6 +1109,26 @@ export default function FilmStudio() {
           40% { opacity: 1; transform: scale(1); }
         }
       `}</style>
+
+      {/* DOCUMENT OVERLAY */}
+      {openDocument && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div style={{ background: '#0f0f0f', maxWidth: '700px', width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '2.5rem 3rem', position: 'relative', border: '1px solid rgba(212,175,55,0.12)' }}>
+            <div style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.45)', marginBottom: '2rem' }}>
+              {ARCHIVE_DOCUMENTS.find(d => d.gateId === openDocument)?.label}
+            </div>
+            <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'rgba(255,255,255,0.72)', whiteSpace: 'pre-wrap', fontFamily: 'Georgia, serif' }}>
+              {film?.documents_content?.[openDocument] ?? ''}
+            </div>
+            <button
+              onClick={() => setOpenDocument(null)}
+              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: '1rem', cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
