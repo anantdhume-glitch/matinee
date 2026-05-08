@@ -439,7 +439,8 @@ export default function FilmStudio() {
 
     if (data.memory) {
       if (memoryData) {
-        await mergeMemory(data.memory, data.portrait ?? {}, memoryData, filmId, supabase)
+        const portraitToMerge = film?.current_mode ? {} : (data.portrait ?? {})
+        await mergeMemory(data.memory, portraitToMerge, memoryData, filmId, supabase)
       } else {
         await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId, updated_at: new Date().toISOString() })
       }
@@ -597,16 +598,19 @@ export default function FilmStudio() {
                     <div style={{ fontSize: '0.72rem', color: textDim, letterSpacing: '0.04em' }}>Let's find the film together through conversation.</div>
                   </button>
 
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{ ...btnPrimary, padding: '1.25rem 1.75rem', textAlign: 'left', width: '100%', lineHeight: 1.6 }}
-                  >
-                    <div style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>I have a script.</div>
-                    <div style={{ fontSize: '0.72rem', color: goldDim, letterSpacing: '0.04em' }}>Let Matinee read it first. PDF or Word document.</div>
-                  </button>
-
-                  <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleScriptUpload(f) }} />
+                  {!film?.current_mode && (
+                    <>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ ...btnPrimary, padding: '1.25rem 1.75rem', textAlign: 'left', width: '100%', lineHeight: 1.6 }}
+                      >
+                        <div style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>I have a script.</div>
+                        <div style={{ fontSize: '0.72rem', color: goldDim, letterSpacing: '0.04em' }}>Let Matinee read it first. PDF or Word document.</div>
+                      </button>
+                      <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleScriptUpload(f) }} />
+                    </>
+                  )}
                 </div>
 
                 {uploadError && (
@@ -692,11 +696,13 @@ export default function FilmStudio() {
 
         {/* Right controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label style={{ ...btnSecondary, fontSize: '0.68rem', cursor: 'pointer', display: 'inline-block' }}>
-            UPLOAD SCRIPT
-            <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }} />
-          </label>
+          {!film?.current_mode && (
+            <label style={{ ...btnSecondary, fontSize: '0.68rem', cursor: 'pointer', display: 'inline-block' }}>
+              UPLOAD SCRIPT
+              <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }} />
+            </label>
+          )}
           <button
             onClick={togglePortrait}
             style={{ ...portraitOpen ? btnPrimary : btnSecondary, fontSize: '0.68rem' }}
