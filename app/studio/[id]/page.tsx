@@ -12,6 +12,12 @@ type GateClosed = {
   last_closed_at?: string
   ripple?: GateId[]
   ripple_dismissed?: GateId[]
+  cleared_by?: 'matinee_work' | 'import'
+}
+type DocumentGenerated = {
+  document: GateId
+  generated_at: string
+  source?: 'import'
 }
 type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 type PortraitField = {
@@ -342,7 +348,7 @@ export default function FilmStudio() {
     title: string
     current_mode: string | null
     gates_closed: GateClosed[]
-    documents_generated: { document: GateId; generated_at: string }[]
+    documents_generated: DocumentGenerated[]
     documents_content: Partial<Record<GateId, string>>
   } | null>(null)
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
@@ -353,6 +359,11 @@ export default function FilmStudio() {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [openDocument, setOpenDocument] = useState<GateId | null>(null)
   const [generating, setGenerating] = useState<GateId | null>(null)
+  const [importPending, setImportPending] = useState<{
+    gateId: GateId
+    content: string
+  } | null>(null)
+  const [importLoading, setImportLoading] = useState<GateId | null>(null)
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
@@ -606,8 +617,12 @@ export default function FilmStudio() {
     await refreshPortrait()
   }
 
-  const approveGate = async (gateId: GateId) => {
-    const newGate: GateClosed = { gate: gateId, closed_at: new Date().toISOString() }
+  const approveGate = async (gateId: GateId, clearedBy?: 'matinee_work' | 'import') => {
+    const newGate: GateClosed = {
+      gate: gateId,
+      closed_at: new Date().toISOString(),
+      ...(clearedBy ? { cleared_by: clearedBy } : {}),
+    }
     const existing = film?.gates_closed ?? []
     const updated = existing.some(g => g.gate === gateId)
       ? existing.map(g => g.gate === gateId ? newGate : g)
@@ -708,6 +723,54 @@ export default function FilmStudio() {
     } finally {
       setGenerating(null)
     }
+  }
+
+  const importDocument = async (gateId: GateId, file: File) => {
+    setImportLoading(gateId)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('filmId', filmId)
+      formData.append('gateId', gateId)
+
+      const response = await fetch('/api/import-document', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+      if (data.content) {
+        setImportPending({ gateId, content: data.content })
+      }
+    } finally {
+      setImportLoading(null)
+    }
+  }
+
+  const confirmImport = async () => {
+    if (!importPending) return
+    const { gateId, content } = importPending
+
+    const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: content }
+    const newGenerated: DocumentGenerated = {
+      document: gateId,
+      generated_at: new Date().toISOString(),
+      source: 'import',
+    }
+    const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
+
+    await supabase
+      .from('films')
+      .update({ documents_content: updatedContent, documents_generated: updatedGenerated })
+      .eq('id', filmId)
+
+    setFilm(prev => prev ? {
+      ...prev,
+      documents_content: updatedContent,
+      documents_generated: updatedGenerated,
+    } : null)
+
+    await approveGate(gateId, 'import')
+    setImportPending(null)
   }
 
   // ── LOADING ────────────────────────────────────────────────────────────────
@@ -1135,15 +1198,30 @@ export default function FilmStudio() {
                                   </span>
                                 )}
 
-                                {/* Action button */}
+                                {/* Action buttons */}
                                 {!isGenerated && (
-                                  <button
-                                    onClick={() => generateDocument(doc.gateId, doc.mode)}
-                                    disabled={generating === doc.gateId}
-                                    style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.55)', background: 'none', border: '1px solid rgba(212,175,55,0.2)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
-                                  >
-                                    {generating === doc.gateId ? '...' : 'Generate'}
-                                  </button>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                                    <button
+                                      onClick={() => generateDocument(doc.gateId, doc.mode)}
+                                      disabled={generating === doc.gateId}
+                                      style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.55)', background: 'none', border: '1px solid rgba(212,175,55,0.2)', padding: '0.28rem 0.6rem', cursor: 'pointer' }}
+                                    >
+                                      {generating === doc.gateId ? '...' : 'Generate'}
+                                    </button>
+                                    <label style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: importLoading === doc.gateId ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)', cursor: importLoading === doc.gateId ? 'default' : 'pointer', padding: '0.28rem 0.6rem' }}>
+                                      {importLoading === doc.gateId ? 'Reading...' : 'Import'}
+                                      <input
+                                        type="file"
+                                        accept=".pdf,.doc,.docx"
+                                        style={{ display: 'none' }}
+                                        onChange={e => {
+                                          const file = e.target.files?.[0]
+                                          if (file) importDocument(doc.gateId, file)
+                                          e.target.value = ''
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
                                 )}
                                 {isGenerated && !isApproved && (
                                   <button
@@ -1172,6 +1250,27 @@ export default function FilmStudio() {
                                     style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(251,191,36,0.5)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.68rem', fontFamily: serif }}
                                   >
                                     Dismiss
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Import confirmation */}
+                              {importPending?.gateId === doc.gateId && (
+                                <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.68rem' }}>
+                                  <span style={{ color: 'rgba(255,255,255,0.45)', flex: 1, lineHeight: 1.5 }}>
+                                    Read. Portrait updated from this document. Close this gate as imported?
+                                  </span>
+                                  <button
+                                    onClick={confirmImport}
+                                    style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(212,175,55,0.7)', cursor: 'pointer', fontFamily: serif, fontSize: '0.68rem', letterSpacing: '0.06em' }}
+                                  >
+                                    Close Gate
+                                  </button>
+                                  <button
+                                    onClick={() => setImportPending(null)}
+                                    style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontFamily: serif, fontSize: '0.68rem' }}
+                                  >
+                                    Discard
                                   </button>
                                 </div>
                               )}
