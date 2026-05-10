@@ -14,9 +14,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const filmId = formData.get('filmId') as string | null
+    const gateId = formData.get('gateId') as string | null
 
-    if (!file || !filmId) {
-      return NextResponse.json({ error: 'Missing file or filmId' }, { status: 400 })
+    if (!file || !filmId || !gateId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const fileName = file.name.toLowerCase()
@@ -45,15 +46,20 @@ export async function POST(request: NextRequest) {
       : ''
 
     const now = new Date().toISOString()
-    const prompt = buildExtractionPrompt(existingMemoryBlock, now)
+    const extractionPrompt = buildExtractionPrompt(existingMemoryBlock, now)
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    let scriptText = ''
+    let extracted: { memory: any; portrait: any }
+    let rawText: string
 
     if (isPDF) {
       const base64 = buffer.toString('base64')
+
+      const pdfPrompt = `${extractionPrompt}
+
+Also include a "raw_text" key at the top level of your JSON response containing the full readable text of this document, suitable for display.`
 
       const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -77,7 +83,7 @@ export async function POST(request: NextRequest) {
                     data: base64
                   }
                 },
-                { type: 'text', text: prompt }
+                { type: 'text', text: pdfPrompt }
               ]
             }
           ]
@@ -86,15 +92,26 @@ export async function POST(request: NextRequest) {
 
       const aiData = await aiResponse.json()
       if (aiData.error) {
-        console.error('Claude PDF read error:', aiData.error)
-        return NextResponse.json({ error: 'Could not read your script right now. Try again.' }, { status: 500 })
+        console.error('Claude PDF import error:', aiData.error)
+        return NextResponse.json({ error: 'Could not read the document right now. Try again.' }, { status: 500 })
       }
-      scriptText = aiData.content[0].text
+
+      let parsed: { memory: any; portrait: any; raw_text?: string }
+      try {
+        const clean = (aiData.content[0].text as string).replace(/```json|```/g, '').trim()
+        parsed = JSON.parse(clean)
+      } catch {
+        console.error('Could not parse Claude PDF import response:', aiData.content[0].text)
+        return NextResponse.json({ error: 'Something went wrong reading the document. Try again.' }, { status: 500 })
+      }
+
+      rawText = parsed.raw_text ?? aiData.content[0].text
+      extracted = { memory: parsed.memory, portrait: parsed.portrait }
 
     } else {
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
-      const docText = result.value.slice(0, 30000)
+      rawText = result.value.slice(0, 30000)
 
       const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -109,7 +126,7 @@ export async function POST(request: NextRequest) {
           messages: [
             {
               role: 'user',
-              content: `${prompt}\n\nSCRIPT:\n${docText}`
+              content: `${extractionPrompt}\n\nDOCUMENT:\n${rawText}`
             }
           ]
         })
@@ -117,19 +134,17 @@ export async function POST(request: NextRequest) {
 
       const aiData = await aiResponse.json()
       if (aiData.error) {
-        console.error('Claude DOCX read error:', aiData.error)
-        return NextResponse.json({ error: 'Could not read your script right now. Try again.' }, { status: 500 })
+        console.error('Claude DOCX import error:', aiData.error)
+        return NextResponse.json({ error: 'Could not read the document right now. Try again.' }, { status: 500 })
       }
-      scriptText = aiData.content[0].text
-    }
 
-    let extracted: { memory: any; portrait: any }
-    try {
-      const clean = scriptText.replace(/```json|```/g, '').trim()
-      extracted = JSON.parse(clean)
-    } catch {
-      console.error('Could not parse Claude script response:', scriptText)
-      return NextResponse.json({ error: 'Something went wrong reading your script. Try again.' }, { status: 500 })
+      try {
+        const clean = (aiData.content[0].text as string).replace(/```json|```/g, '').trim()
+        extracted = JSON.parse(clean)
+      } catch {
+        console.error('Could not parse Claude DOCX import response:', aiData.content[0].text)
+        return NextResponse.json({ error: 'Something went wrong reading the document. Try again.' }, { status: 500 })
+      }
     }
 
     if (extracted.portrait) delete extracted.portrait['portrait_directors_intent']
@@ -143,10 +158,10 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.from('film_memory').insert({ ...memoryPayload, film_id: filmId })
     }
 
-    return NextResponse.json({ success: true, emotional_core: extracted.memory?.emotional_core })
+    return NextResponse.json({ content: rawText })
 
   } catch (error) {
-    console.error('Parse script error:', error)
+    console.error('Import document error:', error)
     return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
   }
 }
