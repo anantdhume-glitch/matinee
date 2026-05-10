@@ -6,9 +6,12 @@ import { useRouter, useParams } from 'next/navigation'
 
 type Message = { id: string; role: string; content: string }
 type GateClosed = {
-  gate: string
-  closed_at: string
-  portrait_version?: string
+  gate: GateId
+  closed_at?: string
+  status?: 'reopened'
+  last_closed_at?: string
+  ripple?: GateId[]
+  ripple_dismissed?: GateId[]
 }
 type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 type PortraitField = {
@@ -135,6 +138,22 @@ const ARCHIVE_DOCUMENTS = [
   { mode: 'editor', label: 'Edit Plan', gateId: 'edit_plan' as GateId },
   { mode: 'editor', label: 'Music Cue Sheet', gateId: 'music_cue_sheet' as GateId },
 ] as const
+
+const GATE_LABELS: Record<GateId, string> = {
+  film_brief:          'Film Brief',
+  treatment:           'Treatment',
+  department_briefs:   'Department Briefs',
+  mode_selection_brief:'Mode Selection Brief',
+  hook_draft:          'Hook Draft',
+  script_lock:         'Script Lock',
+  audio_direction:     'Audio Direction',
+  consistency_lock:    'Consistency Lock',
+  shot_list:           'Shot List',
+  camera_light_plan:   'Camera & Light Plan',
+  visual_prompt_package:'Visual Prompt Package',
+  edit_plan:           'Edit Plan',
+  music_cue_sheet:     'Music Cue Sheet',
+}
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function isFieldEmpty(value: unknown): boolean {
@@ -589,15 +608,63 @@ export default function FilmStudio() {
 
   const approveGate = async (gateId: GateId) => {
     const newGate: GateClosed = { gate: gateId, closed_at: new Date().toISOString() }
-    const updated = [...(film?.gates_closed ?? []), newGate]
+    const existing = film?.gates_closed ?? []
+    const updated = existing.some(g => g.gate === gateId)
+      ? existing.map(g => g.gate === gateId ? newGate : g)
+      : [...existing, newGate]
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
   }
 
   const reopenGate = async (gateId: GateId) => {
-    const updated = (film?.gates_closed ?? []).filter(g => g.gate !== gateId)
+    const currentGate = film?.gates_closed?.find(g => g.gate === gateId)
+    if (!currentGate?.closed_at) return
+
+    const lastClosedAt = currentGate.closed_at
+
+    const affected = (film?.documents_generated ?? [])
+      .filter(d => d.generated_at > lastClosedAt && d.document !== gateId)
+      .map(d => d.document as GateId)
+
+    const enrichedEntry: GateClosed = {
+      gate: gateId,
+      status: 'reopened',
+      last_closed_at: lastClosedAt,
+      ripple: affected,
+      ripple_dismissed: [],
+    }
+
+    const updated = (film?.gates_closed ?? []).map(g =>
+      g.gate === gateId ? enrichedEntry : g
+    )
+
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+  }
+
+  const dismissRippleFlag = async (gateId: GateId, documentId: GateId) => {
+    const updated = (film?.gates_closed ?? []).map(g => {
+      if (g.gate !== gateId || g.status !== 'reopened') return g
+      return {
+        ...g,
+        ripple_dismissed: [...(g.ripple_dismissed ?? []), documentId],
+      }
+    })
+    await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
+    setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+  }
+
+  const getActiveRippleFlag = (documentId: GateId): GateId | null => {
+    for (const gate of film?.gates_closed ?? []) {
+      if (
+        gate.status === 'reopened' &&
+        gate.ripple?.includes(documentId) &&
+        !gate.ripple_dismissed?.includes(documentId)
+      ) {
+        return gate.gate
+      }
+    }
+    return null
   }
 
   const generateDocument = async (gateId: GateId, owningMode: string) => {
@@ -1037,6 +1104,9 @@ export default function FilmStudio() {
                 {/* Production state */}
                 {film?.current_mode && (
                   <>
+                    <div style={{ padding: '0 1.5rem 0.75rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                      Generate opens a conversation with this mode. The document arrives when the film is ready.
+                    </div>
                     {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
                       <div key={mode} style={{ marginBottom: '1rem' }}>
                         <div style={{ fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.35)', padding: '0.5rem 1.5rem' }}>
@@ -1044,50 +1114,66 @@ export default function FilmStudio() {
                         </div>
                         {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
                           const isGenerated = film.documents_generated?.some(d => d.document === doc.gateId)
-                          const isApproved = film.gates_closed?.some(g => g.gate === doc.gateId)
+                          const isApproved = film.gates_closed?.some(g => g.gate === doc.gateId && g.status !== 'reopened')
+                          const activeFlag = getActiveRippleFlag(doc.gateId)
 
                           return (
-                            <div key={doc.gateId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <div key={doc.gateId} style={{ padding: '0.55rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                              {/* Document name */}
-                              {isGenerated ? (
-                                <span
-                                  onClick={() => setOpenDocument(doc.gateId)}
-                                  style={{ fontSize: '0.76rem', color: isApproved ? 'rgba(212,175,55,0.85)' : 'rgba(255,255,255,0.72)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(212,175,55,0.25)' }}
-                                >
-                                  {doc.label}
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>
-                                  {doc.label}
-                                </span>
-                              )}
+                                {/* Document name */}
+                                {isGenerated ? (
+                                  <span
+                                    onClick={() => setOpenDocument(doc.gateId)}
+                                    style={{ fontSize: '0.76rem', color: isApproved ? 'rgba(212,175,55,0.85)' : 'rgba(255,255,255,0.72)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(212,175,55,0.25)' }}
+                                  >
+                                    {doc.label}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>
+                                    {doc.label}
+                                  </span>
+                                )}
 
-                              {/* Action button */}
-                              {!isGenerated && (
-                                <button
-                                  onClick={() => generateDocument(doc.gateId, doc.mode)}
-                                  disabled={generating === doc.gateId}
-                                  style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.55)', background: 'none', border: '1px solid rgba(212,175,55,0.2)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
-                                >
-                                  {generating === doc.gateId ? '...' : 'Generate'}
-                                </button>
-                              )}
-                              {isGenerated && !isApproved && (
-                                <button
-                                  onClick={() => approveGate(doc.gateId)}
-                                  style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0a0a0a', background: 'rgba(212,175,55,0.85)', border: 'none', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
-                                >
-                                  Approve
-                                </button>
-                              )}
-                              {isApproved && (
-                                <button
-                                  onClick={() => reopenGate(doc.gateId)}
-                                  style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.45)', background: 'none', border: '1px solid rgba(212,175,55,0.18)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
-                                >
-                                  Reopen
-                                </button>
+                                {/* Action button */}
+                                {!isGenerated && (
+                                  <button
+                                    onClick={() => generateDocument(doc.gateId, doc.mode)}
+                                    disabled={generating === doc.gateId}
+                                    style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.55)', background: 'none', border: '1px solid rgba(212,175,55,0.2)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
+                                  >
+                                    {generating === doc.gateId ? '...' : 'Generate'}
+                                  </button>
+                                )}
+                                {isGenerated && !isApproved && (
+                                  <button
+                                    onClick={() => approveGate(doc.gateId)}
+                                    style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0a0a0a', background: 'rgba(212,175,55,0.85)', border: 'none', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
+                                  >
+                                    Approve
+                                  </button>
+                                )}
+                                {isApproved && (
+                                  <button
+                                    onClick={() => reopenGate(doc.gateId)}
+                                    style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.45)', background: 'none', border: '1px solid rgba(212,175,55,0.18)', padding: '0.28rem 0.6rem', cursor: 'pointer', flexShrink: 0 }}
+                                  >
+                                    Reopen
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Ripple flag */}
+                              {activeFlag && (
+                                <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.68rem', color: 'rgba(251,191,36,0.7)' }}>
+                                  <span>Built before the {GATE_LABELS[activeFlag]} was revised. Worth a look.</span>
+                                  <button
+                                    onClick={() => dismissRippleFlag(activeFlag, doc.gateId)}
+                                    style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(251,191,36,0.5)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.68rem', fontFamily: serif }}
+                                  >
+                                    Dismiss
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )
