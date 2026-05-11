@@ -7,18 +7,54 @@ type FilmMode = 'producer' | 'director' | 'narrator' | 'cinematographer' | 'edit
 type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 
 type PromptContext = {
-  filmMemory: string | null
+  filmMemory: Record<string, any> | null
   filmTitle: string
   sessionType: string
   currentMode: FilmMode
   gatesClosed?: { gate: string; closed_at: string; portrait_version?: string }[]
 }
 
-function buildProducerPrompt(ctx: PromptContext): string {
-  const memoryBlock = ctx.filmMemory
-    ? ctx.filmMemory
-    : 'The portrait is not yet built. You are meeting the filmmaker for the first time.'
+const PORTRAIT_FIELD_LABELS: Record<string, string> = {
+  portrait_logline:          'Logline',
+  portrait_emotional_core:   'Emotional Core',
+  portrait_story:            'Story',
+  portrait_world:            'World',
+  portrait_subjects:         'Subjects',
+  portrait_themes:           'Themes',
+  portrait_approach:         'Approach',
+  portrait_tone:             'Tone',
+  portrait_visual_world:     'Visual World',
+  portrait_audience:         'Audience',
+  portrait_comparable_films: 'Comparable Films',
+  portrait_target_length:    'Target Length',
+}
 
+function buildPortraitBlock(portrait: Record<string, any> | null): string {
+  if (!portrait) return 'The portrait is not yet built. You are meeting the filmmaker for the first time.'
+
+  const lines: string[] = []
+
+  for (const [key, label] of Object.entries(PORTRAIT_FIELD_LABELS)) {
+    const value = portrait[key]?.value
+    if (value && typeof value === 'string' && value.trim()) {
+      lines.push(`- ${label}: ${value}`)
+    }
+  }
+
+  const uqField = portrait.portrait_unresolved_questions
+  if (uqField?.value && Array.isArray(uqField.value)) {
+    const open = uqField.value.filter((q: any) => !q.resolved)
+    if (open.length > 0) {
+      lines.push(`- Unresolved Questions: ${open.map((q: any) => q.question).join(' | ')}`)
+    }
+  }
+
+  if (lines.length === 0) return 'The portrait is not yet built. You are meeting the filmmaker for the first time.'
+
+  return `FILM PORTRAIT:\n${lines.join('\n')}`
+}
+
+function buildProducerPrompt(ctx: PromptContext): string {
   return `You are Matinee — the filmmaker's producer.
 
 The film is: ${ctx.filmTitle}
@@ -27,7 +63,7 @@ YOUR ROLE
 You think about the whole film. What it is trying to say. Why it exists. How long it should be. Who it is for. You do not think about shots, scripts, narration, or visual details. Those belong to other team members. If the filmmaker asks for any of those things, name the right team member and redirect: "That belongs to [Director / Narrator / Cinematographer]. When you're ready, switch to that mode and they'll take it from there."
 
 WHAT YOU KNOW ABOUT THIS FILM
-${memoryBlock}
+${buildPortraitBlock(ctx.filmMemory)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, assess what the portrait contains:
@@ -135,6 +171,8 @@ function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: stri
 - What is still unresolved: ${filmMemory.unresolved_threads || 'Everything is open'}`
     : 'No memory yet. This is the first session. Begin building it through conversation.'
 
+  const portraitStateBlock = buildPortraitBlock(filmMemory)
+
   const portraitBlock = `FILM PORTRAIT EXTRACTION:
 In the same response, also extract what this exchange reveals about the film's portrait. The portrait fields are precise and structured — only populate a field if the conversation has genuinely revealed something specific about it. Return null for any field the conversation has not addressed. Do not invent or infer beyond what was actually said.
 
@@ -173,6 +211,8 @@ FILM: ${filmTitle}
 SESSION: ${sessionType}
 
 ${memoryBlock}
+
+${portraitStateBlock}
 
 HOW YOU BEHAVE:
 - You ask one question at a time. Always. Never two.
