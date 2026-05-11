@@ -191,7 +191,30 @@ const MODE_PROMPTS: Record<FilmMode, (ctx: PromptContext) => string> = {
   ai_specialist: buildStubPrompt,
 }
 
-function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: string, currentMode: string | null) {
+const CONFIRMATORY_PHRASES = new Set([
+  'yes', 'no', 'ok', 'okay', 'sure', 'got it', 'gotcha', 'agreed',
+  'sounds right', 'sounds good', 'makes sense', 'continue', 'go on',
+  'go ahead', 'let\'s do that', 'that works', 'perfect', 'great',
+  'thanks', 'thank you', 'interesting', 'i see', 'noted'
+])
+
+function shouldExtract(messages: { role: string; content: string }[]): boolean {
+  if (messages.length === 0) return false
+  const last = messages[messages.length - 1]
+  if (last.role !== 'user') return false
+  const text = last.content.trim()
+  if (text.length < 80) return false
+  if (CONFIRMATORY_PHRASES.has(text.toLowerCase())) return false
+  return true
+}
+
+function buildSystemPrompt(
+  filmMemory: any,
+  sessionType: string,
+  filmTitle: string,
+  currentMode: string | null,
+  messages: { role: string; content: string }[]
+): string {
   if (currentMode !== null) {
     const mode = currentMode as FilmMode
     const ctx: PromptContext = {
@@ -214,7 +237,8 @@ function buildSystemPrompt(filmMemory: any, sessionType: string, filmTitle: stri
 
   const portraitStateBlock = buildPortraitBlock(filmMemory)
 
-  const portraitBlock = `FILM PORTRAIT EXTRACTION:
+  const extract = shouldExtract(messages)
+  const portraitBlock = extract ? `FILM PORTRAIT EXTRACTION:
 In the same response, also extract what this exchange reveals about the film's portrait. The portrait fields are precise and structured — only populate a field if the conversation has genuinely revealed something specific about it. Return null for any field the conversation has not addressed. Do not invent or infer beyond what was actually said.
 
 The portrait fields to extract:
@@ -233,7 +257,7 @@ The portrait fields to extract:
 - portrait_comparable_films: Films that share this film's tone, approach, or visual world. Only populate if the filmmaker has named or implied references.
 - portrait_target_length: A specific number in minutes. Only populate if the filmmaker has stated a target length explicitly.
 
-CRITICAL — Field 11 (Director's Intent) does not exist in portrait extraction. Never attempt to extract or populate portrait_directors_intent. It is not part of your task.`
+CRITICAL — Field 11 (Director's Intent) does not exist in portrait extraction. Never attempt to extract or populate portrait_directors_intent. It is not part of your task.` : ''
 
   return `You are Matinee, a filmmaker's creative companion. Not an assistant. Not a tool. A companion. The most attentive, most honest collaborator a filmmaker has ever had.
 
@@ -297,7 +321,7 @@ Output the raw JSON object and nothing else.
     "filmmakers_words": "exact phrases the filmmaker used when something became real",
     "unresolved_threads": "what is still open, what needs to come next"
   },
-  "portrait": {
+  ${extract ? `"portrait": {
     "portrait_logline": "..." ,
     "portrait_emotional_core": "...",
     "portrait_story": "..." ,
@@ -311,7 +335,7 @@ Output the raw JSON object and nothing else.
     "portrait_unresolved_questions": [],
     "portrait_comparable_films": "...",
     "portrait_target_length": "..."
-  }
+  }` : `"portrait": {}`}
 }`
 }
 
@@ -345,7 +369,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, filmMemory, sessionType, filmTitle, currentMode } = await req.json()
 
-    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode)
+    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, messages)
 
     const apiMessages = messages.length > 0
       ? messages
