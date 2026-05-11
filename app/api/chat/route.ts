@@ -372,7 +372,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, messages)
 
     const apiMessages = messages.length > 0
-      ? messages
+      ? messages.slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
     const response = await anthropic.messages.create({
