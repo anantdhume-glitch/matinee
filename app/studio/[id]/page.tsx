@@ -1168,7 +1168,7 @@ export default function FilmStudio() {
                 {film?.current_mode && (
                   <>
                     <div style={{ padding: '0 1.5rem 0.75rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', lineHeight: 1.5 }}>
-                      Generate opens a conversation with this mode. The document arrives when the film is ready.
+                      Generate opens a conversation with the mode. The document follows when you&apos;re ready.
                     </div>
                     {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
                       <div key={mode} style={{ marginBottom: '1rem' }}>
@@ -1243,11 +1243,11 @@ export default function FilmStudio() {
 
                               {/* Ripple flag */}
                               {activeFlag && (
-                                <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.68rem', color: 'rgba(251,191,36,0.7)' }}>
-                                  <span>Built before the {GATE_LABELS[activeFlag]} was revised. Worth a look.</span>
+                                <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.68rem', color: 'rgba(251,191,36,0.7)', lineHeight: 1.5 }}>
+                                  <span>{doc.label} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
                                   <button
                                     onClick={() => dismissRippleFlag(activeFlag, doc.gateId)}
-                                    style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(251,191,36,0.5)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.68rem', fontFamily: serif }}
+                                    style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(251,191,36,0.5)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.68rem', fontFamily: serif, flexShrink: 0 }}
                                   >
                                     Dismiss
                                   </button>
