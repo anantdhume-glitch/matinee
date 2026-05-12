@@ -506,7 +506,7 @@ export default function FilmStudio() {
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null })
+      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null, gatesClosed: film?.gates_closed ?? [] })
     })
     const data = await response.json()
 

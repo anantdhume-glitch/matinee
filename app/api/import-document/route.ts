@@ -79,6 +79,36 @@ Return only a JSON object with this exact shape. No preamble. No explanation out
 }`
   }
 
+  if (gateId === 'department_briefs') {
+    return `${ctx}You are reading an externally produced set of Department Briefs for a film called "${filmTitle}".
+
+These briefs represent the Director's instructions to the Narrator, Cinematographer, AI Specialist, Editor, and Sound teams.
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_visual_world: The visual world — light, palette, camera relationship, texture
+- portrait_tone: The tone — emotional temperature and pacing character
+- portrait_approach: The approach — how the film is being told
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the briefs revealed clearly about the film's direction, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_visual_world": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
   // Generic fallback for all other gate IDs
   return `${ctx}You are reading an externally produced production document for a film called "${filmTitle}".
 
