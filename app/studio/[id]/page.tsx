@@ -13,6 +13,8 @@ type GateClosed = {
   ripple?: GateId[]
   ripple_dismissed?: GateId[]
   cleared_by?: 'matinee_work' | 'import'
+  imported_document?: string
+  confirmed_by_filmmaker_at?: string
 }
 type DocumentGenerated = {
   document: GateId
@@ -362,6 +364,7 @@ export default function FilmStudio() {
   const [importPending, setImportPending] = useState<{
     gateId: GateId
     content: string
+    filename: string
   } | null>(null)
   const [importLoading, setImportLoading] = useState<GateId | null>(null)
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
@@ -617,12 +620,21 @@ export default function FilmStudio() {
     await refreshPortrait()
   }
 
-  const approveGate = async (gateId: GateId, clearedBy?: 'matinee_work' | 'import') => {
-    const newGate: GateClosed = {
-      gate: gateId,
-      closed_at: new Date().toISOString(),
-      ...(clearedBy ? { cleared_by: clearedBy } : {}),
-    }
+  const approveGate = async (gateId: GateId, clearedBy?: 'matinee_work' | 'import', importedDocument?: string) => {
+    const now = new Date().toISOString()
+    const newGate: GateClosed = clearedBy === 'import'
+      ? {
+          gate: gateId,
+          closed_at: now,
+          cleared_by: 'import',
+          imported_document: importedDocument,
+          confirmed_by_filmmaker_at: now,
+        }
+      : {
+          gate: gateId,
+          closed_at: now,
+          ...(clearedBy ? { cleared_by: clearedBy } : {}),
+        }
     const existing = film?.gates_closed ?? []
     const updated = existing.some(g => g.gate === gateId)
       ? existing.map(g => g.gate === gateId ? newGate : g)
@@ -739,7 +751,7 @@ export default function FilmStudio() {
       })
       const data = await response.json()
       if (data.content) {
-        setImportPending({ gateId, content: data.content })
+        setImportPending({ gateId, content: data.content, filename: file.name })
       }
     } finally {
       setImportLoading(null)
@@ -769,7 +781,7 @@ export default function FilmStudio() {
       documents_generated: updatedGenerated,
     } : null)
 
-    await approveGate(gateId, 'import')
+    await approveGate(gateId, 'import', importPending.filename)
     setImportPending(null)
   }
 

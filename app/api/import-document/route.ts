@@ -1,8 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { buildExtractionPrompt, mergeMemoryFromExtraction } from '@/lib/filmMemory'
+import { mergeMemoryFromExtraction } from '@/lib/filmMemory'
 
 export const maxDuration = 60
+
+type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
+
+const GATE_DOC_TYPE: Partial<Record<GateId, 'script' | 'brief' | 'treatment' | 'department_brief'>> = {
+  film_brief: 'brief',
+  treatment: 'treatment',
+  department_briefs: 'department_brief',
+  script_lock: 'script',
+}
+
+function buildSpecialistExtractionPrompt(docType: 'script' | 'brief' | 'treatment' | 'department_brief'): string {
+  const base = `You are reading a filmmaker's document. Extract what you can into Film Memory and Film Portrait fields.
+
+Return a single JSON object with this exact shape:
+{
+  "memory": {
+    "emotional_core": string | null,
+    "characters": object | null,
+    "decisions_made": string | null,
+    "filmmakers_words": string | null,
+    "unresolved_threads": string | null
+  },
+  "portrait": {
+    "portrait_logline": string | null,
+    "portrait_emotional_core": string | null,
+    "portrait_story": string | null,
+    "portrait_world": string | null,
+    "portrait_subjects": string | null,
+    "portrait_themes": string | null,
+    "portrait_approach": string | null,
+    "portrait_tone": string | null,
+    "portrait_visual_world": string | null,
+    "portrait_audience": string | null,
+    "portrait_comparable_films": string | null,
+    "portrait_target_length": string | null
+  }
+}
+
+portrait_directors_intent is never extracted — omit it entirely.
+Use null for any field you cannot fill from this document. Do not invent or infer beyond what is written.`
+
+  const instructions: Record<typeof docType, string> = {
+    script: `This is a narrative script or screenplay draft.
+Extract: emotional core, characters and their arcs, tone, the filmmaker's distinctive language and phrasing, unresolved dramatic threads.
+Prioritise portrait_emotional_core, portrait_story, portrait_subjects, portrait_tone.`,
+
+    brief: `This is a strategic planning document — a Film Brief or production brief.
+Extract: the emotional premise, narrative approach, intended audience, distribution context, target length, and what success looks like for this film.
+Prioritise portrait_approach, portrait_story, portrait_audience, portrait_target_length, portrait_comparable_films.
+Do not read sections like budget, schedule, or crew as Film Memory — focus only on creative and editorial intent.`,
+
+    treatment: `This is a Director's Treatment — a set of directorial decisions about how the film will be made.
+Extract: the director's defined visual world, tone, the film's emotional logic, and any explicit creative commitments.
+Prioritise portrait_visual_world, portrait_tone, portrait_themes, portrait_emotional_core.
+Capture the director's exact language — these are deliberate choices, not drafts.`,
+
+    department_brief: `This is a production handoff document for a department or collaborator.
+Extract whatever Film Portrait signal is present, but treat this as a supporting document.
+Do not overwrite strong creative intent with operational language.
+Populate only fields where the document contains clear, direct creative information.`,
+  }
+
+  return `${instructions[docType]}\n\n${base}`
+}
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,7 +110,8 @@ export async function POST(request: NextRequest) {
       : ''
 
     const now = new Date().toISOString()
-    const extractionPrompt = buildExtractionPrompt(existingMemoryBlock, now)
+    const docType = GATE_DOC_TYPE[gateId as GateId] ?? 'script'
+    const extractionPrompt = buildSpecialistExtractionPrompt(docType)
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
