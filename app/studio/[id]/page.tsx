@@ -13,6 +13,8 @@ type GateClosed = {
   ripple?: GateId[]
   ripple_dismissed?: GateId[]
   cleared_by?: 'matinee_work' | 'import'
+  imported_document?: string
+  confirmed_by_filmmaker_at?: string
 }
 type DocumentGenerated = {
   document: GateId
@@ -255,7 +257,8 @@ async function mergeMemory(
   portrait: any,
   existing: FilmMemory,
   filmId: string,
-  supabase: any
+  supabase: any,
+  createdBy: string = 'studio'
 ) {
   const longer = (a?: string, b?: string) =>
     (a?.length ?? 0) >= (b?.length ?? 0) ? a : b
@@ -298,8 +301,8 @@ async function mergeMemory(
     if (!existing_field) {
       portraitUpdates[field] = {
         value: extracted_value,
-        created_by: 'studio',
-        created_in_mode: 'discovery',
+        created_by: createdBy,
+        created_in_mode: createdBy === 'import' ? 'import' : 'discovery',
         updated_at: now,
       }
     } else {
@@ -307,8 +310,8 @@ async function mergeMemory(
       if (extracted_value.length > existing_value.length) {
         portraitUpdates[field] = {
           value: extracted_value,
-          created_by: 'studio',
-          created_in_mode: 'discovery',
+          created_by: createdBy,
+          created_in_mode: createdBy === 'import' ? 'import' : 'discovery',
           updated_at: now,
           history: appendHistory(existing_field),
         }
@@ -371,8 +374,13 @@ export default function FilmStudio() {
   const [generating, setGenerating] = useState<GateId | null>(null)
   const [importPending, setImportPending] = useState<{
     gateId: GateId
-    content: string
+    filename: string
+    summary: string
+    fieldsUpdated: string[]
+    fieldsAbsent: string[]
+    extractedPortrait: any
   } | null>(null)
+  const [importDiscussing, setImportDiscussing] = useState(false)
   const [importLoading, setImportLoading] = useState<GateId | null>(null)
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
@@ -738,50 +746,70 @@ export default function FilmStudio() {
 
   const importDocument = async (gateId: GateId, file: File) => {
     setImportLoading(gateId)
+    setImportDiscussing(false)
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('filmId', filmId)
       formData.append('gateId', gateId)
 
-      const response = await fetch('/api/import-document', {
-        method: 'POST',
-        body: formData,
-      })
+      const response = await fetch('/api/import-document', { method: 'POST', body: formData })
       const data = await response.json()
-      if (data.content) {
-        setImportPending({ gateId, content: data.content })
+
+      if (data.summary) {
+        await supabase.from('messages').insert({ role: 'assistant', content: data.summary, film_id: filmId })
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.summary }])
+        setImportPending({
+          gateId,
+          filename: file.name,
+          summary: data.summary,
+          fieldsUpdated: data.fieldsUpdated ?? [],
+          fieldsAbsent: data.fieldsAbsent ?? [],
+          extractedPortrait: data.extractedPortrait ?? {},
+        })
       }
     } finally {
       setImportLoading(null)
     }
   }
 
+  const approveGateFromImport = async (gateId: GateId, filename: string) => {
+    const now = new Date().toISOString()
+    const newGate: GateClosed = {
+      gate: gateId,
+      closed_at: now,
+      cleared_by: 'import',
+      imported_document: filename,
+      confirmed_by_filmmaker_at: now,
+    }
+    const existing = film?.gates_closed ?? []
+    const updated = existing.some(g => g.gate === gateId)
+      ? existing.map(g => g.gate === gateId ? newGate : g)
+      : [...existing, newGate]
+    await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
+    setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+  }
+
   const confirmImport = async () => {
     if (!importPending) return
-    const { gateId, content } = importPending
+    const { gateId, filename, summary, extractedPortrait } = importPending
 
-    const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: content }
-    const newGenerated: DocumentGenerated = {
-      document: gateId,
-      generated_at: new Date().toISOString(),
-      source: 'import',
+    const { data: existingMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+    if (existingMemory) {
+      await mergeMemory({}, extractedPortrait, existingMemory, filmId, supabase, 'import')
     }
+
+    const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: summary }
+    const newGenerated: DocumentGenerated = { document: gateId, generated_at: new Date().toISOString(), source: 'import' }
     const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
+    await supabase.from('films').update({ documents_content: updatedContent, documents_generated: updatedGenerated }).eq('id', filmId)
+    setFilm(prev => prev ? { ...prev, documents_content: updatedContent, documents_generated: updatedGenerated } : null)
 
-    await supabase
-      .from('films')
-      .update({ documents_content: updatedContent, documents_generated: updatedGenerated })
-      .eq('id', filmId)
+    await approveGateFromImport(gateId, filename)
 
-    setFilm(prev => prev ? {
-      ...prev,
-      documents_content: updatedContent,
-      documents_generated: updatedGenerated,
-    } : null)
-
-    await approveGate(gateId, 'import')
+    if (portraitOpen) await refreshPortrait()
     setImportPending(null)
+    setImportDiscussing(false)
   }
 
   // ── LOADING ────────────────────────────────────────────────────────────────
@@ -1027,6 +1055,24 @@ export default function FilmStudio() {
                 </div>
               )}
 
+              {/* Import approve / discuss — shown after Matinee surfaces the extraction summary */}
+              {importPending && !importDiscussing && (
+                <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.25rem' }}>
+                  <button
+                    onClick={confirmImport}
+                    style={{ ...btnPrimary, fontSize: '0.72rem', padding: '0.6rem 1.25rem' }}
+                  >
+                    Close the gate
+                  </button>
+                  <button
+                    onClick={() => setImportDiscussing(true)}
+                    style={{ ...btnSecondary, fontSize: '0.72rem', padding: '0.6rem 1.25rem' }}
+                  >
+                    Talk through it first
+                  </button>
+                </div>
+              )}
+
               <div ref={bottomRef} />
             </div>
           </div>
@@ -1239,10 +1285,11 @@ export default function FilmStudio() {
                           const gateEntry = film.gates_closed?.find(g => g.gate === doc.gateId)
                           const isReopened = gateEntry?.status === 'reopened'
                           const isApproved = !!gateEntry && !isReopened
+                          const hasPendingImport = importPending?.gateId === doc.gateId
                           const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' | 'REOPENED' =
                             isReopened ? 'REOPENED' :
                             isApproved ? 'LOCKED' :
-                            isGenerated ? 'IN REVIEW' : 'OPEN'
+                            (isGenerated || hasPendingImport) ? 'IN REVIEW' : 'OPEN'
                           const stateColor =
                             gateState === 'LOCKED'    ? 'rgba(212,175,55,0.75)' :
                             gateState === 'REOPENED'  ? 'rgba(251,191,36,0.55)' :
@@ -1277,7 +1324,7 @@ export default function FilmStudio() {
                                 </span>
 
                                 {/* Action buttons */}
-                                {!isGenerated && (
+                                {!isGenerated && !hasPendingImport && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                                     <button
                                       onClick={() => generateDocument(doc.gateId, doc.mode)}
@@ -1332,20 +1379,17 @@ export default function FilmStudio() {
                                 </div>
                               )}
 
-                              {/* Import confirmation */}
-                              {importPending?.gateId === doc.gateId && (
-                                <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.68rem' }}>
-                                  <span style={{ color: 'rgba(255,255,255,0.45)', flex: 1, lineHeight: 1.5 }}>
-                                    Read. Portrait updated from this document. Close this gate as imported?
-                                  </span>
+                              {/* Import pending — close/discard (shown when filmmaker clicked discuss) */}
+                              {hasPendingImport && importDiscussing && (
+                                <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.68rem' }}>
                                   <button
                                     onClick={confirmImport}
                                     style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(212,175,55,0.7)', cursor: 'pointer', fontFamily: serif, fontSize: '0.68rem', letterSpacing: '0.06em' }}
                                   >
-                                    Close Gate
+                                    Close gate
                                   </button>
                                   <button
-                                    onClick={() => setImportPending(null)}
+                                    onClick={() => { setImportPending(null); setImportDiscussing(false) }}
                                     style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontFamily: serif, fontSize: '0.68rem' }}
                                   >
                                     Discard

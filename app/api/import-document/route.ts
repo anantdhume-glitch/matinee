@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { buildExtractionPrompt, mergeMemoryFromExtraction } from '@/lib/filmMemory'
 
 export const maxDuration = 60
 
@@ -8,6 +7,117 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+function getExtractionPrompt(gateId: string, filmTitle: string, existingMemoryBlock: string): string {
+  const ctx = existingMemoryBlock ? `${existingMemoryBlock}\n` : ''
+
+  if (gateId === 'film_brief') {
+    return `${ctx}You are reading an externally produced Film Brief for a film called "${filmTitle}".
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_logline: The logline — what this film is, in one sentence
+- portrait_emotional_core: The emotional core — what the film makes the audience feel, not what it is about
+- portrait_story: The story — beginning, turning point, and end
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_themes: The themes — what the film argues beneath the story
+- portrait_approach: The approach — how the film is being told (observation, testimony, reconstruction, etc.)
+- portrait_tone: The tone — emotional temperature of the film
+- portrait_audience: The audience — who this is for and where they will watch it
+- portrait_target_length: Target length — how long the film should be
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the brief revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_logline": "string or null",
+    "portrait_emotional_core": "string or null",
+    "portrait_story": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_themes": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_audience": "string or null",
+    "portrait_target_length": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
+  if (gateId === 'treatment') {
+    return `${ctx}You are reading an externally produced Director's Treatment for a film called "${filmTitle}".
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_story: The story — structure, turning points, emotional arc
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_themes: The themes — what the film argues beneath the story
+- portrait_approach: The approach — observational, testimony, reconstruction, etc.
+- portrait_visual_world: The visual world — light, palette, camera relationship
+- portrait_tone: The tone — emotional temperature
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the treatment revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_story": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_themes": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_visual_world": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
+  // Generic fallback for all other gate IDs
+  return `${ctx}You are reading an externally produced production document for a film called "${filmTitle}".
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_logline: The logline
+- portrait_emotional_core: The emotional core — what the film makes the audience feel
+- portrait_story: The story structure
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects
+- portrait_themes: The themes
+- portrait_approach: The approach
+- portrait_tone: The tone
+- portrait_visual_world: The visual world
+- portrait_audience: The audience
+- portrait_comparable_films: Comparable films
+- portrait_target_length: Target length
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the document revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_logline": "string or null",
+    "portrait_emotional_core": "string or null",
+    "portrait_story": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_themes": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_visual_world": "string or null",
+    "portrait_audience": "string or null",
+    "portrait_comparable_films": "string or null",
+    "portrait_target_length": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,8 +141,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: existingMemory } = await supabaseAdmin
-      .from('film_memory').select('*').eq('film_id', filmId).single()
+    const [{ data: filmRow }, { data: existingMemory }] = await Promise.all([
+      supabaseAdmin.from('films').select('title').eq('id', filmId).single(),
+      supabaseAdmin.from('film_memory').select('*').eq('film_id', filmId).single(),
+    ])
+
+    const filmTitle = filmRow?.title ?? 'Untitled Film'
 
     const existingMemoryBlock = existingMemory
       ? `WHAT YOU ALREADY KNOW ABOUT THIS FILM:
@@ -45,28 +159,20 @@ export async function POST(request: NextRequest) {
 `
       : ''
 
-    const now = new Date().toISOString()
-    const extractionPrompt = buildExtractionPrompt(existingMemoryBlock, now)
-
+    const prompt = getExtractionPrompt(gateId, filmTitle, existingMemoryBlock)
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    let extracted: { memory: any; portrait: any }
-    let rawText: string
+    let rawResponse: string
 
     if (isPDF) {
       const base64 = buffer.toString('base64')
-
-      const pdfPrompt = `${extractionPrompt}
-
-Also include a "raw_text" key at the top level of your JSON response containing the full readable text of this document, suitable for display.`
-
       const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': process.env.ANTHROPIC_API_KEY!,
-          'anthropic-version': '2023-06-01'
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
@@ -77,88 +183,61 @@ Also include a "raw_text" key at the top level of your JSON response containing 
               content: [
                 {
                   type: 'document',
-                  source: {
-                    type: 'base64',
-                    media_type: 'application/pdf',
-                    data: base64
-                  }
+                  source: { type: 'base64', media_type: 'application/pdf', data: base64 },
                 },
-                { type: 'text', text: pdfPrompt }
-              ]
-            }
-          ]
-        })
+                { type: 'text', text: prompt },
+              ],
+            },
+          ],
+        }),
       })
-
       const aiData = await aiResponse.json()
       if (aiData.error) {
         console.error('Claude PDF import error:', aiData.error)
         return NextResponse.json({ error: 'Could not read the document right now. Try again.' }, { status: 500 })
       }
-
-      let parsed: { memory: any; portrait: any; raw_text?: string }
-      try {
-        const clean = (aiData.content[0].text as string).replace(/```json|```/g, '').trim()
-        parsed = JSON.parse(clean)
-      } catch {
-        console.error('Could not parse Claude PDF import response:', aiData.content[0].text)
-        return NextResponse.json({ error: 'Something went wrong reading the document. Try again.' }, { status: 500 })
-      }
-
-      rawText = parsed.raw_text ?? aiData.content[0].text
-      extracted = { memory: parsed.memory, portrait: parsed.portrait }
+      rawResponse = aiData.content[0].text
 
     } else {
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
-      rawText = result.value.slice(0, 30000)
-
+      const docText = result.value.slice(0, 30000)
       const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': process.env.ANTHROPIC_API_KEY!,
-          'anthropic-version': '2023-06-01'
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 8000,
-          messages: [
-            {
-              role: 'user',
-              content: `${extractionPrompt}\n\nDOCUMENT:\n${rawText}`
-            }
-          ]
-        })
+          messages: [{ role: 'user', content: `${prompt}\n\nDOCUMENT:\n${docText}` }],
+        }),
       })
-
       const aiData = await aiResponse.json()
       if (aiData.error) {
         console.error('Claude DOCX import error:', aiData.error)
         return NextResponse.json({ error: 'Could not read the document right now. Try again.' }, { status: 500 })
       }
-
-      try {
-        const clean = (aiData.content[0].text as string).replace(/```json|```/g, '').trim()
-        extracted = JSON.parse(clean)
-      } catch {
-        console.error('Could not parse Claude DOCX import response:', aiData.content[0].text)
-        return NextResponse.json({ error: 'Something went wrong reading the document. Try again.' }, { status: 500 })
-      }
+      rawResponse = aiData.content[0].text
     }
 
-    if (extracted.portrait) delete extracted.portrait['portrait_directors_intent']
-
-    const merged = mergeMemoryFromExtraction(existingMemory ?? {}, extracted)
-    const memoryPayload = { ...merged, updated_at: now }
-
-    if (existingMemory) {
-      await supabaseAdmin.from('film_memory').update(memoryPayload).eq('film_id', filmId)
-    } else {
-      await supabaseAdmin.from('film_memory').insert({ ...memoryPayload, film_id: filmId })
+    let parsed: { extractedPortrait: Record<string, string | null>; fieldsAbsent: string[]; summary: string }
+    try {
+      const clean = rawResponse.replace(/```json|```/g, '').trim()
+      parsed = JSON.parse(clean)
+    } catch {
+      console.error('Could not parse import-document response:', rawResponse)
+      return NextResponse.json({ error: 'Something went wrong reading the document. Try again.' }, { status: 500 })
     }
 
-    return NextResponse.json({ content: rawText })
+    const { extractedPortrait, fieldsAbsent, summary } = parsed
+    const fieldsUpdated = Object.entries(extractedPortrait)
+      .filter(([, v]) => v !== null && v !== '')
+      .map(([k]) => k)
+
+    return NextResponse.json({ summary, fieldsUpdated, fieldsAbsent, extractedPortrait })
 
   } catch (error) {
     console.error('Import document error:', error)
