@@ -163,6 +163,16 @@ const GATE_LABELS: Record<GateId, string> = {
   music_cue_sheet:     'Music Cue Sheet',
 }
 
+const MODES: Array<{ label: string; value: string | null }> = [
+  { label: 'DISCOVERY',      value: null },
+  { label: 'PRODUCER',       value: 'producer' },
+  { label: 'DIRECTOR',       value: 'director' },
+  { label: 'NARRATOR',       value: 'narrator' },
+  { label: 'CINEMATOGRAPHER',value: 'cinematographer' },
+  { label: 'AI SPECIALIST',  value: 'ai_specialist' },
+  { label: 'EDITOR',         value: 'editor' },
+]
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function isFieldEmpty(value: unknown): boolean {
   if (!value) return true
@@ -370,6 +380,7 @@ export default function FilmStudio() {
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
+  const [modeOpen, setModeOpen] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -948,6 +959,54 @@ export default function FilmStudio() {
 
         {/* CONVERSATION */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+          {/* MODE SWITCHER */}
+          <div style={{ position: 'relative', flexShrink: 0, borderBottom: `1px solid ${border}`, padding: '0.55rem 3rem' }}>
+            <div style={{ maxWidth: '620px', margin: '0 auto' }}>
+              <span
+                onClick={() => setModeOpen(prev => !prev)}
+                style={{
+                  fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase',
+                  color: film?.current_mode ? gold : goldDim,
+                  cursor: 'pointer', userSelect: 'none', fontVariant: 'small-caps',
+                }}
+              >
+                {MODES.find(m => m.value === (film?.current_mode ?? null))?.label ?? 'DISCOVERY'}
+              </span>
+            </div>
+            {modeOpen && (
+              <div
+                style={{
+                  position: 'absolute', top: '100%', left: '3rem', zIndex: 50,
+                  background: '#111', border: `1px solid ${borderMid}`,
+                  minWidth: '180px', padding: '0.4rem 0',
+                }}
+              >
+                {MODES.map(mode => {
+                  const isActive = (film?.current_mode ?? null) === mode.value
+                  return (
+                    <div
+                      key={String(mode.value)}
+                      onClick={async () => {
+                        setModeOpen(false)
+                        const { error } = await supabase.from('films').update({ current_mode: mode.value }).eq('id', filmId)
+                        if (!error) setFilm(prev => prev ? { ...prev, current_mode: mode.value } : null)
+                      }}
+                      style={{
+                        padding: '0.45rem 1rem', fontSize: '0.6rem', letterSpacing: '0.14em',
+                        textTransform: 'uppercase', cursor: 'pointer',
+                        color: isActive ? gold : textDim,
+                        background: isActive ? 'rgba(201,169,110,0.06)' : 'transparent',
+                      }}
+                    >
+                      {mode.label}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
             <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
               {messages.map((msg, i) => (
@@ -1189,7 +1248,18 @@ export default function FilmStudio() {
                         </div>
                         {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
                           const isGenerated = film.documents_generated?.some(d => d.document === doc.gateId)
-                          const isApproved = film.gates_closed?.some(g => g.gate === doc.gateId && g.status !== 'reopened')
+                          const gateEntry = film.gates_closed?.find(g => g.gate === doc.gateId)
+                          const isReopened = gateEntry?.status === 'reopened'
+                          const isApproved = !!gateEntry && !isReopened
+                          const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' | 'REOPENED' =
+                            isReopened ? 'REOPENED' :
+                            isApproved ? 'LOCKED' :
+                            isGenerated ? 'IN REVIEW' : 'OPEN'
+                          const stateColor =
+                            gateState === 'LOCKED'    ? 'rgba(212,175,55,0.75)' :
+                            gateState === 'REOPENED'  ? 'rgba(251,191,36,0.55)' :
+                            gateState === 'IN REVIEW' ? 'rgba(255,255,255,0.45)' :
+                                                        'rgba(255,255,255,0.18)'
                           const activeFlag = getActiveRippleFlag(doc.gateId)
 
                           return (
@@ -1209,6 +1279,14 @@ export default function FilmStudio() {
                                     {doc.label}
                                   </span>
                                 )}
+
+                                {/* State label */}
+                                <span style={{
+                                  fontSize: '0.58rem', letterSpacing: '0.10em',
+                                  textTransform: 'uppercase', color: stateColor, flexShrink: 0,
+                                }}>
+                                  {gateState}
+                                </span>
 
                                 {/* Action buttons */}
                                 {!isGenerated && (
