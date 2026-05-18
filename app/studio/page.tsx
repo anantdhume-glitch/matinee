@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -29,8 +29,6 @@ const GATE_LABELS: Record<string, string> = {
   music_cue_sheet:      'Music Cue Sheet',
 }
 
-const PAGE_SIZE = 8
-
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -49,7 +47,7 @@ export default function Studio() {
   const [creating, setCreating] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const newFilmInputRef = useRef<HTMLInputElement>(null)
+  const [showNewFilmForm, setShowNewFilmForm] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -76,6 +74,8 @@ export default function Studio() {
       user_id: user!.id
     }).select().single()
     if (data) {
+      setShowNewFilmForm(false)
+      setNewTitle('')
       router.push(`/studio/${data.id}`)
     } else {
       setCreating(false)
@@ -93,15 +93,27 @@ export default function Studio() {
     </main>
   )
 
-  const totalPages = Math.ceil(films.length / PAGE_SIZE)
-  const pageStart = (currentPage - 1) * PAGE_SIZE
-  const pageFilms = films.slice(pageStart, pageStart + PAGE_SIZE)
+  // Page 1: 8 films. Page 2+: 9 films per page.
+  const totalPages = films.length <= 8 ? 1 : Math.ceil((films.length - 8) / 9) + 1
+  const pageFilms = currentPage === 1
+    ? films.slice(0, 8)
+    : films.slice(8 + (currentPage - 2) * 9, 8 + (currentPage - 1) * 9)
 
   const metaStyle: React.CSSProperties = {
     fontFamily: "'Courier New', monospace",
     fontSize: '9px',
     letterSpacing: '0.1em',
     textTransform: 'uppercase',
+  }
+
+  const titleStyle: React.CSSProperties = {
+    fontFamily: 'Georgia, serif',
+    fontSize: '16px',
+    fontWeight: 400,
+    letterSpacing: '0.01em',
+    lineHeight: 1.3,
+    marginBottom: '0.9rem',
+    margin: 0,
   }
 
   const cardBase: React.CSSProperties = {
@@ -153,17 +165,9 @@ export default function Studio() {
                 onMouseLeave={() => setHoveredId(null)}
                 style={{ ...cardBase, background: isHovered ? '#1a1508' : '#131008' }}
               >
-                <div style={{
-                  fontFamily: 'Georgia, serif',
-                  fontSize: '16px',
-                  fontWeight: 400,
-                  color: 'rgba(201, 168, 76, 0.9)',
-                  letterSpacing: '0.01em',
-                  lineHeight: 1.3,
-                  marginBottom: '0.9rem',
-                }}>
+                <p style={{ ...titleStyle, color: 'rgba(201, 168, 76, 0.9)' }}>
                   {film.title}
-                </div>
+                </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.22)' }}>
                     {formatDate(film.updated_at)}
@@ -178,53 +182,88 @@ export default function Studio() {
             )
           })}
 
-          {/* Begin a New Film card — page 1 only, Option A */}
+          {/* Begin a New Film card — page 1 only, Option B */}
           {currentPage === 1 && (
             <div
-              onClick={() => newFilmInputRef.current?.focus()}
+              onClick={() => setShowNewFilmForm(true)}
               onMouseEnter={() => setHoveredId('__new__')}
               onMouseLeave={() => setHoveredId(null)}
-              style={{ ...cardBase, background: hoveredId === '__new__' ? '#1a1508' : '#131008' }}
+              style={{ ...cardBase, background: hoveredId === '__new__' ? '#1a1508' : '#131008', cursor: 'pointer' }}
             >
-              <div style={{
-                fontFamily: 'Georgia, serif',
-                fontSize: '16px',
-                fontWeight: 400,
-                color: 'rgba(255, 255, 255, 0.28)',
-                letterSpacing: '0.01em',
-                lineHeight: 1.3,
-                marginBottom: '0.9rem',
-              }}>
-                Begin a new film
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <input
-                  ref={newFilmInputRef}
-                  placeholder="Name your film, or leave it untitled"
-                  value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && createFilm()}
-                  onClick={e => e.stopPropagation()}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'rgba(255, 255, 255, 0.5)',
-                    padding: '0 0 0.25rem',
-                    fontSize: '9px',
-                    fontFamily: "'Courier New', monospace",
-                    letterSpacing: '0.1em',
-                    outline: 'none',
-                    width: '100%',
-                  }}
-                />
-                <div style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.18)' }}>
-                  New
-                </div>
+              <p style={{ ...titleStyle, color: 'rgba(255, 255, 255, 0.28)' }}>Begin a new film</p>
+              <div style={{ marginTop: 'auto' }}>
+                <span style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.18)' }}>NEW</span>
               </div>
             </div>
           )}
         </div>
+
+        {/* Inline new film form — Option B */}
+        {showNewFilmForm && (
+          <div style={{
+            marginTop: '1px',
+            background: '#131008',
+            padding: '1.25rem 1.4rem',
+            display: 'flex',
+            gap: '1rem',
+            alignItems: 'center',
+          }}>
+            <input
+              autoFocus
+              placeholder="Name your film, or leave it untitled"
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') createFilm()
+                if (e.key === 'Escape') setShowNewFilmForm(false)
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+                color: 'rgba(255, 255, 255, 0.6)',
+                padding: '0.4rem 0',
+                fontSize: '13px',
+                fontFamily: "'Courier New', monospace",
+                letterSpacing: '0.08em',
+                outline: 'none',
+                flex: 1,
+              }}
+            />
+            <button
+              onClick={createFilm}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(201, 168, 76, 0.4)',
+                color: 'rgba(201, 168, 76, 0.7)',
+                fontFamily: "'Courier New', monospace",
+                fontSize: '9px',
+                letterSpacing: '0.16em',
+                padding: '0.5rem 1rem',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Begin
+            </button>
+            <button
+              onClick={() => setShowNewFilmForm(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.2)',
+                fontFamily: "'Courier New', monospace",
+                fontSize: '9px',
+                letterSpacing: '0.12em',
+                cursor: 'pointer',
+                padding: '0.5rem 0',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {totalPages > 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
