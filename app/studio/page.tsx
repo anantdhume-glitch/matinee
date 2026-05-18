@@ -197,7 +197,10 @@ export default function Studio() {
               }}>
                 Begin a new film
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div
+                style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
+                onClick={e => { e.stopPropagation(); newFilmInputRef.current?.focus() }}
+              >
                 <input
                   ref={newFilmInputRef}
                   placeholder="Name your film, or leave it untitled"
@@ -210,12 +213,13 @@ export default function Studio() {
                     border: 'none',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'rgba(255, 255, 255, 0.5)',
-                    padding: '0 0 0.25rem',
-                    fontSize: '9px',
+                    padding: '0.5rem 0',
+                    fontSize: '11px',
                     fontFamily: "'Courier New', monospace",
                     letterSpacing: '0.1em',
                     outline: 'none',
                     width: '100%',
+                    cursor: 'text',
                   }}
                 />
                 <div style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.18)' }}>
