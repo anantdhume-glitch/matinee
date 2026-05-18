@@ -204,7 +204,7 @@ export default function Studio() {
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && createFilm()}
-                  onClick={e => e.stopPropagation()}
+                  tabIndex={0}
                   style={{
                     background: 'transparent',
                     border: 'none',
