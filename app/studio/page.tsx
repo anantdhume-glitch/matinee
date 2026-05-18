@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -29,6 +29,8 @@ const GATE_LABELS: Record<string, string> = {
   music_cue_sheet:      'Music Cue Sheet',
 }
 
+const PAGE_SIZE = 8
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -46,6 +48,8 @@ export default function Studio() {
   const [newTitle, setNewTitle] = useState('')
   const [creating, setCreating] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const newFilmInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -85,12 +89,38 @@ export default function Studio() {
     </main>
   )
 
+  const totalPages = Math.ceil(films.length / PAGE_SIZE)
+  const pageStart = (currentPage - 1) * PAGE_SIZE
+  const pageFilms = films.slice(pageStart, pageStart + PAGE_SIZE)
+
   const metaStyle: React.CSSProperties = {
     fontFamily: "'Courier New', monospace",
     fontSize: '9px',
     letterSpacing: '0.1em',
     textTransform: 'uppercase',
   }
+
+  const cardBase: React.CSSProperties = {
+    padding: '1.4rem 1.4rem 1.2rem',
+    minHeight: '140px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    cursor: 'pointer',
+    transition: 'background 0.15s ease',
+  }
+
+  const paginationBtn = (disabled: boolean): React.CSSProperties => ({
+    background: 'transparent',
+    border: 'none',
+    fontFamily: "'Courier New', monospace",
+    fontSize: '9px',
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: disabled ? 'rgba(255, 255, 255, 0.12)' : 'rgba(201, 168, 76, 0.55)',
+    cursor: disabled ? 'default' : 'pointer',
+    padding: 0,
+  })
 
   return (
     <main style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', fontFamily: 'Georgia, serif', color: '#e8e0d0' }}>
@@ -104,11 +134,11 @@ export default function Studio() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: '1fr 1fr 1fr',
           gap: '1px',
           background: 'rgba(255, 255, 255, 0.07)',
         }}>
-          {films.map(film => {
+          {pageFilms.map(film => {
             const gateLabel = lastClosedGateLabel(film.gates_closed)
             const isHovered = hoveredId === film.id
             return (
@@ -117,16 +147,7 @@ export default function Studio() {
                 onClick={() => router.push(`/studio/${film.id}`)}
                 onMouseEnter={() => setHoveredId(film.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                style={{
-                  background: isHovered ? '#1a1508' : '#131008',
-                  padding: '1.4rem 1.4rem 1.2rem',
-                  minHeight: '140px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s ease',
-                }}
+                style={{ ...cardBase, background: isHovered ? '#1a1508' : '#131008' }}
               >
                 <div style={{
                   fontFamily: 'Georgia, serif',
@@ -141,7 +162,7 @@ export default function Studio() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.22)' }}>
-                    Last updated · {formatDate(film.updated_at)}
+                    {formatDate(film.updated_at)}
                   </div>
                   {gateLabel && (
                     <div style={{ ...metaStyle, color: 'rgba(201, 168, 76, 0.45)' }}>
@@ -153,58 +174,85 @@ export default function Studio() {
             )
           })}
 
-          {/* Begin a New Film card */}
-          <div
-            onMouseEnter={() => setHoveredId('__new__')}
-            onMouseLeave={() => setHoveredId(null)}
-            style={{
-              background: hoveredId === '__new__' ? '#131008' : '#0c0a07',
-              border: '0.5px solid rgba(201, 168, 76, 0.25)',
-              padding: '1.4rem 1.4rem 1.2rem',
-              minHeight: '140px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-end',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              transition: 'background 0.15s ease',
-            }}
-          >
-            <input
-              placeholder="Name your film, or leave it untitled"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && createFilm()}
-              onClick={e => e.stopPropagation()}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid #333',
-                color: '#e8e0d0',
-                padding: '0.75rem 0',
-                fontSize: '0.9rem',
-                outline: 'none',
-                fontFamily: 'Georgia, serif',
-              }}
-            />
-            <button
-              onClick={e => { e.stopPropagation(); createFilm() }}
-              style={{
-                background: 'transparent',
-                border: '1px solid #c9a96e',
-                color: '#c9a96e',
-                padding: '0.75rem',
-                fontSize: '0.85rem',
-                letterSpacing: '0.15em',
-                cursor: 'pointer',
-                fontFamily: 'Georgia, serif',
-                width: 'fit-content',
-              }}
+          {/* Begin a New Film card — page 1 only, Option A */}
+          {currentPage === 1 && (
+            <div
+              onClick={() => newFilmInputRef.current?.focus()}
+              onMouseEnter={() => setHoveredId('__new__')}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{ ...cardBase, background: hoveredId === '__new__' ? '#1a1508' : '#131008' }}
             >
-              BEGIN A NEW FILM
+              <div style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: '16px',
+                fontWeight: 400,
+                color: 'rgba(255, 255, 255, 0.28)',
+                letterSpacing: '0.01em',
+                lineHeight: 1.3,
+                marginBottom: '0.9rem',
+              }}>
+                Begin a new film
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <input
+                  ref={newFilmInputRef}
+                  placeholder="Name your film, or leave it untitled"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && createFilm()}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    padding: '0 0 0.25rem',
+                    fontSize: '9px',
+                    fontFamily: "'Courier New', monospace",
+                    letterSpacing: '0.1em',
+                    outline: 'none',
+                    width: '100%',
+                  }}
+                />
+                <div style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.18)' }}>
+                  New
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+            <button
+              onClick={() => currentPage > 1 && setCurrentPage(p => p - 1)}
+              disabled={currentPage === 1}
+              style={paginationBtn(currentPage === 1)}
+              onMouseEnter={e => { if (currentPage > 1) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.9)' }}
+              onMouseLeave={e => { if (currentPage > 1) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.55)' }}
+            >
+              ← Previous
+            </button>
+            <span style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '9px',
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'rgba(255, 255, 255, 0.22)',
+            }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => currentPage < totalPages && setCurrentPage(p => p + 1)}
+              disabled={currentPage === totalPages}
+              style={paginationBtn(currentPage === totalPages)}
+              onMouseEnter={e => { if (currentPage < totalPages) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.9)' }}
+              onMouseLeave={e => { if (currentPage < totalPages) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.55)' }}
+            >
+              Next →
             </button>
           </div>
-        </div>
+        )}
       </div>
     </main>
   )
