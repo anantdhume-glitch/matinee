@@ -68,16 +68,22 @@ export default function Studio() {
   }, [])
 
   const createFilm = async () => {
-    if (creating) return
+    console.log('[createFilm] called — creating:', creating, 'newTitle:', newTitle)
+    if (creating) { console.log('[createFilm] blocked by creating flag'); return }
     setCreating(true)
+    console.log('[createFilm] calling supabase.auth.getUser')
     const { data: { user } } = await supabase.auth.getUser()
+    console.log('[createFilm] user:', user?.id ?? 'null')
     const { data, error } = await supabase.from('films').insert({
       title: newTitle.trim() || 'Untitled Film',
       user_id: user!.id
     }).select().single()
+    console.log('[createFilm] insert result — data:', data, 'error:', error)
     if (data) {
+      console.log('[createFilm] navigating to /studio/' + data.id)
       router.push(`/studio/${data.id}`)
     } else {
+      console.log('[createFilm] insert failed — resetting creating flag')
       setCreating(false)
     }
   }
