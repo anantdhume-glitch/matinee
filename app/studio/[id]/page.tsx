@@ -375,6 +375,7 @@ export default function FilmStudio() {
   const [scriptSoul, setScriptSoul] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const importFileInputRef = useRef<HTMLInputElement>(null)
   const [portraitOpen, setPortraitOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [openDocument, setOpenDocument] = useState<GateId | null>(null)
@@ -806,7 +807,29 @@ export default function FilmStudio() {
       await mergeMemory({}, extractedPortrait, existingMemory, filmId, supabase, 'import')
     }
 
-    const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: summary }
+    const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+    const docLabel = ARCHIVE_DOCUMENTS.find(d => d.gateId === gateId)?.label ?? gateId
+    const owningMode = gateId === 'film_brief' ? 'producer' : gateId === 'treatment' ? 'director' : gateId === 'department_briefs' ? 'director' : 'producer'
+    let documentContent = summary
+    try {
+      const genResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filmId,
+          messages: [{ role: 'user', content: `Produce the ${docLabel}.` }],
+          filmMemory: freshMemory,
+          sessionType: 'RETURNING',
+          filmTitle: film?.title,
+          currentMode: owningMode,
+          gatesClosed: film?.gates_closed ?? [],
+        })
+      })
+      const genData = await genResponse.json()
+      documentContent = genData.content ?? summary
+    } catch {}
+
+    const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: documentContent }
     const newGenerated: DocumentGenerated = { document: gateId, generated_at: new Date().toISOString(), source: 'import' }
     const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
     await supabase.from('films').update({ documents_content: updatedContent, documents_generated: updatedGenerated }).eq('id', filmId)
@@ -817,6 +840,12 @@ export default function FilmStudio() {
     if (portraitOpen) await refreshPortrait()
     setImportPending(null)
     setImportDiscussing(false)
+  }
+
+  const discardImport = () => {
+    setImportPending(null)
+    setImportDiscussing(false)
+    if (importFileInputRef.current) importFileInputRef.current.value = ''
   }
 
   // ── LOADING ────────────────────────────────────────────────────────────────
@@ -1066,16 +1095,10 @@ export default function FilmStudio() {
               {importPending && !importDiscussing && (
                 <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.25rem' }}>
                   <button
-                    onClick={confirmImport}
-                    style={{ ...btnPrimary, fontSize: '0.72rem', padding: '0.6rem 1.25rem' }}
-                  >
-                    Close the gate
-                  </button>
-                  <button
-                    onClick={() => setImportDiscussing(true)}
+                    onClick={() => { setImportDiscussing(true); setArchiveOpen(true) }}
                     style={{ ...btnSecondary, fontSize: '0.72rem', padding: '0.6rem 1.25rem' }}
                   >
-                    Talk through it first
+                    Review in Archive
                   </button>
                 </div>
               )}
@@ -1347,6 +1370,7 @@ export default function FilmStudio() {
                                     <label style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: importLoading === doc.gateId ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)', cursor: importLoading === doc.gateId ? 'default' : 'pointer', padding: '0.28rem 0.6rem' }}>
                                       {importLoading === doc.gateId ? 'Reading...' : 'Import'}
                                       <input
+                                        ref={importFileInputRef}
                                         type="file"
                                         accept=".pdf,.doc,.docx"
                                         style={{ display: 'none' }}
@@ -1407,7 +1431,7 @@ export default function FilmStudio() {
                                     Close gate
                                   </button>
                                   <button
-                                    onClick={() => { setImportPending(null); setImportDiscussing(false) }}
+                                    onClick={discardImport}
                                     style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontFamily: serif, fontSize: '0.68rem' }}
                                   >
                                     Discard
