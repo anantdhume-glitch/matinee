@@ -71,11 +71,15 @@ export default function Studio() {
     if (creating) return
     setCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('films').insert({
+    const { data, error } = await supabase.from('films').insert({
       title: newTitle.trim() || 'Untitled Film',
       user_id: user!.id
     }).select().single()
-    if (data) router.push(`/studio/${data.id}`)
+    if (data) {
+      router.push(`/studio/${data.id}`)
+    } else {
+      setCreating(false)
+    }
   }
 
   const signOut = async () => {
