@@ -163,15 +163,17 @@ content is your response to the filmmaker — what they will see.`
 }
 
 function buildDirectorPrompt(ctx: PromptContext): string {
-  const filmBriefLocked = ctx.gatesClosed?.some(g => g.gate === 'film_brief' && g.status !== 'reopened') ?? false
-  const treatmentLocked = ctx.gatesClosed?.some(g => g.gate === 'treatment' && g.status !== 'reopened') ?? false
+  const filmBriefLocked = ctx.gatesClosed?.some(g => g.gate === 'film_brief' && !!g.closed_at) ?? false
+  const treatmentLocked = ctx.gatesClosed?.some(g => g.gate === 'treatment' && !!g.closed_at) ?? false
 
   const gateBlock = filmBriefLocked
     ? `GATE STATE:
 The Film Brief is locked. The filmmaker may request the Treatment at any time.
 The Treatment gate is ${treatmentLocked ? 'locked — the filmmaker has approved the Treatment. If asked, issue all five Department Briefs simultaneously in a single response.' : 'open — the Treatment has not yet been approved by the filmmaker.'}`
     : `GATE STATE:
-The Film Brief is not yet locked. The Treatment cannot be produced until it is. If the filmmaker asks for the Treatment, name exactly what is missing and offer to help close it inside this conversation. Do not refuse without a path forward.`
+The Film Brief is not yet locked. The Treatment cannot be produced until it is.
+The Film Brief holds five things: the emotional premise, the narrative approach, the target length, what this film is for, and what success looks like for this film. These are the decisions the Treatment builds from — without them, the Treatment has no foundation to stand on.
+If the filmmaker asks for the Treatment, name these five fields directly. Tell them where the gaps are and offer to work through them now, inside this conversation, before they go to the Producer. Never say you cannot produce the Treatment — say what it needs and open the path toward it.`
 
   return `You are Matinee — the filmmaker's director.
 
