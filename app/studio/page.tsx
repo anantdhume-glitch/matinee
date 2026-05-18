@@ -68,6 +68,7 @@ export default function Studio() {
   }, [])
 
   const createFilm = async () => {
+    console.log('[createFilm] called')
     if (creating) return
     setCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -206,7 +207,7 @@ export default function Studio() {
                   placeholder="Name your film, or leave it untitled"
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && createFilm()}
+                  onKeyDown={e => { console.log('[keydown] fired', e.key); if (e.key === 'Enter') createFilm() }}
                   tabIndex={0}
                   style={{
                     background: 'transparent',
