@@ -163,6 +163,13 @@ const GATE_LABELS: Record<GateId, string> = {
   music_cue_sheet:     'Music Cue Sheet',
 }
 
+const GATE_PREREQUISITES: Partial<Record<GateId, GateId>> = {
+  treatment:            'film_brief',
+  department_briefs:    'treatment',
+  mode_selection_brief: 'department_briefs',
+  hook_draft:           'mode_selection_brief',
+}
+
 const MODES: Array<{ label: string; value: string | null }> = [
   { label: 'DISCOVERY',      value: null },
   { label: 'PRODUCER',       value: 'producer' },
@@ -1286,6 +1293,10 @@ export default function FilmStudio() {
                           const isReopened = gateEntry?.status === 'reopened'
                           const isApproved = !!gateEntry && !isReopened
                           const hasPendingImport = importPending?.gateId === doc.gateId
+                          const prereqGateId = GATE_PREREQUISITES[doc.gateId]
+                          const prereqMet = prereqGateId
+                            ? film.gates_closed?.some(g => g.gate === prereqGateId && !!g.closed_at) ?? false
+                            : true
                           const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' | 'REOPENED' =
                             isReopened ? 'REOPENED' :
                             isApproved ? 'LOCKED' :
@@ -1327,9 +1338,9 @@ export default function FilmStudio() {
                                 {!isGenerated && !hasPendingImport && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                                     <button
-                                      onClick={() => generateDocument(doc.gateId, doc.mode)}
-                                      disabled={generating === doc.gateId}
-                                      style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.55)', background: 'none', border: '1px solid rgba(212,175,55,0.2)', padding: '0.28rem 0.6rem', cursor: 'pointer' }}
+                                      onClick={() => prereqMet ? generateDocument(doc.gateId, doc.mode) : undefined}
+                                      disabled={generating === doc.gateId || !prereqMet}
+                                      style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: prereqMet ? 'rgba(212,175,55,0.55)' : 'rgba(212,175,55,0.18)', background: 'none', border: `1px solid ${prereqMet ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.07)'}`, padding: '0.28rem 0.6rem', cursor: prereqMet ? 'pointer' : 'not-allowed' }}
                                     >
                                       {generating === doc.gateId ? '...' : 'Generate'}
                                     </button>
@@ -1365,6 +1376,13 @@ export default function FilmStudio() {
                                   </button>
                                 )}
                               </div>
+
+                              {/* Prerequisite note */}
+                              {!isGenerated && !hasPendingImport && !prereqMet && prereqGateId && (
+                                <div style={{ marginTop: '0.25rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.22)', fontStyle: 'italic' }}>
+                                  Needs {GATE_LABELS[prereqGateId]} approved first.
+                                </div>
+                              )}
 
                               {/* Ripple flag */}
                               {activeFlag && (
