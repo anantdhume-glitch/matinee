@@ -168,6 +168,8 @@ const GATE_PREREQUISITES: Partial<Record<GateId, GateId>> = {
   department_briefs:    'treatment',
   mode_selection_brief: 'department_briefs',
   hook_draft:           'mode_selection_brief',
+  script_lock:          'hook_draft',
+  audio_direction:      'script_lock',
 }
 
 const MODES: Array<{ label: string; value: string | null }> = [
