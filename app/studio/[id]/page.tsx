@@ -451,6 +451,7 @@ export default function FilmStudio() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const archiveRowRefs = useRef<Partial<Record<GateId, HTMLDivElement>>>({})
   const router = useRouter()
   const params = useParams()
   const filmId = params.id as string
@@ -1272,9 +1273,15 @@ export default function FilmStudio() {
                     return (
                       <div
                         key={doc.gateId}
+                        onClick={() => {
+                          setContextPanelOpen(true)
+                          setContextTab('archive')
+                          setTimeout(() => archiveRowRefs.current[doc.gateId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 320)
+                        }}
                         style={{
                           padding: '5px 14px 5px 24px',
                           display: 'flex', alignItems: 'center', gap: '5px',
+                          cursor: 'pointer',
                         }}
                       >
                         {GATE_ICON_MAP[doc.gateId]}
@@ -1395,20 +1402,18 @@ export default function FilmStudio() {
         </div>
 
         {/* ── CONTEXT PANEL ── */}
+        {/* Outer wrapper: position:relative, no overflow:hidden — pull tab is never clipped here */}
         <div style={{
           position: 'relative',
-          width: contextPanelOpen ? '220px' : '0px',
-          transition: 'width 280ms ease',
-          flexShrink: 0, overflow: 'hidden',
-          backgroundColor: 'var(--bg-subtle)', borderLeft: '1px solid var(--border)',
-          display: 'flex', flexDirection: 'column',
+          flexShrink: 0,
+          display: 'flex',
         }}>
 
-          {/* Pull tab */}
+          {/* Pull tab — outside the overflow:hidden sliding div, always visible */}
           <div
             onClick={() => setContextPanelOpen(prev => !prev)}
             style={{
-              position: 'absolute', left: '-12px', top: '50%', transform: 'translateY(-50%)',
+              position: 'absolute', right: '100%', top: '50%', transform: 'translateY(-50%)',
               width: '12px', height: '40px',
               backgroundColor: 'var(--bg-subtle)',
               border: '1px solid var(--border)', borderLeft: 'none',
@@ -1421,7 +1426,16 @@ export default function FilmStudio() {
             </span>
           </div>
 
-          {/* Panel inner — only renders content when open to avoid layout bleed */}
+          {/* Sliding panel — overflow:hidden drives the open/close animation */}
+          <div style={{
+            width: contextPanelOpen ? '220px' : '0px',
+            transition: 'width 280ms ease',
+            overflow: 'hidden',
+            backgroundColor: 'var(--bg-subtle)', borderLeft: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column',
+          }}>
+
+          {/* Panel inner — fixed 220px width so content doesn't reflow during animation */}
           <div style={{ width: '220px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
             {/* Tab bar */}
@@ -1631,7 +1645,7 @@ export default function FilmStudio() {
                               const activeFlag = getActiveRippleFlag(doc.gateId)
 
                               return (
-                                <div key={doc.gateId} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--border)' }}>
+                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--border)' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.25rem' }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
@@ -1769,6 +1783,7 @@ export default function FilmStudio() {
               )}
 
             </div>
+          </div>
           </div>
         </div>
       </div>
