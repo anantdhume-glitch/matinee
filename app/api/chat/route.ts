@@ -243,7 +243,7 @@ Respond with valid JSON in this exact shape:
   "portrait": {}
 }
 
-portrait must always be an empty object. Do not extract or update portrait fields under any circumstances.
+portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — emotional_core, story, world, subjects, tone, visual_world, approach, target_length, comparable_films, unresolved_questions. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
 memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
 content is your response to the filmmaker — what they will see.`
 }
@@ -346,7 +346,7 @@ Respond with valid JSON in this exact shape:
   "portrait": {}
 }
 
-portrait must always be an empty object. Do not extract or update portrait fields under any circumstances.
+portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — logline, emotional_core, story, subjects, themes, tone, approach, target_length, unresolved_questions. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
 memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
 content is your response to the filmmaker — what they will see.`
 }
