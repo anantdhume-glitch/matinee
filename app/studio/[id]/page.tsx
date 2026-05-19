@@ -432,6 +432,7 @@ export default function FilmStudio() {
   const importFileInputRef = useRef<HTMLInputElement>(null)
   const [contextPanelOpen, setContextPanelOpen] = useState(false)
   const [contextTab, setContextTab] = useState<string>('portrait')
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [openDocument, setOpenDocument] = useState<GateId | null>(null)
   const [generating, setGenerating] = useState<GateId | null>(null)
   const [importPending, setImportPending] = useState<{
@@ -907,98 +908,237 @@ export default function FilmStudio() {
   // ── ENTRY SCREENS ──────────────────────────────────────────────────────────
   if (entryMode !== 'conversation') {
     return (
-      <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-serif)', color: 'var(--text)' }}>
-        <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.75rem 2.5rem', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ color: 'var(--gold)', letterSpacing: '0.3em', fontSize: '0.85rem' }}>MATINEE</span>
-          <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem', fontStyle: 'italic' }}>{film?.title}</span>
-        </nav>
+      <main style={{
+        backgroundColor: 'var(--bg)',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'var(--font-serif)',
+        color: 'var(--text)',
+        position: 'relative',
+      }}>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 2rem' }}>
-          <div style={{ width: '100%', maxWidth: '480px' }}>
+        {/* Film title — pinned top-centre */}
+        <span style={{
+          position: 'absolute',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontFamily: 'var(--font-serif)',
+          fontSize: '13px',
+          fontStyle: 'italic',
+          color: 'var(--text-dim)',
+          whiteSpace: 'nowrap',
+        }}>
+          {film?.title || 'Untitled Film'}
+        </span>
 
-            {/* CHOICE */}
-            {entryMode === 'choice' && (
-              <>
-                <p style={{ fontSize: '1.3rem', lineHeight: 1.8, color: 'var(--text)', textAlign: 'center', marginBottom: '0.6rem', fontWeight: 300 }}>
-                  Where are you in this film&apos;s journey?
+        {/* CHOICE */}
+        {entryMode === 'choice' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <p style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '27px',
+              fontWeight: 400,
+              color: 'var(--text)',
+              textAlign: 'center',
+              marginBottom: '8px',
+            }}>
+              Where are you in this film&apos;s journey?
+            </p>
+            <p style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '9px',
+              letterSpacing: '0.12em',
+              color: 'var(--text-dim)',
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              marginBottom: '36px',
+            }}>
+              HOW YOU ARRIVE SHAPES HOW WE BEGIN
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '380px' }}>
+
+              {/* Card 1 — I have an idea */}
+              <button
+                onClick={beginFromConversation}
+                onMouseEnter={() => setHoveredCard('idea')}
+                onMouseLeave={() => setHoveredCard(null)}
+                style={{
+                  background: hoveredCard === 'idea' ? '#1A1A1F' : 'var(--surface)',
+                  border: `1px solid ${hoveredCard === 'idea' ? 'var(--gold-dim)' : 'var(--border)'}`,
+                  padding: '20px 26px',
+                  textAlign: 'left',
+                  width: '100%',
+                  cursor: 'pointer',
+                  transition: 'background 200ms ease, border-color 200ms ease',
+                }}
+              >
+                <p style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: '19px',
+                  color: 'var(--gold)',
+                  marginBottom: '6px',
+                }}>
+                  I have an idea.
                 </p>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'center', marginBottom: '3rem', letterSpacing: '0.03em', lineHeight: 1.6 }}>
-                  How you arrive shapes how we begin.
+                <p style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-dim)',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.5,
+                }}>
+                  LET&apos;S FIND THE FILM TOGETHER THROUGH CONVERSATION
                 </p>
+              </button>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Card 2 — I have a script (only in discovery) */}
+              {!film?.current_mode && (
+                <>
                   <button
-                    onClick={beginFromConversation}
-                    style={{ ...btnSecondary, padding: '1.25rem 1.75rem', textAlign: 'left', width: '100%', lineHeight: 1.6 }}
-                  >
-                    <div style={{ fontSize: '0.9rem', color: 'var(--text)', marginBottom: '0.3rem' }}>I have an idea.</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', letterSpacing: '0.04em' }}>Let&apos;s find the film together through conversation.</div>
-                  </button>
-
-                  {!film?.current_mode && (
-                    <>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        style={{ ...btnPrimary, padding: '1.25rem 1.75rem', textAlign: 'left', width: '100%', lineHeight: 1.6 }}
-                      >
-                        <div style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>I have a script.</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--gold-dim)', letterSpacing: '0.04em' }}>Let Matinee read it first. PDF or Word document.</div>
-                      </button>
-                      <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) handleScriptUpload(f) }} />
-                    </>
-                  )}
-                </div>
-
-                {uploadError && (
-                  <p style={{ marginTop: '1.25rem', fontSize: '0.8rem', color: '#7a3333', fontStyle: 'italic', textAlign: 'center' }}>{uploadError}</p>
-                )}
-
-                <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
-                  <span
-                    onClick={async () => {
-                      await supabase.from('messages').delete().eq('film_id', filmId)
-                      await supabase.from('film_memory').delete().eq('film_id', filmId)
-                      await supabase.from('films').delete().eq('id', filmId)
-                      router.push('/studio')
+                    onClick={() => fileInputRef.current?.click()}
+                    onMouseEnter={() => setHoveredCard('script')}
+                    onMouseLeave={() => setHoveredCard(null)}
+                    style={{
+                      background: hoveredCard === 'script' ? '#1A1A1F' : 'var(--surface)',
+                      border: `1px solid ${hoveredCard === 'script' ? 'var(--gold-dim)' : 'var(--border)'}`,
+                      padding: '20px 26px',
+                      textAlign: 'left',
+                      width: '100%',
+                      cursor: 'pointer',
+                      transition: 'background 200ms ease, border-color 200ms ease',
                     }}
-                    style={{ fontSize: '0.7rem', color: 'var(--text-dim)', letterSpacing: '0.08em', cursor: 'pointer', textTransform: 'uppercase' }}
                   >
-                    Cancel — return to the Studio
-                  </span>
-                </div>
-              </>
+                    <p style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: '19px',
+                      color: 'var(--gold)',
+                      marginBottom: '6px',
+                    }}>
+                      I have a script.
+                    </p>
+                    <p style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '9px',
+                      letterSpacing: '0.08em',
+                      color: 'var(--text-dim)',
+                      textTransform: 'uppercase',
+                      lineHeight: 1.5,
+                    }}>
+                      LET MATINEE READ IT FIRST · PDF OR WORD DOCUMENT
+                    </p>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleScriptUpload(f) }}
+                  />
+                </>
+              )}
+            </div>
+
+            {uploadError && (
+              <p style={{
+                marginTop: '16px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '10px',
+                color: 'var(--text-dim)',
+                textAlign: 'center',
+              }}>
+                {uploadError}
+              </p>
             )}
 
-            {/* UPLOADING */}
-            {entryMode === 'uploading' && (
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '1.1rem', color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.7, marginBottom: '0.75rem' }}>
-                  Reading your script...
-                </p>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>
-                  Building the Film Memory. This takes a moment.
-                </p>
-              </div>
-            )}
-
-            {/* SOUL */}
-            {entryMode === 'soul' && scriptSoul && (
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '0.62rem', letterSpacing: '0.2em', color: 'var(--gold-dim)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>
-                  What the film is becoming
-                </p>
-                <p style={{ fontSize: '1.4rem', lineHeight: 1.8, color: 'var(--text)', fontWeight: 300, marginBottom: '2.5rem' }}>
-                  {scriptSoul}
-                </p>
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', letterSpacing: '0.06em', fontStyle: 'italic' }}>
-                  The Film Memory is built. Stepping into the Studio...
-                </p>
-              </div>
-            )}
-
+            {/* Cancel link */}
+            <span
+              onClick={async () => {
+                await supabase.from('messages').delete().eq('film_id', filmId)
+                await supabase.from('film_memory').delete().eq('film_id', filmId)
+                await supabase.from('films').delete().eq('id', filmId)
+                router.push('/studio')
+              }}
+              style={{
+                marginTop: '24px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                letterSpacing: '0.1em',
+                color: 'var(--text-dim)',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              CANCEL — RETURN TO THE STUDIO
+            </span>
           </div>
-        </div>
+        )}
+
+        {/* UPLOADING */}
+        {entryMode === 'uploading' && (
+          <div style={{ textAlign: 'center' }}>
+            <p style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '19px',
+              fontStyle: 'italic',
+              color: 'var(--text-dim)',
+              lineHeight: 1.7,
+              marginBottom: '8px',
+            }}>
+              Reading your script...
+            </p>
+            <p style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '9px',
+              letterSpacing: '0.1em',
+              color: 'var(--text-dim)',
+              textTransform: 'uppercase',
+            }}>
+              BUILDING THE FILM MEMORY. THIS TAKES A MOMENT.
+            </p>
+          </div>
+        )}
+
+        {/* SOUL */}
+        {entryMode === 'soul' && scriptSoul && (
+          <div style={{ textAlign: 'center', maxWidth: '480px' }}>
+            <p style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '9px',
+              letterSpacing: '0.2em',
+              color: 'var(--gold-dim)',
+              textTransform: 'uppercase',
+              marginBottom: '24px',
+            }}>
+              WHAT THE FILM IS BECOMING
+            </p>
+            <p style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '22px',
+              lineHeight: 1.8,
+              color: 'var(--text)',
+              fontWeight: 400,
+              marginBottom: '40px',
+            }}>
+              {scriptSoul}
+            </p>
+            <p style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '9px',
+              letterSpacing: '0.1em',
+              color: 'var(--text-dim)',
+              textTransform: 'uppercase',
+            }}>
+              THE FILM MEMORY IS BUILT. STEPPING INTO THE STUDIO...
+            </p>
+          </div>
+        )}
+
       </main>
     )
   }

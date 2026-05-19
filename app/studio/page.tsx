@@ -4,40 +4,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-type GateClosed = { gate: string; closed_at: string }
-
 type Film = {
   id: string
   title: string
-  updated_at: string
-  gates_closed: GateClosed[] | null
-}
-
-const GATE_LABELS: Record<string, string> = {
-  film_brief:           'Film Brief',
-  treatment:            'Treatment',
-  department_briefs:    'Department Briefs',
-  mode_selection_brief: 'Mode Selection Brief',
-  hook_draft:           'Hook Draft',
-  script_lock:          'Script Lock',
-  audio_direction:      'Audio Direction',
-  consistency_lock:     'Consistency Lock',
-  shot_list:            'Shot List',
-  camera_light_plan:    'Camera & Light Plan',
-  visual_prompt_package:'Visual Prompt Package',
-  edit_plan:            'Edit Plan',
-  music_cue_sheet:      'Music Cue Sheet',
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function lastClosedGateLabel(gates: GateClosed[] | null): string | null {
-  if (!gates || gates.length === 0) return null
-  const sorted = [...gates].sort((a, b) => new Date(b.closed_at).getTime() - new Date(a.closed_at).getTime())
-  const gate = sorted[0].gate
-  return GATE_LABELS[gate] ?? gate
+  created_at: string
+  current_mode: string | null
 }
 
 export default function Studio() {
@@ -45,9 +16,9 @@ export default function Studio() {
   const [loading, setLoading] = useState(true)
   const [newTitle, setNewTitle] = useState('')
   const [creating, setCreating] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [heroMessage, setHeroMessage] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [showNewFilmForm, setShowNewFilmForm] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -57,9 +28,23 @@ export default function Studio() {
       if (!user) { router.push('/'); return }
       const { data } = await supabase
         .from('films')
-        .select('id, title, updated_at, gates_closed')
-        .order('updated_at', { ascending: false })
-      setFilms(data || [])
+        .select('id, title, created_at, current_mode')
+        .order('created_at', { ascending: false })
+      const filmList = data || []
+      setFilms(filmList)
+
+      if (filmList.length > 0) {
+        const { data: msgData } = await supabase
+          .from('messages')
+          .select('content')
+          .eq('film_id', filmList[0].id)
+          .eq('role', 'assistant')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        if (msgData) setHeroMessage(msgData.content)
+      }
+
       setLoading(false)
     }
     init()
@@ -69,17 +54,11 @@ export default function Studio() {
     if (creating) return
     setCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase.from('films').insert({
+    const { data } = await supabase.from('films').insert({
       title: newTitle.trim() || 'Untitled Film',
       user_id: user!.id
     }).select().single()
-    if (data) {
-      setShowNewFilmForm(false)
-      setNewTitle('')
-      router.push(`/studio/${data.id}`)
-    } else {
-      setCreating(false)
-    }
+    if (data) router.push(`/studio/${data.id}`)
   }
 
   const signOut = async () => {
@@ -87,75 +66,175 @@ export default function Studio() {
     router.push('/')
   }
 
+  const formatDate = (ts: string) =>
+    new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()
+
+  const modeDisplay = (mode: string | null) =>
+    mode ? mode.replace('_', ' ').toUpperCase() : 'DISCOVERY'
+
+  const openModal = () => { setNewTitle(''); setModalOpen(true) }
+  const closeModal = () => { setModalOpen(false); setNewTitle('') }
+
   if (loading) return (
-    <main style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c9a96e', fontFamily: 'Georgia, serif', letterSpacing: '0.2em' }}>
+    <main style={{
+      backgroundColor: 'var(--bg)',
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'var(--font-mono)',
+      color: 'var(--gold)',
+      letterSpacing: '0.1em',
+      fontSize: '10px',
+      textTransform: 'uppercase',
+    }}>
       Setting the scene...
     </main>
   )
 
-  // Page 1: 8 films. Page 2+: 9 films per page.
-  const totalPages = films.length <= 8 ? 1 : Math.ceil((films.length - 8) / 9) + 1
-  const pageFilms = currentPage === 1
-    ? films.slice(0, 8)
-    : films.slice(8 + (currentPage - 2) * 9, 8 + (currentPage - 1) * 9)
-
-  const metaStyle: React.CSSProperties = {
-    fontFamily: "'Courier New', monospace",
-    fontSize: '9px',
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-  }
-
-  const titleStyle: React.CSSProperties = {
-    fontFamily: 'Georgia, serif',
-    fontSize: '16px',
-    fontWeight: 400,
-    letterSpacing: '0.01em',
-    lineHeight: 1.3,
-    marginBottom: '0.9rem',
-    margin: 0,
-  }
-
-  const cardBase: React.CSSProperties = {
-    padding: '1.4rem 1.4rem 1.2rem',
-    minHeight: '140px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    cursor: 'pointer',
-    transition: 'background 0.15s ease',
-  }
-
-  const paginationBtn = (disabled: boolean): React.CSSProperties => ({
-    background: 'transparent',
-    border: 'none',
-    fontFamily: "'Courier New', monospace",
-    fontSize: '9px',
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color: disabled ? 'rgba(255, 255, 255, 0.12)' : 'rgba(201, 168, 76, 0.55)',
-    cursor: disabled ? 'default' : 'pointer',
-    padding: 0,
-  })
+  const [heroFilm, ...restFilms] = films
 
   return (
-    <main style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', fontFamily: 'Georgia, serif', color: '#e8e0d0' }}>
-      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 3rem', borderBottom: '1px solid #1a1a1a' }}>
-        <span style={{ color: '#c9a96e', letterSpacing: '0.3em', fontSize: '0.9rem' }}>MATINEE</span>
-        <span onClick={signOut} style={{ color: '#555', fontSize: '0.8rem', cursor: 'pointer', letterSpacing: '0.1em' }}>LEAVE</span>
-      </nav>
+    <main style={{
+      backgroundColor: 'var(--bg)',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      color: 'var(--text)',
+    }}>
 
-      <div style={{ padding: '4rem 3rem' }}>
-        <h2 style={{ fontSize: '0.8rem', letterSpacing: '0.2em', color: '#555', marginBottom: '3rem' }}>THE STUDIO</h2>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '1px',
-          background: 'rgba(255, 255, 255, 0.07)',
+      {/* HEADER STRIP */}
+      <header style={{
+        height: '56px',
+        borderBottom: '1px solid var(--border)',
+        padding: '0 32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: '15px',
+          fontWeight: 500,
+          letterSpacing: '0.3em',
+          color: 'var(--gold)',
+          textTransform: 'uppercase',
         }}>
-          {pageFilms.map(film => {
-            const gateLabel = lastClosedGateLabel(film.gates_closed)
+          MATINEE
+        </span>
+        <span
+          onClick={signOut}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '9px',
+            letterSpacing: '0.15em',
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+          }}
+        >
+          LEAVE
+        </span>
+      </header>
+
+      {/* BODY */}
+      <div style={{ padding: '32px 32px 0', flex: 1, overflowY: 'auto' }}>
+
+        {/* Section label */}
+        <p style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '9px',
+          letterSpacing: '0.2em',
+          color: 'var(--text-dim)',
+          textTransform: 'uppercase',
+          marginBottom: '24px',
+        }}>
+          THE STUDIO
+        </p>
+
+        {/* Film list */}
+        <div style={{ borderTop: '1px solid var(--border)' }}>
+
+          {/* Hero row */}
+          {heroFilm && (
+            <div
+              onClick={() => router.push(`/studio/${heroFilm.id}`)}
+              style={{
+                padding: '20px 0',
+                borderBottom: '1px solid var(--border)',
+                position: 'relative',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+              }}
+            >
+              {/* Gold left border — always present on hero */}
+              <div style={{
+                position: 'absolute',
+                left: '-32px',
+                top: 0,
+                bottom: 0,
+                width: '2px',
+                background: 'var(--gold)',
+              }} />
+
+              <div style={{ flex: 1, minWidth: 0, paddingRight: '16px' }}>
+                <p style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: '22px',
+                  fontWeight: 400,
+                  color: 'var(--text)',
+                  marginBottom: '4px',
+                  lineHeight: 1.2,
+                }}>
+                  {heroFilm.title}
+                </p>
+                <p style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-dim)',
+                  marginBottom: heroMessage ? '8px' : 0,
+                }}>
+                  In{' '}
+                  <span style={{ color: 'var(--gold)' }}>
+                    {modeDisplay(heroFilm.current_mode)}
+                  </span>
+                </p>
+                {heroMessage && (
+                  <p style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: '13px',
+                    fontStyle: 'italic',
+                    color: 'var(--text-dim)',
+                    lineHeight: 1.5,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {heroMessage}
+                  </p>
+                )}
+              </div>
+
+              <p style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                color: 'var(--text-dim)',
+                textTransform: 'uppercase',
+                flexShrink: 0,
+                paddingTop: '4px',
+              }}>
+                {formatDate(heroFilm.created_at)}
+              </p>
+            </div>
+          )}
+
+          {/* Standard rows */}
+          {restFilms.map(film => {
+            const isUntitled = !film.title || film.title === 'Untitled Film'
             const isHovered = hoveredId === film.id
             return (
               <div
@@ -163,140 +242,191 @@ export default function Studio() {
                 onClick={() => router.push(`/studio/${film.id}`)}
                 onMouseEnter={() => setHoveredId(film.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                style={{ ...cardBase, background: isHovered ? '#1a1508' : '#131008' }}
+                style={{
+                  padding: '16px 0',
+                  borderBottom: '1px solid var(--border)',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                }}
               >
-                <p style={{ ...titleStyle, color: 'rgba(201, 168, 76, 0.9)' }}>
-                  {film.title}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <div style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.22)' }}>
-                    {formatDate(film.updated_at)}
-                  </div>
-                  {gateLabel && (
-                    <div style={{ ...metaStyle, color: 'rgba(201, 168, 76, 0.45)' }}>
-                      {gateLabel} — closed
-                    </div>
-                  )}
+                {/* Gold hover border */}
+                <div style={{
+                  position: 'absolute',
+                  left: '-32px',
+                  top: 0,
+                  bottom: 0,
+                  width: '2px',
+                  background: 'var(--gold)',
+                  opacity: isHovered ? 1 : 0,
+                  transition: 'opacity 200ms ease',
+                }} />
+
+                <div style={{ flex: 1, minWidth: 0, paddingRight: '16px' }}>
+                  <p style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: isUntitled ? '17px' : '19px',
+                    fontWeight: 400,
+                    fontStyle: isUntitled ? 'italic' : 'normal',
+                    color: isUntitled ? 'var(--text-dim)' : 'var(--text)',
+                    marginBottom: '4px',
+                    lineHeight: 1.2,
+                  }}>
+                    {film.title}
+                  </p>
+                  <p style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '9px',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-dim)',
+                  }}>
+                    In{' '}
+                    <span style={{ color: 'var(--gold)' }}>
+                      {modeDisplay(film.current_mode)}
+                    </span>
+                  </p>
                 </div>
+
+                <p style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  color: 'var(--text-dim)',
+                  textTransform: 'uppercase',
+                  flexShrink: 0,
+                  paddingTop: '2px',
+                }}>
+                  {formatDate(film.created_at)}
+                </p>
               </div>
             )
           })}
 
-          {/* Begin a New Film card — page 1 only, Option B */}
-          {currentPage === 1 && (
-            <div
-              onClick={() => setShowNewFilmForm(true)}
-              onMouseEnter={() => setHoveredId('__new__')}
-              onMouseLeave={() => setHoveredId(null)}
-              style={{ ...cardBase, background: hoveredId === '__new__' ? '#1a1508' : '#131008', cursor: 'pointer' }}
-            >
-              <p style={{ ...titleStyle, color: 'rgba(255, 255, 255, 0.28)' }}>Begin a new film</p>
-              <div style={{ marginTop: 'auto' }}>
-                <span style={{ ...metaStyle, color: 'rgba(255, 255, 255, 0.18)' }}>NEW</span>
-              </div>
-            </div>
+          {films.length === 0 && (
+            <p style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '17px',
+              fontStyle: 'italic',
+              color: 'var(--text-dim)',
+              padding: '24px 0',
+            }}>
+              No films yet.
+            </p>
           )}
         </div>
 
-        {/* Inline new film form — Option B */}
-        {showNewFilmForm && (
-          <div style={{
-            marginTop: '1px',
-            background: '#131008',
-            padding: '1.25rem 1.4rem',
-            display: 'flex',
-            gap: '1rem',
+        {/* Begin a new film */}
+        <div
+          onClick={openModal}
+          style={{
+            display: 'inline-flex',
             alignItems: 'center',
+            gap: '8px',
+            marginTop: '24px',
+            cursor: 'pointer',
+            paddingBottom: '32px',
+          }}
+        >
+          <span style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '18px',
+            color: 'var(--gold)',
+            lineHeight: 1,
+          }}>+</span>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            letterSpacing: '0.12em',
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
           }}>
+            BEGIN A NEW FILM
+          </span>
+        </div>
+
+      </div>
+
+      {/* NEW FILM MODAL */}
+      {modalOpen && (
+        <div
+          onClick={closeModal}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              padding: '32px',
+              width: '480px',
+            }}
+          >
             <input
               autoFocus
+              type="text"
               placeholder="Name your film, or leave it untitled"
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') createFilm()
-                if (e.key === 'Escape') setShowNewFilmForm(false)
+                if (e.key === 'Escape') closeModal()
               }}
               style={{
+                width: '100%',
+                fontFamily: 'var(--font-serif)',
+                fontSize: '19px',
+                color: 'var(--text)',
                 background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'rgba(255, 255, 255, 0.6)',
-                padding: '0.4rem 0',
-                fontSize: '13px',
-                fontFamily: "'Courier New', monospace",
-                letterSpacing: '0.08em',
-                outline: 'none',
-                flex: 1,
+                borderBottom: '1px solid var(--border)',
+                padding: '0 0 12px',
+                marginBottom: '24px',
+                display: 'block',
               }}
             />
-            <button
-              onClick={createFilm}
-              style={{
-                background: 'transparent',
-                border: '1px solid rgba(201, 168, 76, 0.4)',
-                color: 'rgba(201, 168, 76, 0.7)',
-                fontFamily: "'Courier New', monospace",
-                fontSize: '9px',
-                letterSpacing: '0.16em',
-                padding: '0.5rem 1rem',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Begin
-            </button>
-            <button
-              onClick={() => setShowNewFilmForm(false)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.2)',
-                fontFamily: "'Courier New', monospace",
-                fontSize: '9px',
-                letterSpacing: '0.12em',
-                cursor: 'pointer',
-                padding: '0.5rem 0',
-              }}
-            >
-              Cancel
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <button
+                onClick={createFilm}
+                disabled={creating}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--gold-dim)',
+                  color: 'var(--gold)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  padding: '10px 20px',
+                  cursor: creating ? 'default' : 'pointer',
+                }}
+              >
+                {creating ? 'One moment...' : 'BEGIN'}
+              </button>
+              <span
+                onClick={closeModal}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  color: 'var(--text-dim)',
+                  cursor: 'pointer',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                Cancel
+              </span>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
-            <button
-              onClick={() => currentPage > 1 && setCurrentPage(p => p - 1)}
-              disabled={currentPage === 1}
-              style={paginationBtn(currentPage === 1)}
-              onMouseEnter={e => { if (currentPage > 1) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.9)' }}
-              onMouseLeave={e => { if (currentPage > 1) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.55)' }}
-            >
-              ← Previous
-            </button>
-            <span style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: '9px',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'rgba(255, 255, 255, 0.22)',
-            }}>
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => currentPage < totalPages && setCurrentPage(p => p + 1)}
-              disabled={currentPage === totalPages}
-              style={paginationBtn(currentPage === totalPages)}
-              onMouseEnter={e => { if (currentPage < totalPages) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.9)' }}
-              onMouseLeave={e => { if (currentPage < totalPages) (e.currentTarget as HTMLElement).style.color = 'rgba(201, 168, 76, 0.55)' }}
-            >
-              Next →
-            </button>
-          </div>
-        )}
-      </div>
     </main>
   )
 }

@@ -11,18 +11,18 @@ export default function Home() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [emailFocused, setEmailFocused] = useState(false)
+  const [passwordFocused, setPasswordFocused] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const handleTokens = async () => {
-      // Check query string for token_hash
       const params = new URLSearchParams(window.location.search)
       const token_hash = params.get('token_hash')
       const type = params.get('type')
       const code = params.get('code')
 
-      // Check fragment for access_token
       const hash = window.location.hash
       const hashParams = new URLSearchParams(hash.substring(1))
       const access_token = hashParams.get('access_token')
@@ -44,7 +44,6 @@ export default function Home() {
         if (!error) { router.push('/auth/set-password'); return }
       }
 
-      // Check if already logged in
       const { data: { session } } = await supabase.auth.getSession()
       if (session) { router.push('/studio'); return }
 
@@ -65,29 +64,170 @@ export default function Home() {
   }
 
   if (checking) return (
-    <main style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', color: '#c9a96e', letterSpacing: '0.2em', fontSize: '0.85rem' }}>
+    <main style={{
+      backgroundColor: 'var(--bg)',
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'var(--font-mono)',
+      color: 'var(--gold)',
+      letterSpacing: '0.1em',
+      fontSize: '10px',
+      textTransform: 'uppercase',
+    }}>
       Setting the scene...
     </main>
   )
 
   return (
-    <main style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', color: '#e8e0d0' }}>
-      <h1 style={{ fontSize: '1rem', letterSpacing: '0.3em', marginBottom: '3rem', color: '#c9a96e' }}>MATINEE</h1>
-      <div style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-          style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #333', color: '#e8e0d0', padding: '0.75rem 0', fontSize: '0.9rem', outline: 'none', fontFamily: 'Georgia, serif' }} />
-        <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAuth()}
-          style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #333', color: '#e8e0d0', padding: '0.75rem 0', fontSize: '0.9rem', outline: 'none', fontFamily: 'Georgia, serif' }} />
-        {error && <p style={{ color: '#c0392b', fontSize: '0.8rem' }}>{error}</p>}
-        <button onClick={handleAuth} disabled={loading}
-          style={{ background: 'transparent', border: '1px solid #c9a96e', color: '#c9a96e', padding: '0.75rem', fontSize: '0.85rem', letterSpacing: '0.15em', cursor: 'pointer', marginTop: '1rem', fontFamily: 'Georgia, serif' }}>
+    <main style={{
+      backgroundColor: 'var(--bg)',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <div style={{
+        width: '300px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}>
+
+        {/* Wordmark */}
+        <h1 style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: '24px',
+          fontWeight: 500,
+          letterSpacing: '0.4em',
+          color: 'var(--gold)',
+          textTransform: 'uppercase',
+          marginBottom: '8px',
+        }}>
+          MATINEE
+        </h1>
+
+        {/* Tagline */}
+        <p style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          fontWeight: 400,
+          letterSpacing: '0.1em',
+          color: 'var(--text-dim)',
+          textTransform: 'uppercase',
+          marginBottom: '48px',
+        }}>
+          The filmmaker is always the director.
+        </p>
+
+        {/* Inputs */}
+        <div style={{ width: '100%' }}>
+
+          {/* Email */}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onFocus={() => setEmailFocused(true)}
+            onBlur={() => setEmailFocused(false)}
+            style={{
+              width: '100%',
+              background: emailFocused ? '#1C1C21' : 'var(--surface)',
+              border: `1px solid ${emailFocused ? 'var(--gold-dim)' : 'var(--border)'}`,
+              borderBottom: 'none',
+              color: 'var(--text)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              padding: '14px 16px',
+              display: 'block',
+              transition: 'background 0.2s, border-color 0.2s',
+            }}
+          />
+
+          {/* Password */}
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onFocus={() => setPasswordFocused(true)}
+            onBlur={() => setPasswordFocused(false)}
+            onKeyDown={e => e.key === 'Enter' && handleAuth()}
+            style={{
+              width: '100%',
+              background: passwordFocused ? '#1C1C21' : 'var(--surface)',
+              border: `1px solid ${passwordFocused ? 'var(--gold-dim)' : 'var(--border)'}`,
+              color: 'var(--text)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              padding: '14px 16px',
+              display: 'block',
+              transition: 'background 0.2s, border-color 0.2s',
+            }}
+          />
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p style={{
+            width: '100%',
+            marginTop: '12px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            color: 'var(--text-dim)',
+          }}>
+            {error}
+          </p>
+        )}
+
+        {/* CTA Button */}
+        <button
+          onClick={handleAuth}
+          disabled={loading}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,169,110,0.06)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--gold)'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--gold-dim)'
+          }}
+          style={{
+            width: '100%',
+            marginTop: '24px',
+            background: 'transparent',
+            border: '1px solid var(--gold-dim)',
+            color: 'var(--gold)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            fontWeight: 400,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            padding: '14px',
+            cursor: loading ? 'default' : 'pointer',
+            transition: 'background 0.2s, border-color 0.2s',
+          }}
+        >
           {loading ? 'One moment...' : isSignUp ? 'ENTER THE STUDIO' : 'RETURN TO THE STUDIO'}
         </button>
-        <p onClick={() => setIsSignUp(!isSignUp)}
-          style={{ textAlign: 'center', fontSize: '0.8rem', color: '#666', cursor: 'pointer', marginTop: '0.5rem' }}>
+
+        {/* Sub-link */}
+        <p
+          onClick={() => setIsSignUp(!isSignUp)}
+          style={{
+            marginTop: '20px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            color: 'var(--text-dim)',
+            cursor: 'pointer',
+          }}
+        >
           {isSignUp ? 'Already have an account? Sign in.' : 'First time here? Create an account.'}
         </p>
+
       </div>
     </main>
   )
