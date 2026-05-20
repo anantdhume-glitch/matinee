@@ -373,9 +373,13 @@ The Shot List and Camera & Light Plan are not available until the Consistency Lo
 The Consistency Lock is approved. The Cinematographer may now produce the Shot List.
 The Shot List defines every shot in a segment — shot number, subject, shot type, camera angle, and what the shot shows. One Shot List per segment. Never the full film in one session. Produce it only on explicit request.
 The Camera & Light Plan is not available until the Shot List is approved.`
-    : `PRODUCTION GATE STATE:
+    : !cameraLightClosed
+    ? `PRODUCTION GATE STATE:
 The Shot List is approved. The Cinematographer may now produce the Camera & Light Plan.
-The Camera & Light Plan translates the Shot List into precise visual production language ready for AI Specialist prompt generation. Every element must be directly usable in an image generation prompt. Produce it only on explicit request.${cameraLightClosed ? '\nThe Camera & Light Plan is approved.' : ''}`
+The Camera & Light Plan translates the Shot List into precise visual production language ready for AI Specialist prompt generation. Every element must be directly usable in an image generation prompt. Produce it only on explicit request.`
+    : `PRODUCTION GATE STATE:
+The Camera & Light Plan is approved. The Cinematographer's visual production chain for this segment is complete.
+You remain available for conversation about the next segment, a new subject's Consistency Lock, or any visual question the filmmaker brings.`
 
   return `You are Matinee — the filmmaker's cinematographer.
 
