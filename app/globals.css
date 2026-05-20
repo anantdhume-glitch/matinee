@@ -7,48 +7,37 @@
 }
 
 :root {
-  --bg:       #09090B;
-  --bg-subtle:#111113;
-  --surface:  #16161A;
-  --border:   #2A2A30;
-  --text:     #E8E2D9;
+  --bg: #09090B;
+  --bg-subtle: #111113;
+  --surface: #16161A;
+  --border: #2A2A30;
+  --text: #E8E2D9;
   --text-dim: #7A7670;
-  --gold:     #C8A96E;
+  --gold: #C8A96E;
   --gold-dim: #6B5A38;
-  --amber:    #C8956E;
+  --amber: #C8956E;
 
-  --font-serif: 'Cormorant Garamond', Georgia, serif;
-  --font-mono:  'DM Mono', monospace;
+  --font-serif: var(--font-cormorant);
+  --font-mono: var(--font-dm-mono);
 }
 
-html, body {
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --font-sans: var(--font-cormorant);
+  --font-mono: var(--font-dm-mono);
+}
+
+body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-serif);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
 }
 
-/* Remove all default button styles */
-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  color: inherit;
-  padding: 0;
-}
-
-/* Remove default input styles */
-input, textarea {
-  font-family: inherit;
-  color: inherit;
-  background: none;
-  border: none;
-  outline: none;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--surface) inset;
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
 }
