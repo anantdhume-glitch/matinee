@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import {
   FileText, Clapperboard, LayoutList, Radio, Anchor,
   ScrollText, Mic, Lock, List, LayoutTemplate,
-  Aperture, Sparkles, Scissors, Music
+  Aperture, Sparkles, Scissors, Music, Pin
 } from 'lucide-react'
 
 type Message = { id: string; role: string; content: string }
@@ -206,6 +206,48 @@ const MODES: Array<{ label: string; value: string | null }> = [
   { label: 'CINEMATOGRAPHER',value: 'cinematographer' },
   { label: 'AI SPECIALIST',  value: 'ai_specialist' },
   { label: 'EDITOR',         value: 'editor' },
+]
+
+const PHASE_GROUPS: Array<{ label: string; initial: string; modes: string[] }> = [
+  { label: 'PRE-PRODUCTION', initial: 'P', modes: ['producer'] },
+  { label: 'PRODUCTION',     initial: 'P', modes: ['director', 'narrator', 'cinematographer', 'ai_specialist'] },
+  { label: 'POST',           initial: 'P', modes: ['editor'] },
+]
+
+const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
+  producer: [
+    'portrait_logline', 'portrait_emotional_core', 'portrait_story',
+    'portrait_subjects', 'portrait_themes', 'portrait_approach',
+    'portrait_comparable_films', 'portrait_audience', 'portrait_target_length',
+    'portrait_unresolved_questions',
+  ],
+  director: [
+    'portrait_emotional_core', 'portrait_story', 'portrait_world',
+    'portrait_subjects', 'portrait_tone', 'portrait_visual_world',
+    'portrait_approach', 'portrait_target_length', 'portrait_comparable_films',
+    'portrait_unresolved_questions',
+  ],
+  narrator: [
+    'portrait_logline', 'portrait_emotional_core', 'portrait_story',
+    'portrait_subjects', 'portrait_themes', 'portrait_tone',
+    'portrait_approach', 'portrait_target_length', 'portrait_unresolved_questions',
+  ],
+  cinematographer: [
+    'portrait_tone', 'portrait_visual_world', 'portrait_world',
+    'portrait_subjects', 'portrait_approach', 'portrait_comparable_films',
+    'portrait_target_length',
+  ],
+  ai_specialist: [
+    'portrait_tone', 'portrait_visual_world', 'portrait_comparable_films',
+  ],
+  editor: [
+    'portrait_emotional_core', 'portrait_tone', 'portrait_approach',
+    'portrait_audience', 'portrait_target_length', 'portrait_unresolved_questions',
+  ],
+}
+
+const FALLBACK_PORTRAIT_FIELD_KEYS = [
+  'portrait_logline', 'portrait_emotional_core', 'portrait_tone', 'portrait_unresolved_questions',
 ]
 
 // Tab map: mode value → ordered tab keys (first is default)
@@ -448,6 +490,11 @@ export default function FilmStudio() {
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
+  const [railCollapsed, setRailCollapsed] = useState(false)
+  const [panelDocked, setPanelDocked] = useState(false)
+  const [hoveredMode, setHoveredMode] = useState<string | null>(null)
+  const [stripHovered, setStripHovered] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(1440)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -479,6 +526,20 @@ export default function FilmStudio() {
   useEffect(() => {
     setContextTab(getDefaultTab(film?.current_mode ?? null))
   }, [film?.current_mode])
+
+  // railCollapsed syncs with panelDocked
+  useEffect(() => {
+    if (panelDocked) setRailCollapsed(true)
+    else setRailCollapsed(false)
+  }, [panelDocked])
+
+  // Track viewport width for pin affordance check
+  useEffect(() => {
+    const update = () => setViewportWidth(window.innerWidth)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   const refreshPortrait = async () => {
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
@@ -1148,6 +1209,7 @@ export default function FilmStudio() {
   // ── DERIVED ────────────────────────────────────────────────────────────────
   const currentModeKey = film?.current_mode ?? ''
   const contextTabs = MODE_TABS[currentModeKey] ?? ['portrait']
+  const canPin = viewportWidth - 176 - 360 >= 600
 
   // ── MAIN STUDIO ────────────────────────────────────────────────────────────
   return (
@@ -1190,117 +1252,174 @@ export default function FilmStudio() {
       {/* ── BODY ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* ── LEFT RAIL — Production Compass ── */}
+        {/* ── LEFT RAIL ── */}
         <div style={{
-          width: '176px', flexShrink: 0, height: '100%',
-          backgroundColor: 'var(--bg-elev)', borderRight: '1px solid var(--line)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto',
+          width: railCollapsed ? '40px' : '176px',
+          flexShrink: 0,
+          height: '100%',
+          backgroundColor: 'var(--bg-elev)',
+          borderRight: '1px solid var(--line)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          transition: `width var(--dur-slow) var(--ease-curtain)`,
         }}>
-          {/* Film title */}
-          <div style={{ padding: '16px 14px 12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-            <span
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={async (e) => {
-                const newTitle = e.currentTarget.textContent?.trim()
-                if (!newTitle || newTitle === film?.title) return
-                setFilm(prev => prev ? { ...prev, title: newTitle } : null)
-                await supabase.from('films').update({ title: newTitle }).eq('id', filmId)
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-              style={{
-                fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic',
-                color: 'var(--fg-dim)', outline: 'none', cursor: 'text',
-                display: 'block', lineHeight: 1.5,
-              }}
-            >
-              {film?.title}
+          {/* Film title — hidden when collapsed */}
+          {!railCollapsed && (
+            <div style={{ padding: '16px 14px 12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+              <span
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={async (e) => {
+                  const newTitle = e.currentTarget.textContent?.trim()
+                  if (!newTitle || newTitle === film?.title) return
+                  setFilm(prev => prev ? { ...prev, title: newTitle } : null)
+                  await supabase.from('films').update({ title: newTitle }).eq('id', filmId)
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+                style={{
+                  fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic',
+                  color: 'var(--fg-dim)', outline: 'none', cursor: 'text',
+                  display: 'block', lineHeight: 1.5,
+                }}
+              >
+                {film?.title}
+              </span>
+            </div>
+          )}
+
+          {/* Collapse toggle */}
+          <div
+            onClick={() => setRailCollapsed(prev => !prev)}
+            style={{
+              height: '32px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              borderBottom: '1px solid var(--line)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)', lineHeight: 1 }}>
+              {railCollapsed ? '›' : '‹'}
             </span>
           </div>
 
-          {/* Mode list */}
-          <div style={{ flex: 1 }}>
-            {MODES.map(mode => {
-              const isActive = (film?.current_mode ?? null) === mode.value
-              const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === mode.value)
+          {/* Scrollable mode list */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
 
-              // Determine gated: mode has docs and its first doc's prereq is unmet
-              let isGated = false
-              if (mode.value && modeDocs.length > 0) {
-                const firstDoc = modeDocs[0]
-                const prereqId = GATE_PREREQUISITES[firstDoc.gateId]
-                if (prereqId) {
-                  const prereqMet = film?.gates_closed?.some(g => g.gate === prereqId && !!g.closed_at) ?? false
-                  isGated = !prereqMet
-                }
-              }
+            {/* Discovery row */}
+            {(() => {
+              const isActive = (film?.current_mode ?? null) === null
+              const isHov = hoveredMode === '__discovery__'
+              const nameColor = isActive ? 'var(--accent)' : 'var(--fg)'
+              const modeBg = isActive ? 'rgba(200,169,110,0.07)' : isHov ? 'var(--bg-elev-2)' : 'transparent'
+              return (
+                <div
+                  onClick={async () => {
+                    const { error } = await supabase.from('films').update({ current_mode: null }).eq('id', filmId)
+                    if (!error) setFilm(prev => prev ? { ...prev, current_mode: null } : null)
+                  }}
+                  onMouseEnter={() => setHoveredMode('__discovery__')}
+                  onMouseLeave={() => setHoveredMode(null)}
+                  style={{ padding: '10px 14px', cursor: 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
+                >
+                  {!railCollapsed && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
+                      DISCOVERY
+                    </span>
+                  )}
+                  {railCollapsed && isActive && (
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
+                  )}
+                </div>
+              )
+            })()}
 
-              const nameColor = isActive ? 'var(--accent)' : isGated ? 'var(--fg-dim)' : 'var(--fg)'
-              const modeBg = isActive ? 'rgba(200,169,110,0.07)' : 'transparent'
+            {/* Phase groups */}
+            {PHASE_GROUPS.map(group => {
+              const isGroupActive = group.modes.includes(film?.current_mode ?? '')
+              const groupHasAttention = group.modes.some(mv => {
+                const docs = ARCHIVE_DOCUMENTS.filter(d => d.mode === mv)
+                return docs.some(doc => {
+                  const gen = film?.documents_generated?.some(d => d.document === doc.gateId)
+                  const gate = film?.gates_closed?.find(g => g.gate === doc.gateId)
+                  const locked = !!gate && gate.status !== 'reopened' && !!gate.closed_at
+                  return gen && !locked
+                })
+              })
 
               return (
-                <div key={String(mode.value)}>
-                  {/* Mode row */}
-                  <div
-                    onClick={async () => {
-                      const { error } = await supabase.from('films').update({ current_mode: mode.value }).eq('id', filmId)
-                      if (!error) setFilm(prev => prev ? { ...prev, current_mode: mode.value } : null)
-                    }}
-                    style={{
-                      padding: '10px 14px', cursor: 'pointer',
-                      backgroundColor: modeBg,
-                    }}
-                  >
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em',
-                      textTransform: 'uppercase', color: nameColor,
-                    }}>
-                      {mode.label}
-                    </span>
-                  </div>
+                <div key={group.label}>
+                  {/* Phase group header */}
+                  {!railCollapsed ? (
+                    <div style={{ padding: '8px 14px 3px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
+                      {group.label}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '6px 0 3px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: isGroupActive ? 'var(--accent)' : 'var(--fg-dim)', lineHeight: 1 }}>
+                        {group.initial}
+                      </span>
+                      {groupHasAttention && (
+                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', marginTop: '3px' }} />
+                      )}
+                    </div>
+                  )}
 
-                  {/* Gate document sub-items */}
-                  {modeDocs.map(doc => {
-                    const gateEntry = film?.gates_closed?.find(g => g.gate === doc.gateId)
-                    const isReopened = gateEntry?.status === 'reopened'
-                    const isLocked = !!gateEntry && !isReopened && !!gateEntry.closed_at
-                    const hasContent = !!film?.documents_content?.[doc.gateId]
-                    const isInReview = hasContent && !isLocked
+                  {/* Mode rows */}
+                  {group.modes.map(modeValue => {
+                    const modeConfig = MODES.find(m => m.value === modeValue)
+                    if (!modeConfig) return null
+                    const isActive = film?.current_mode === modeValue
+                    const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === modeValue)
+                    const isHov = hoveredMode === modeValue
 
-                    const badgeLabel = isLocked ? 'LOCKED' : isInReview ? 'IN REVIEW' : 'OPEN'
-                    const badgeColor = isLocked ? 'var(--accent)' : isInReview ? 'var(--gate-review)' : 'var(--fg-dim)'
-                    const badgeBorder = isLocked ? 'var(--accent)' : isInReview ? 'var(--gate-review)' : 'var(--line)'
+                    let isGated = false
+                    if (modeDocs.length > 0) {
+                      const firstDoc = modeDocs[0]
+                      const prereqId = GATE_PREREQUISITES[firstDoc.gateId]
+                      if (prereqId) {
+                        const prereqMet = film?.gates_closed?.some(g => g.gate === prereqId && !!g.closed_at) ?? false
+                        isGated = !prereqMet
+                      }
+                    }
+
+                    const hasReviewDoc = modeDocs.some(doc => {
+                      const gen = film?.documents_generated?.some(d => d.document === doc.gateId)
+                      const gate = film?.gates_closed?.find(g => g.gate === doc.gateId)
+                      const locked = !!gate && gate.status !== 'reopened' && !!gate.closed_at
+                      return gen && !locked
+                    })
+                    const hasAnyDoc = film?.documents_generated?.some(d => modeDocs.some(doc => doc.gateId === d.document))
+                    const dotColor = hasReviewDoc ? 'var(--accent)' : hasAnyDoc ? 'var(--fg-dim)' : null
+
+                    const nameColor = isActive ? 'var(--accent)' : isGated ? 'var(--fg-dim)' : 'var(--fg)'
+                    const modeBg = isActive ? 'rgba(200,169,110,0.07)' : (!isGated && isHov) ? 'var(--bg-elev-2)' : 'transparent'
 
                     return (
                       <div
-                        key={doc.gateId}
-                        onClick={() => {
-                          setContextPanelOpen(true)
-                          setContextTab('archive')
-                          setTimeout(() => archiveRowRefs.current[doc.gateId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 320)
+                        key={modeValue}
+                        onClick={async () => {
+                          const { error } = await supabase.from('films').update({ current_mode: modeValue }).eq('id', filmId)
+                          if (!error) setFilm(prev => prev ? { ...prev, current_mode: modeValue } : null)
                         }}
-                        style={{
-                          padding: '5px 14px 5px 24px',
-                          display: 'flex', alignItems: 'center', gap: '5px',
-                          cursor: 'pointer',
-                        }}
+                        onMouseEnter={() => { if (!isGated) setHoveredMode(modeValue) }}
+                        onMouseLeave={() => setHoveredMode(null)}
+                        style={{ padding: '10px 14px', cursor: isGated ? 'default' : 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
                       >
-                        {GATE_ICON_MAP[doc.gateId]}
-                        <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)',
-                          textTransform: 'uppercase', flex: 1,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {doc.label}
-                        </span>
-                        <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: '7px', letterSpacing: '0.08em',
-                          textTransform: 'uppercase', color: badgeColor,
-                          border: `1px solid ${badgeBorder}`, padding: '1px 4px',
-                          flexShrink: 0, lineHeight: 1.4,
-                        }}>
-                          {badgeLabel}
-                        </span>
+                        {!railCollapsed && (
+                          <>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {modeConfig.label}
+                            </span>
+                            {dotColor && (
+                              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0, marginLeft: '6px' }} />
+                            )}
+                          </>
+                        )}
+                        {railCollapsed && isActive && (
+                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
+                        )}
                       </div>
                     )
                   })}
@@ -1309,9 +1428,9 @@ export default function FilmStudio() {
             })}
           </div>
 
-          {/* Upload Script — pinned to bottom, only in discovery */}
-          {!film?.current_mode && (
-            <div style={{ marginTop: 'auto', borderTop: '1px solid var(--line)', flexShrink: 0 }}>
+          {/* Upload Script — bottom, only in discovery + expanded */}
+          {!film?.current_mode && !railCollapsed && (
+            <div style={{ borderTop: '1px solid var(--line)', flexShrink: 0 }}>
               <label style={{
                 display: 'block', padding: '14px',
                 fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em',
@@ -1331,7 +1450,14 @@ export default function FilmStudio() {
         </div>
 
         {/* ── CONVERSATION ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, backgroundColor: 'var(--bg)' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: '600px', backgroundColor: 'var(--bg)', position: 'relative' }}>
+          {/* Overlay — closes floating panel on outside click */}
+          {contextPanelOpen && !panelDocked && (
+            <div
+              onClick={() => setContextPanelOpen(false)}
+              style={{ position: 'absolute', inset: 0, zIndex: 5, cursor: 'default' }}
+            />
+          )}
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
             <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
@@ -1403,41 +1529,86 @@ export default function FilmStudio() {
         </div>
 
         {/* ── CONTEXT PANEL ── */}
-        {/* Outer wrapper: position:relative, no overflow:hidden — pull tab is never clipped here */}
         <div style={{
           position: 'relative',
           flexShrink: 0,
-          display: 'flex',
+          width: contextPanelOpen && panelDocked ? '360px' : '32px',
+          transition: `width var(--dur-slow) var(--ease-curtain)`,
+          height: '100%',
         }}>
 
-          {/* Pull tab — outside the overflow:hidden sliding div, always visible */}
+          {/* Strip — always in DOM, closes when panel opens */}
           <div
-            onClick={() => setContextPanelOpen(prev => !prev)}
+            onClick={!contextPanelOpen ? () => setContextPanelOpen(true) : undefined}
+            onMouseEnter={() => setStripHovered(true)}
+            onMouseLeave={() => setStripHovered(false)}
             style={{
-              position: 'absolute', right: '100%', top: '50%', transform: 'translateY(-50%)',
-              width: '12px', height: '40px',
-              backgroundColor: 'var(--bg-elev)',
-              border: '1px solid var(--line)', borderLeft: 'none',
-              cursor: 'pointer', zIndex: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'absolute', right: 0, top: 0, bottom: 0, width: '32px',
+              backgroundColor: !contextPanelOpen && stripHovered ? 'var(--bg-elev-2)' : 'var(--bg-elev)',
+              borderLeft: '1px solid var(--line)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: !contextPanelOpen ? 'pointer' : 'default',
+              transition: `background var(--dur-fast) var(--ease-stage)`,
+              zIndex: 1,
+              overflow: 'hidden',
             }}
           >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)', lineHeight: 1 }}>
-              {contextPanelOpen ? '›' : '‹'}
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.06em',
+              color: !contextPanelOpen && stripHovered ? 'var(--fg)' : 'var(--fg-dim)',
+              writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+              marginBottom: '8px',
+              transition: `color var(--dur-fast) var(--ease-stage)`,
+              overflow: 'hidden', maxHeight: '160px', whiteSpace: 'nowrap',
+            }}>
+              {film?.title || 'UNTITLED FILM'}
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '8px', lineHeight: 1,
+              color: !contextPanelOpen && stripHovered ? 'var(--fg)' : 'var(--fg-dim)',
+              transition: `color var(--dur-fast) var(--ease-stage)`,
+            }}>
+              ‹
             </span>
           </div>
 
-          {/* Sliding panel — overflow:hidden drives the open/close animation */}
-          <div style={{
-            width: contextPanelOpen ? '220px' : '0px',
-            transition: 'width 280ms ease',
-            overflow: 'hidden',
-            backgroundColor: 'var(--bg-elev)', borderLeft: '1px solid var(--line)',
-            display: 'flex', flexDirection: 'column',
-          }}>
+          {/* Open panel — floating (position:absolute, z-index:10) or docked (z-index:2) */}
+          {contextPanelOpen && (
+            <div style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0,
+              width: '360px',
+              backgroundColor: 'var(--bg-elev)', borderLeft: '1px solid var(--line)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+              zIndex: panelDocked ? 2 : 10,
+            }}>
 
-          {/* Panel inner — fixed 220px width so content doesn't reflow during animation */}
-          <div style={{ width: '220px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Panel header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+              <div
+                onClick={() => setContextPanelOpen(false)}
+                style={{ cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-dim)', letterSpacing: '0.1em', lineHeight: 1 }}
+              >
+                ✕
+              </div>
+              <div
+                onClick={() => {
+                  if (!canPin) return
+                  if (panelDocked) {
+                    setPanelDocked(false)
+                  } else {
+                    setPanelDocked(true)
+                  }
+                }}
+                style={{
+                  cursor: canPin ? 'pointer' : 'not-allowed',
+                  opacity: canPin ? 1 : 0.3,
+                  display: 'flex', alignItems: 'center',
+                }}
+              >
+                <Pin size={14} color={panelDocked ? 'var(--accent)' : 'var(--fg-dim)'} />
+              </div>
+            </div>
 
             {/* Tab bar */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
@@ -1487,7 +1658,15 @@ export default function FilmStudio() {
                         The portrait is still taking shape. Keep the conversation going and it will fill in.
                       </p>
                     ) : (
-                      PORTRAIT_FIELDS.map((field, idx) => {
+                      (() => {
+                        const modeKey = film?.current_mode ?? null
+                        const modeFieldKeys = modeKey ? (MODE_PORTRAIT_FIELDS[modeKey] ?? null) : null
+                        const fieldsToRender = panelDocked
+                          ? PORTRAIT_FIELDS
+                          : modeFieldKeys
+                            ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
+                            : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
+                        return fieldsToRender.map((field, idx) => {
                         const raw = filmMemory[field.key]
                         const isEmpty = isFieldEmpty(raw)
                         const value = getPortraitValue(raw)
@@ -1585,12 +1764,13 @@ export default function FilmStudio() {
                               )}
                             </div>
 
-                            {idx < PORTRAIT_FIELDS.length - 1 && (
+                            {idx < fieldsToRender.length - 1 && (
                               <div style={{ height: '1px', background: 'var(--line)', marginBottom: '1.5rem' }} />
                             )}
                           </div>
                         )
-                      })
+                        })
+                      })()
                     )}
                   </div>
                 </div>
@@ -1784,8 +1964,8 @@ export default function FilmStudio() {
               )}
 
             </div>
-          </div>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
