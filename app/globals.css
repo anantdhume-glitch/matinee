@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -8,14 +8,14 @@
 
 :root {
   --bg: #09090B;
-  --bg-subtle: #111113;
-  --surface: #16161A;
-  --border: #2A2A30;
-  --text: #E8E2D9;
-  --text-dim: #7A7670;
-  --gold: #C8A96E;
-  --gold-dim: #6B5A38;
-  --amber: #C8956E;
+  --bg-elev: #111113;
+  --bg-elev-2: #16161A;
+  --line: #2A2A30;
+  --fg: #E8E2D9;
+  --fg-dim: #7A7670;
+  --accent: #C8A96E;
+  --accent-dim: #6B5A38;
+  --gate-review: #C8956E;
 
   --font-serif: var(--font-cormorant);
   --font-mono: var(--font-dm-mono);
@@ -23,21 +23,21 @@
 
 @theme inline {
   --color-background: var(--bg);
-  --color-foreground: var(--text);
+  --color-foreground: var(--fg);
   --font-sans: var(--font-cormorant);
   --font-mono: var(--font-dm-mono);
 }
 
 body {
   background: var(--bg);
-  color: var(--text);
+  color: var(--fg);
   font-family: var(--font-serif);
 }
 
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px var(--surface) inset;
-  -webkit-text-fill-color: var(--text);
-  caret-color: var(--text);
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-elev-2) inset;
+  -webkit-text-fill-color: var(--fg);
+  caret-color: var(--fg);
 }

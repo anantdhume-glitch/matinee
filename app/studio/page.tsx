@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
@@ -83,7 +83,7 @@ export default function Studio() {
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: 'var(--font-mono)',
-      color: 'var(--gold)',
+      color: 'var(--accent)',
       letterSpacing: '0.1em',
       fontSize: '10px',
       textTransform: 'uppercase',
@@ -100,13 +100,13 @@ export default function Studio() {
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      color: 'var(--text)',
+      color: 'var(--fg)',
     }}>
 
       {/* HEADER STRIP */}
       <header style={{
         height: '56px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '1px solid var(--line)',
         padding: '0 32px',
         display: 'flex',
         alignItems: 'center',
@@ -118,7 +118,7 @@ export default function Studio() {
           fontSize: '15px',
           fontWeight: 500,
           letterSpacing: '0.3em',
-          color: 'var(--gold)',
+          color: 'var(--accent)',
           textTransform: 'uppercase',
         }}>
           MATINEE
@@ -129,7 +129,7 @@ export default function Studio() {
             fontFamily: 'var(--font-mono)',
             fontSize: '9px',
             letterSpacing: '0.15em',
-            color: 'var(--text-dim)',
+            color: 'var(--fg-dim)',
             textTransform: 'uppercase',
             cursor: 'pointer',
           }}
@@ -146,7 +146,7 @@ export default function Studio() {
           fontFamily: 'var(--font-mono)',
           fontSize: '9px',
           letterSpacing: '0.2em',
-          color: 'var(--text-dim)',
+          color: 'var(--fg-dim)',
           textTransform: 'uppercase',
           marginBottom: '24px',
         }}>
@@ -169,14 +169,14 @@ export default function Studio() {
           <span style={{
             fontFamily: 'var(--font-serif)',
             fontSize: '18px',
-            color: 'var(--gold)',
+            color: 'var(--accent)',
             lineHeight: 1,
           }}>+</span>
           <span style={{
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
             letterSpacing: '0.12em',
-            color: 'var(--text-dim)',
+            color: 'var(--fg-dim)',
             textTransform: 'uppercase',
           }}>
             BEGIN A NEW FILM
@@ -184,7 +184,7 @@ export default function Studio() {
         </div>
 
         {/* Film list */}
-        <div style={{ borderTop: '1px solid var(--border)' }}>
+        <div style={{ borderTop: '1px solid var(--line)' }}>
 
           {/* Hero row */}
           {heroFilm && (
@@ -192,7 +192,7 @@ export default function Studio() {
               onClick={() => router.push(`/studio/${heroFilm.id}`)}
               style={{
                 padding: '20px 0',
-                borderBottom: '1px solid var(--border)',
+                borderBottom: '1px solid var(--line)',
                 position: 'relative',
                 cursor: 'pointer',
                 display: 'flex',
@@ -207,7 +207,7 @@ export default function Studio() {
                 top: 0,
                 bottom: 0,
                 width: '2px',
-                background: 'var(--gold)',
+                background: 'var(--accent)',
               }} />
 
               <div style={{ flex: 1, minWidth: 0, paddingRight: '16px' }}>
@@ -215,7 +215,7 @@ export default function Studio() {
                   fontFamily: 'var(--font-serif)',
                   fontSize: '22px',
                   fontWeight: 500,
-                  color: 'var(--text)',
+                  color: 'var(--fg)',
                   marginBottom: '4px',
                   lineHeight: 1.2,
                 }}>
@@ -225,11 +225,11 @@ export default function Studio() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: '9px',
                   textTransform: 'uppercase',
-                  color: 'var(--text-dim)',
+                  color: 'var(--fg-dim)',
                   marginBottom: heroMessage ? '8px' : 0,
                 }}>
                   In{' '}
-                  <span style={{ color: 'var(--gold)' }}>
+                  <span style={{ color: 'var(--accent)' }}>
                     {modeDisplay(heroFilm.current_mode)}
                   </span>
                 </p>
@@ -238,7 +238,7 @@ export default function Studio() {
                     fontFamily: 'var(--font-serif)',
                     fontSize: '13px',
                     fontStyle: 'italic',
-                    color: 'var(--text)',
+                    color: 'var(--fg)',
                     opacity: 1,
                     lineHeight: 1.5,
                     overflow: 'hidden',
@@ -253,7 +253,7 @@ export default function Studio() {
               <p style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '9px',
-                color: 'var(--text-dim)',
+                color: 'var(--fg-dim)',
                 textTransform: 'uppercase',
                 flexShrink: 0,
                 paddingTop: '4px',
@@ -275,7 +275,7 @@ export default function Studio() {
                 onMouseLeave={() => setHoveredId(null)}
                 style={{
                   padding: '16px 0',
-                  borderBottom: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--line)',
                   position: 'relative',
                   cursor: 'pointer',
                   display: 'flex',
@@ -290,7 +290,7 @@ export default function Studio() {
                   top: 0,
                   bottom: 0,
                   width: '2px',
-                  background: 'var(--gold)',
+                  background: 'var(--accent)',
                   opacity: isHovered ? 1 : 0,
                   transition: 'opacity 200ms ease',
                 }} />
@@ -301,7 +301,7 @@ export default function Studio() {
                     fontSize: isUntitled ? '17px' : '19px',
                     fontWeight: 400,
                     fontStyle: isUntitled ? 'italic' : 'normal',
-                    color: isUntitled ? 'var(--text-dim)' : 'var(--text)',
+                    color: isUntitled ? 'var(--fg-dim)' : 'var(--fg)',
                     marginBottom: '4px',
                     lineHeight: 1.2,
                   }}>
@@ -311,10 +311,10 @@ export default function Studio() {
                     fontFamily: 'var(--font-mono)',
                     fontSize: '9px',
                     textTransform: 'uppercase',
-                    color: 'var(--text-dim)',
+                    color: 'var(--fg-dim)',
                   }}>
                     In{' '}
-                    <span style={{ color: 'var(--gold)' }}>
+                    <span style={{ color: 'var(--accent)' }}>
                       {modeDisplay(film.current_mode)}
                     </span>
                   </p>
@@ -323,7 +323,7 @@ export default function Studio() {
                 <p style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '9px',
-                  color: 'var(--text-dim)',
+                  color: 'var(--fg-dim)',
                   textTransform: 'uppercase',
                   flexShrink: 0,
                   paddingTop: '2px',
@@ -339,7 +339,7 @@ export default function Studio() {
               fontFamily: 'var(--font-serif)',
               fontSize: '17px',
               fontStyle: 'italic',
-              color: 'var(--text-dim)',
+              color: 'var(--fg-dim)',
               padding: '24px 0',
             }}>
               No films yet.
@@ -366,8 +366,8 @@ export default function Studio() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
+              background: 'var(--bg-elev-2)',
+              border: '1px solid var(--line)',
               padding: '32px',
               width: '480px',
             }}
@@ -386,9 +386,9 @@ export default function Studio() {
                 width: '100%',
                 fontFamily: 'var(--font-serif)',
                 fontSize: '19px',
-                color: 'var(--text)',
+                color: 'var(--fg)',
                 background: 'transparent',
-                borderBottom: '1px solid var(--border)',
+                borderBottom: '1px solid var(--line)',
                 padding: '0 0 12px',
                 marginBottom: '24px',
                 display: 'block',
@@ -400,8 +400,8 @@ export default function Studio() {
                 disabled={creating}
                 style={{
                   background: 'transparent',
-                  border: '1px solid var(--gold-dim)',
-                  color: 'var(--gold)',
+                  border: '1px solid var(--accent-dim)',
+                  color: 'var(--accent)',
                   fontFamily: 'var(--font-mono)',
                   fontSize: '10px',
                   letterSpacing: '0.2em',
@@ -417,7 +417,7 @@ export default function Studio() {
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '10px',
-                  color: 'var(--text-dim)',
+                  color: 'var(--fg-dim)',
                   cursor: 'pointer',
                   letterSpacing: '0.1em',
                 }}

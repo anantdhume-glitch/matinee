@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
@@ -85,17 +85,17 @@ type EntryMode = 'choice' | 'uploading' | 'soul' | 'conversation'
 
 // ── BUTTON STYLES ─────────────────────────────────────────────────────────────
 const btnPrimary: React.CSSProperties = {
-  background: 'transparent', border: '1px solid var(--gold)', color: 'var(--gold)',
+  background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)',
   padding: '0.7rem 1.5rem', fontSize: '0.75rem', letterSpacing: '0.12em',
   cursor: 'pointer', fontFamily: 'var(--font-serif)', transition: 'all 0.2s'
 }
 const btnSecondary: React.CSSProperties = {
-  background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)',
+  background: 'transparent', border: '1px solid var(--line)', color: 'var(--fg-dim)',
   padding: '0.7rem 1.5rem', fontSize: '0.75rem', letterSpacing: '0.1em',
   cursor: 'pointer', fontFamily: 'var(--font-serif)', transition: 'all 0.2s'
 }
 const btnSmall: React.CSSProperties = {
-  background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-dim)',
+  background: 'transparent', border: '1px solid var(--line)', color: 'var(--fg-dim)',
   padding: '4px 10px', fontSize: '0.62rem', letterSpacing: '0.1em',
   cursor: 'pointer', fontFamily: 'var(--font-serif)', transition: 'all 0.2s'
 }
@@ -167,19 +167,19 @@ const GATE_PREREQUISITES: Partial<Record<GateId, GateId>> = {
 }
 
 const GATE_ICON_MAP: Record<GateId, React.ReactNode> = {
-  film_brief:            <FileText size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  treatment:             <Clapperboard size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  department_briefs:     <LayoutList size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  mode_selection_brief:  <Radio size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  hook_draft:            <Anchor size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  script_lock:           <ScrollText size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  audio_direction:       <Mic size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  consistency_lock:      <Lock size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  shot_list:             <List size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  camera_light_plan:     <Aperture size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  visual_prompt_package: <Sparkles size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  edit_plan:             <Scissors size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
-  music_cue_sheet:       <Music size={10} color="var(--text-dim)" style={{ flexShrink: 0 }} />,
+  film_brief:            <FileText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  treatment:             <Clapperboard size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  department_briefs:     <LayoutList size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  mode_selection_brief:  <Radio size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  hook_draft:            <Anchor size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  script_lock:           <ScrollText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  audio_direction:       <Mic size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  consistency_lock:      <Lock size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  shot_list:             <List size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  camera_light_plan:     <Aperture size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  visual_prompt_package: <Sparkles size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  edit_plan:             <Scissors size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  music_cue_sheet:       <Music size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
 }
 
 const ARCHIVE_ICON_MAP: Record<GateId, (color: string) => React.ReactNode> = {
@@ -902,7 +902,7 @@ export default function FilmStudio() {
 
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) return (
-    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', fontFamily: 'var(--font-serif)', letterSpacing: '0.2em', fontSize: '0.85rem' }}>
+    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'var(--font-serif)', letterSpacing: '0.2em', fontSize: '0.85rem' }}>
       Setting the scene...
     </main>
   )
@@ -918,7 +918,7 @@ export default function FilmStudio() {
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: 'var(--font-serif)',
-        color: 'var(--text)',
+        color: 'var(--fg)',
         position: 'relative',
       }}>
 
@@ -931,7 +931,7 @@ export default function FilmStudio() {
           fontFamily: 'var(--font-serif)',
           fontSize: '13px',
           fontStyle: 'italic',
-          color: 'var(--text-dim)',
+          color: 'var(--fg-dim)',
           whiteSpace: 'nowrap',
         }}>
           {film?.title || 'Untitled Film'}
@@ -944,7 +944,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-serif)',
               fontSize: '27px',
               fontWeight: 400,
-              color: 'var(--text)',
+              color: 'var(--fg)',
               textAlign: 'center',
               marginBottom: '8px',
             }}>
@@ -954,7 +954,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-mono)',
               fontSize: '9px',
               letterSpacing: '0.12em',
-              color: 'var(--text-dim)',
+              color: 'var(--fg-dim)',
               textTransform: 'uppercase',
               textAlign: 'center',
               marginBottom: '36px',
@@ -970,8 +970,8 @@ export default function FilmStudio() {
                 onMouseEnter={() => setHoveredCard('idea')}
                 onMouseLeave={() => setHoveredCard(null)}
                 style={{
-                  background: hoveredCard === 'idea' ? '#1A1A1F' : 'var(--surface)',
-                  border: `1px solid ${hoveredCard === 'idea' ? 'var(--gold-dim)' : 'var(--border)'}`,
+                  background: hoveredCard === 'idea' ? '#1A1A1F' : 'var(--bg-elev-2)',
+                  border: `1px solid ${hoveredCard === 'idea' ? 'var(--accent-dim)' : 'var(--line)'}`,
                   padding: '20px 26px',
                   textAlign: 'left',
                   width: '100%',
@@ -982,7 +982,7 @@ export default function FilmStudio() {
                 <p style={{
                   fontFamily: 'var(--font-serif)',
                   fontSize: '19px',
-                  color: 'var(--gold)',
+                  color: 'var(--accent)',
                   marginBottom: '6px',
                 }}>
                   I have an idea.
@@ -991,7 +991,7 @@ export default function FilmStudio() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: '9px',
                   letterSpacing: '0.08em',
-                  color: 'var(--text-dim)',
+                  color: 'var(--fg-dim)',
                   textTransform: 'uppercase',
                   lineHeight: 1.5,
                 }}>
@@ -1007,8 +1007,8 @@ export default function FilmStudio() {
                     onMouseEnter={() => setHoveredCard('script')}
                     onMouseLeave={() => setHoveredCard(null)}
                     style={{
-                      background: hoveredCard === 'script' ? '#1A1A1F' : 'var(--surface)',
-                      border: `1px solid ${hoveredCard === 'script' ? 'var(--gold-dim)' : 'var(--border)'}`,
+                      background: hoveredCard === 'script' ? '#1A1A1F' : 'var(--bg-elev-2)',
+                      border: `1px solid ${hoveredCard === 'script' ? 'var(--accent-dim)' : 'var(--line)'}`,
                       padding: '20px 26px',
                       textAlign: 'left',
                       width: '100%',
@@ -1019,7 +1019,7 @@ export default function FilmStudio() {
                     <p style={{
                       fontFamily: 'var(--font-serif)',
                       fontSize: '19px',
-                      color: 'var(--gold)',
+                      color: 'var(--accent)',
                       marginBottom: '6px',
                     }}>
                       I have a script.
@@ -1028,7 +1028,7 @@ export default function FilmStudio() {
                       fontFamily: 'var(--font-mono)',
                       fontSize: '9px',
                       letterSpacing: '0.08em',
-                      color: 'var(--text-dim)',
+                      color: 'var(--fg-dim)',
                       textTransform: 'uppercase',
                       lineHeight: 1.5,
                     }}>
@@ -1051,7 +1051,7 @@ export default function FilmStudio() {
                 marginTop: '16px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: '10px',
-                color: 'var(--text-dim)',
+                color: 'var(--fg-dim)',
                 textAlign: 'center',
               }}>
                 {uploadError}
@@ -1071,7 +1071,7 @@ export default function FilmStudio() {
                 fontFamily: 'var(--font-mono)',
                 fontSize: '9px',
                 letterSpacing: '0.1em',
-                color: 'var(--text-dim)',
+                color: 'var(--fg-dim)',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
               }}
@@ -1088,7 +1088,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-serif)',
               fontSize: '19px',
               fontStyle: 'italic',
-              color: 'var(--text-dim)',
+              color: 'var(--fg-dim)',
               lineHeight: 1.7,
               marginBottom: '8px',
             }}>
@@ -1098,7 +1098,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-mono)',
               fontSize: '9px',
               letterSpacing: '0.1em',
-              color: 'var(--text-dim)',
+              color: 'var(--fg-dim)',
               textTransform: 'uppercase',
             }}>
               BUILDING THE FILM MEMORY. THIS TAKES A MOMENT.
@@ -1113,7 +1113,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-mono)',
               fontSize: '9px',
               letterSpacing: '0.2em',
-              color: 'var(--gold-dim)',
+              color: 'var(--accent-dim)',
               textTransform: 'uppercase',
               marginBottom: '24px',
             }}>
@@ -1123,7 +1123,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-serif)',
               fontSize: '22px',
               lineHeight: 1.8,
-              color: 'var(--text)',
+              color: 'var(--fg)',
               fontWeight: 400,
               marginBottom: '40px',
             }}>
@@ -1133,7 +1133,7 @@ export default function FilmStudio() {
               fontFamily: 'var(--font-mono)',
               fontSize: '9px',
               letterSpacing: '0.1em',
-              color: 'var(--text-dim)',
+              color: 'var(--fg-dim)',
               textTransform: 'uppercase',
             }}>
               THE FILM MEMORY IS BUILT. STEPPING INTO THE STUDIO...
@@ -1151,18 +1151,18 @@ export default function FilmStudio() {
 
   // ── MAIN STUDIO ────────────────────────────────────────────────────────────
   return (
-    <main style={{ backgroundColor: 'var(--bg)', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-serif)', color: 'var(--text)', overflow: 'hidden' }}>
+    <main style={{ backgroundColor: 'var(--bg)', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-serif)', color: 'var(--fg)', overflow: 'hidden' }}>
 
       {/* ── HEADER STRIP ── */}
       <nav style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '0 2rem', height: '44px', flexShrink: 0,
-        borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-subtle)',
+        borderBottom: '1px solid var(--line)', backgroundColor: 'var(--bg-elev)',
       }}>
         {/* Wordmark */}
         <span style={{
           fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500,
-          letterSpacing: '0.3em', color: 'var(--gold)', textTransform: 'uppercase',
+          letterSpacing: '0.3em', color: 'var(--accent)', textTransform: 'uppercase',
         }}>
           MATINEE
         </span>
@@ -1170,7 +1170,7 @@ export default function FilmStudio() {
         {/* Current mode label */}
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em',
-          color: 'var(--text-dim)', textTransform: 'uppercase',
+          color: 'var(--fg-dim)', textTransform: 'uppercase',
         }}>
           {MODES.find(m => m.value === (film?.current_mode ?? null))?.label ?? 'DISCOVERY'}
         </span>
@@ -1180,7 +1180,7 @@ export default function FilmStudio() {
           onClick={() => router.push('/studio')}
           style={{
             fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em',
-            color: 'var(--text-dim)', textTransform: 'uppercase', cursor: 'pointer',
+            color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer',
           }}
         >
           LEAVE
@@ -1193,11 +1193,11 @@ export default function FilmStudio() {
         {/* ── LEFT RAIL — Production Compass ── */}
         <div style={{
           width: '176px', flexShrink: 0, height: '100%',
-          backgroundColor: 'var(--bg-subtle)', borderRight: '1px solid var(--border)',
+          backgroundColor: 'var(--bg-elev)', borderRight: '1px solid var(--line)',
           display: 'flex', flexDirection: 'column', overflowY: 'auto',
         }}>
           {/* Film title */}
-          <div style={{ padding: '16px 14px 12px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ padding: '16px 14px 12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
             <span
               contentEditable
               suppressContentEditableWarning
@@ -1210,7 +1210,7 @@ export default function FilmStudio() {
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
               style={{
                 fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic',
-                color: 'var(--text-dim)', outline: 'none', cursor: 'text',
+                color: 'var(--fg-dim)', outline: 'none', cursor: 'text',
                 display: 'block', lineHeight: 1.5,
               }}
             >
@@ -1235,7 +1235,7 @@ export default function FilmStudio() {
                 }
               }
 
-              const nameColor = isActive ? 'var(--gold)' : isGated ? 'var(--text-dim)' : 'var(--text)'
+              const nameColor = isActive ? 'var(--accent)' : isGated ? 'var(--fg-dim)' : 'var(--fg)'
               const modeBg = isActive ? 'rgba(200,169,110,0.07)' : 'transparent'
 
               return (
@@ -1268,8 +1268,8 @@ export default function FilmStudio() {
                     const isInReview = hasContent && !isLocked
 
                     const badgeLabel = isLocked ? 'LOCKED' : isInReview ? 'IN REVIEW' : 'OPEN'
-                    const badgeColor = isLocked ? 'var(--gold)' : isInReview ? 'var(--amber)' : 'var(--text-dim)'
-                    const badgeBorder = isLocked ? 'var(--gold)' : isInReview ? 'var(--amber)' : 'var(--border)'
+                    const badgeColor = isLocked ? 'var(--accent)' : isInReview ? 'var(--gate-review)' : 'var(--fg-dim)'
+                    const badgeBorder = isLocked ? 'var(--accent)' : isInReview ? 'var(--gate-review)' : 'var(--line)'
 
                     return (
                       <div
@@ -1287,7 +1287,7 @@ export default function FilmStudio() {
                       >
                         {GATE_ICON_MAP[doc.gateId]}
                         <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-dim)',
+                          fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)',
                           textTransform: 'uppercase', flex: 1,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
@@ -1311,11 +1311,11 @@ export default function FilmStudio() {
 
           {/* Upload Script — pinned to bottom, only in discovery */}
           {!film?.current_mode && (
-            <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+            <div style={{ marginTop: 'auto', borderTop: '1px solid var(--line)', flexShrink: 0 }}>
               <label style={{
                 display: 'block', padding: '14px',
                 fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em',
-                color: 'var(--text-dim)', textTransform: 'uppercase', cursor: 'pointer',
+                color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer',
               }}>
                 UPLOAD SCRIPT
                 <input
@@ -1338,11 +1338,11 @@ export default function FilmStudio() {
               {messages.map((msg, i) => (
                 <div key={i}>
                   {msg.role === 'assistant' ? (
-                    <p style={{ fontSize: '1.15rem', lineHeight: '1.9', color: 'var(--text)', fontWeight: 300 }}>
+                    <p style={{ fontSize: '1.15rem', lineHeight: '1.9', color: 'var(--fg)', fontWeight: 300 }}>
                       {msg.content}
                     </p>
                   ) : (
-                    <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--border)' }}>
+                    <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--line)' }}>
                       <p style={{ fontSize: '0.9rem', lineHeight: '1.75', color: '#5a5a5a' }}>
                         {msg.content}
                       </p>
@@ -1357,7 +1357,7 @@ export default function FilmStudio() {
                   {[0, 1, 2].map(i => (
                     <span key={i} style={{
                       width: '5px', height: '5px', borderRadius: '50%',
-                      backgroundColor: 'var(--gold-dim)', display: 'inline-block',
+                      backgroundColor: 'var(--accent-dim)', display: 'inline-block',
                       animation: 'matineePulse 1.4s ease-in-out infinite',
                       animationDelay: `${i * 0.2}s`
                     }} />
@@ -1382,7 +1382,7 @@ export default function FilmStudio() {
           </div>
 
           {/* INPUT */}
-          <div style={{ borderTop: '1px solid var(--border)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
+          <div style={{ borderTop: '1px solid var(--line)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
             <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <input
                 ref={inputRef}
@@ -1390,11 +1390,11 @@ export default function FilmStudio() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendMessage()}
                 placeholder="Speak..."
-                style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
+                style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
               />
               <span
                 onClick={() => sendMessage()}
-                style={{ color: input.trim() ? 'var(--gold)' : 'var(--border)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
+                style={{ color: input.trim() ? 'var(--accent)' : 'var(--line)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
               >
                 →
               </span>
@@ -1416,13 +1416,13 @@ export default function FilmStudio() {
             style={{
               position: 'absolute', right: '100%', top: '50%', transform: 'translateY(-50%)',
               width: '12px', height: '40px',
-              backgroundColor: 'var(--bg-subtle)',
-              border: '1px solid var(--border)', borderLeft: 'none',
+              backgroundColor: 'var(--bg-elev)',
+              border: '1px solid var(--line)', borderLeft: 'none',
               cursor: 'pointer', zIndex: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--text-dim)', lineHeight: 1 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)', lineHeight: 1 }}>
               {contextPanelOpen ? '›' : '‹'}
             </span>
           </div>
@@ -1432,7 +1432,7 @@ export default function FilmStudio() {
             width: contextPanelOpen ? '220px' : '0px',
             transition: 'width 280ms ease',
             overflow: 'hidden',
-            backgroundColor: 'var(--bg-subtle)', borderLeft: '1px solid var(--border)',
+            backgroundColor: 'var(--bg-elev)', borderLeft: '1px solid var(--line)',
             display: 'flex', flexDirection: 'column',
           }}>
 
@@ -1440,7 +1440,7 @@ export default function FilmStudio() {
           <div style={{ width: '220px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
             {/* Tab bar */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
               {contextTabs.map(tab => {
                 const isActive = contextTab === tab
                 return (
@@ -1451,8 +1451,8 @@ export default function FilmStudio() {
                       padding: '10px 10px 8px',
                       fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em',
                       textTransform: 'uppercase', cursor: 'pointer',
-                      color: isActive ? 'var(--gold)' : 'var(--text-dim)',
-                      borderBottom: isActive ? '1px solid var(--gold)' : 'none',
+                      color: isActive ? 'var(--accent)' : 'var(--fg-dim)',
+                      borderBottom: isActive ? '1px solid var(--accent)' : 'none',
                       marginBottom: isActive ? '-1px' : 0,
                     }}
                   >
@@ -1469,12 +1469,12 @@ export default function FilmStudio() {
               {contextTab === 'portrait' && (
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   {/* Portrait header */}
-                  <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.6rem', letterSpacing: '0.2em', color: 'var(--gold-dim)', textTransform: 'uppercase' }}>
+                  <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.6rem', letterSpacing: '0.2em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>
                       Film Portrait
                     </span>
                     {portraitRefreshedAt && (
-                      <p style={{ fontSize: '0.6rem', color: 'var(--text-dim)', letterSpacing: '0.03em', marginTop: '0.2rem' }}>
+                      <p style={{ fontSize: '0.6rem', color: 'var(--fg-dim)', letterSpacing: '0.03em', marginTop: '0.2rem' }}>
                         {formatDate(portraitRefreshedAt)}
                       </p>
                     )}
@@ -1483,7 +1483,7 @@ export default function FilmStudio() {
                   {/* Portrait fields */}
                   <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 2rem' }}>
                     {!filmMemory ? (
-                      <p style={{ color: 'var(--text-dim)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.7 }}>
+                      <p style={{ color: 'var(--fg-dim)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.7 }}>
                         The portrait is still taking shape. Keep the conversation going and it will fill in.
                       </p>
                     ) : (
@@ -1496,13 +1496,13 @@ export default function FilmStudio() {
                         return (
                           <div key={field.key}>
                             <div style={{ marginBottom: '1.5rem' }}>
-                              <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--gold-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                              <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
                                 {field.label}
                               </p>
 
                               {isEmpty ? (
-                                <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
-                                  <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
+                                <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                  <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
                                     {field.question}
                                   </p>
                                   {field.special === 'directors_intent' && (
@@ -1514,22 +1514,22 @@ export default function FilmStudio() {
                                           placeholder="Write here..."
                                           style={{
                                             width: '100%', background: 'transparent',
-                                            border: 'none', borderBottom: '1px solid var(--border)',
-                                            color: 'var(--text)', fontFamily: 'var(--font-serif)', fontSize: '0.78rem',
+                                            border: 'none', borderBottom: '1px solid var(--line)',
+                                            color: 'var(--fg)', fontFamily: 'var(--font-serif)', fontSize: '0.78rem',
                                             lineHeight: 1.6, padding: '0.4rem 0',
                                             resize: 'vertical', minHeight: '70px',
                                             outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
                                           }}
                                         />
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                          <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                                          <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
                                             {directEdit.saving ? 'Saving...' : 'Save'}
                                           </button>
                                           <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
                                         </div>
                                       </div>
                                     ) : (
-                                      <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                                      <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
                                         Write your intent
                                       </button>
                                     )
@@ -1540,9 +1540,9 @@ export default function FilmStudio() {
                                   {field.special === 'unresolved_questions' && Array.isArray(value) ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                       {(value as Array<{ question: string; category: string; added_at: string }>).map(item => (
-                                        <div key={item.added_at} style={{ borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
+                                        <div key={item.added_at} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
                                           <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
-                                          <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--gold-dim)', textTransform: 'uppercase' }}>{item.category}</span>
+                                          <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -1558,15 +1558,15 @@ export default function FilmStudio() {
                                             onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
                                             style={{
                                               width: '100%', background: 'transparent',
-                                              border: 'none', borderBottom: '1px solid var(--border)',
-                                              color: 'var(--text)', fontFamily: 'var(--font-serif)', fontSize: '0.78rem',
+                                              border: 'none', borderBottom: '1px solid var(--line)',
+                                              color: 'var(--fg)', fontFamily: 'var(--font-serif)', fontSize: '0.78rem',
                                               lineHeight: 1.6, padding: '0.4rem 0',
                                               resize: 'vertical', minHeight: '70px',
                                               outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
                                             }}
                                           />
                                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                                            <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
                                               {directEdit.saving ? 'Saving...' : 'Save'}
                                             </button>
                                             <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
@@ -1586,7 +1586,7 @@ export default function FilmStudio() {
                             </div>
 
                             {idx < PORTRAIT_FIELDS.length - 1 && (
-                              <div style={{ height: '1px', background: 'var(--border)', marginBottom: '1.5rem' }} />
+                              <div style={{ height: '1px', background: 'var(--line)', marginBottom: '1.5rem' }} />
                             )}
                           </div>
                         )
@@ -1602,19 +1602,19 @@ export default function FilmStudio() {
                   <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0' }}>
 
                     {!film?.current_mode && (
-                      <div style={{ padding: '1rem', color: 'var(--text-dim)', fontSize: '0.73rem', lineHeight: 1.7, fontStyle: 'italic' }}>
+                      <div style={{ padding: '1rem', color: 'var(--fg-dim)', fontSize: '0.73rem', lineHeight: 1.7, fontStyle: 'italic' }}>
                         Production documents are generated in production modes. Enter a mode to begin.
                       </div>
                     )}
 
                     {film?.current_mode && (
                       <>
-                        <div style={{ padding: '0 1rem 0.5rem', fontSize: '0.62rem', color: 'var(--text-dim)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                        <div style={{ padding: '0 1rem 0.5rem', fontSize: '0.62rem', color: 'var(--fg-dim)', fontStyle: 'italic', lineHeight: 1.5 }}>
                           Generate opens a conversation with the mode. The document follows when you&apos;re ready.
                         </div>
                         {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
                           <div key={mode} style={{ marginBottom: '0.75rem' }}>
-                            <div style={{ fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--gold-dim)', padding: '0.4rem 1rem' }}>
+                            <div style={{ fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '0.4rem 1rem' }}>
                               {mode.replace('_', ' ')}
                             </div>
                             {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
@@ -1634,19 +1634,19 @@ export default function FilmStudio() {
                                 isApproved ? 'LOCKED' :
                                 (isGenerated || hasPendingImport) ? 'IN REVIEW' : 'OPEN'
                               const stateColor =
-                                gateState === 'LOCKED'    ? 'var(--gold)' :
-                                gateState === 'REOPENED'  ? 'var(--amber)' :
-                                gateState === 'IN REVIEW' ? 'var(--text)' :
-                                                            'var(--text-dim)'
+                                gateState === 'LOCKED'    ? 'var(--accent)' :
+                                gateState === 'REOPENED'  ? 'var(--gate-review)' :
+                                gateState === 'IN REVIEW' ? 'var(--fg)' :
+                                                            'var(--fg-dim)'
                               const iconColor =
-                                gateState === 'LOCKED'    ? 'var(--gold)' :
-                                gateState === 'REOPENED'  ? 'var(--amber)' :
-                                gateState === 'IN REVIEW' ? 'var(--text-dim)' :
-                                                            'var(--text-dim)'
+                                gateState === 'LOCKED'    ? 'var(--accent)' :
+                                gateState === 'REOPENED'  ? 'var(--gate-review)' :
+                                gateState === 'IN REVIEW' ? 'var(--fg-dim)' :
+                                                            'var(--fg-dim)'
                               const activeFlag = getActiveRippleFlag(doc.gateId)
 
                               return (
-                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--border)' }}>
+                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.25rem' }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
@@ -1654,12 +1654,12 @@ export default function FilmStudio() {
                                     {isGenerated ? (
                                       <span
                                         onClick={() => setOpenDocument(doc.gateId)}
-                                        style={{ fontSize: '0.72rem', color: isApproved ? 'var(--gold)' : 'var(--text)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--border)', flex: 1 }}
+                                        style={{ fontSize: '0.72rem', color: isApproved ? 'var(--accent)' : 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1 }}
                                       >
                                         {doc.label}
                                       </span>
                                     ) : (
-                                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontStyle: 'italic', flex: 1 }}>
+                                      <span style={{ fontSize: '0.72rem', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1 }}>
                                         {doc.label}
                                       </span>
                                     )}
@@ -1679,11 +1679,11 @@ export default function FilmStudio() {
                                       <button
                                         onClick={() => canGenerate ? generateDocument(doc.gateId, doc.mode) : undefined}
                                         disabled={generating === doc.gateId || !canGenerate}
-                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--gold)' : 'var(--gold-dim)', background: 'none', border: `1px solid ${canGenerate ? 'var(--gold-dim)' : 'var(--border)'}`, padding: '0.25rem 0.5rem', cursor: canGenerate ? 'pointer' : 'not-allowed' }}
+                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--accent)' : 'var(--accent-dim)', background: 'none', border: `1px solid ${canGenerate ? 'var(--accent-dim)' : 'var(--line)'}`, padding: '0.25rem 0.5rem', cursor: canGenerate ? 'pointer' : 'not-allowed' }}
                                       >
                                         {generating === doc.gateId ? '...' : 'Generate'}
                                       </button>
-                                      <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: importLoading === doc.gateId ? 'var(--text-dim)' : 'var(--text-dim)', cursor: importLoading === doc.gateId ? 'default' : 'pointer', padding: '0.25rem 0.5rem' }}>
+                                      <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: importLoading === doc.gateId ? 'var(--fg-dim)' : 'var(--fg-dim)', cursor: importLoading === doc.gateId ? 'default' : 'pointer', padding: '0.25rem 0.5rem' }}>
                                         {importLoading === doc.gateId ? 'Reading...' : 'Import'}
                                         <input
                                           ref={importFileInputRef}
@@ -1703,7 +1703,7 @@ export default function FilmStudio() {
                                     <div style={{ paddingLeft: '18px', marginTop: '0.2rem' }}>
                                       <button
                                         onClick={() => approveGate(doc.gateId)}
-                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--gold)', border: 'none', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
+                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
                                       >
                                         Approve
                                       </button>
@@ -1713,7 +1713,7 @@ export default function FilmStudio() {
                                     <div style={{ paddingLeft: '18px', marginTop: '0.2rem' }}>
                                       <button
                                         onClick={() => reopenGate(doc.gateId)}
-                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--gold-dim)', background: 'none', border: '1px solid var(--border)', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
+                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-dim)', background: 'none', border: '1px solid var(--line)', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
                                       >
                                         Reopen
                                       </button>
@@ -1722,24 +1722,24 @@ export default function FilmStudio() {
 
                                   {/* Prerequisite note */}
                                   {!isGenerated && !hasPendingImport && !prereqMet && prereqGateId && (
-                                    <div style={{ marginTop: '0.2rem', paddingLeft: '18px', fontSize: '0.6rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                                    <div style={{ marginTop: '0.2rem', paddingLeft: '18px', fontSize: '0.6rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
                                       Needs {GATE_LABELS[prereqGateId]} approved first.
                                     </div>
                                   )}
                                   {/* Wrong-mode note */}
                                   {!isGenerated && !hasPendingImport && prereqMet && !isOwningMode && (
-                                    <div style={{ marginTop: '0.2rem', paddingLeft: '18px', fontSize: '0.6rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                                    <div style={{ marginTop: '0.2rem', paddingLeft: '18px', fontSize: '0.6rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
                                       Switch to {doc.mode.replace('_', ' ')} mode to generate.
                                     </div>
                                   )}
 
                                   {/* Ripple flag */}
                                   {activeFlag && (
-                                    <div style={{ marginTop: '0.3rem', paddingLeft: '18px', display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.64rem', color: 'var(--amber)', lineHeight: 1.5 }}>
+                                    <div style={{ marginTop: '0.3rem', paddingLeft: '18px', display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.64rem', color: 'var(--gate-review)', lineHeight: 1.5 }}>
                                       <span>{doc.label} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
                                       <button
                                         onClick={() => dismissRippleFlag(activeFlag, doc.gateId)}
-                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--amber)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.64rem', fontFamily: 'var(--font-serif)', flexShrink: 0 }}
+                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.64rem', fontFamily: 'var(--font-serif)', flexShrink: 0 }}
                                       >
                                         Dismiss
                                       </button>
@@ -1751,13 +1751,13 @@ export default function FilmStudio() {
                                     <div style={{ marginTop: '0.3rem', paddingLeft: '18px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.64rem' }}>
                                       <button
                                         onClick={confirmImport}
-                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem', letterSpacing: '0.06em' }}
+                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem', letterSpacing: '0.06em' }}
                                       >
                                         Close gate
                                       </button>
                                       <button
                                         onClick={discardImport}
-                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem' }}
+                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-dim)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem' }}
                                       >
                                         Discard
                                       </button>
@@ -1777,7 +1777,7 @@ export default function FilmStudio() {
               {/* PLACEHOLDER TABS */}
               {contextTab !== 'portrait' && contextTab !== 'archive' && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
-                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic', color: 'var(--text-dim)', textAlign: 'center' }}>
+                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', textAlign: 'center' }}>
                     Coming in the next story.
                   </p>
                 </div>
@@ -1800,16 +1800,16 @@ export default function FilmStudio() {
       {/* DOCUMENT OVERLAY */}
       {openDocument && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-          <div style={{ background: 'var(--bg-subtle)', maxWidth: '700px', width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '2.5rem 3rem', position: 'relative', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--gold-dim)', marginBottom: '2rem' }}>
+          <div style={{ background: 'var(--bg-elev)', maxWidth: '700px', width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '2.5rem 3rem', position: 'relative', border: '1px solid var(--line)' }}>
+            <div style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)', marginBottom: '2rem' }}>
               {ARCHIVE_DOCUMENTS.find(d => d.gateId === openDocument)?.label}
             </div>
-            <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--text)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
+            <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
               {film?.documents_content?.[openDocument] ?? ''}
             </div>
             <button
               onClick={() => setOpenDocument(null)}
-              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '1rem', cursor: 'pointer' }}
+              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'var(--fg-dim)', fontSize: '1rem', cursor: 'pointer' }}
             >
               ✕
             </button>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
@@ -71,7 +71,7 @@ export default function Home() {
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: 'var(--font-mono)',
-      color: 'var(--gold)',
+      color: 'var(--accent)',
       letterSpacing: '0.1em',
       fontSize: '10px',
       textTransform: 'uppercase',
@@ -102,7 +102,7 @@ export default function Home() {
           fontSize: '24px',
           fontWeight: 500,
           letterSpacing: '0.4em',
-          color: 'var(--gold)',
+          color: 'var(--accent)',
           textTransform: 'uppercase',
           marginBottom: '8px',
         }}>
@@ -115,7 +115,7 @@ export default function Home() {
           fontSize: '10px',
           fontWeight: 400,
           letterSpacing: '0.1em',
-          color: 'var(--text-dim)',
+          color: 'var(--fg-dim)',
           textTransform: 'uppercase',
           marginBottom: '48px',
         }}>
@@ -135,10 +135,10 @@ export default function Home() {
             onBlur={() => setEmailFocused(false)}
             style={{
               width: '100%',
-              background: emailFocused ? '#1C1C21' : 'var(--surface)',
-              border: `1px solid ${emailFocused ? 'var(--gold-dim)' : 'var(--border)'}`,
+              background: emailFocused ? '#1C1C21' : 'var(--bg-elev-2)',
+              border: `1px solid ${emailFocused ? 'var(--accent-dim)' : 'var(--line)'}`,
               borderBottom: 'none',
-              color: 'var(--text)',
+              color: 'var(--fg)',
               fontFamily: 'var(--font-mono)',
               fontSize: '12px',
               padding: '14px 16px',
@@ -158,9 +158,9 @@ export default function Home() {
             onKeyDown={e => e.key === 'Enter' && handleAuth()}
             style={{
               width: '100%',
-              background: passwordFocused ? '#1C1C21' : 'var(--surface)',
-              border: `1px solid ${passwordFocused ? 'var(--gold-dim)' : 'var(--border)'}`,
-              color: 'var(--text)',
+              background: passwordFocused ? '#1C1C21' : 'var(--bg-elev-2)',
+              border: `1px solid ${passwordFocused ? 'var(--accent-dim)' : 'var(--line)'}`,
+              color: 'var(--fg)',
               fontFamily: 'var(--font-mono)',
               fontSize: '12px',
               padding: '14px 16px',
@@ -177,7 +177,7 @@ export default function Home() {
             marginTop: '12px',
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
-            color: 'var(--text-dim)',
+            color: 'var(--fg-dim)',
           }}>
             {error}
           </p>
@@ -189,18 +189,18 @@ export default function Home() {
           disabled={loading}
           onMouseEnter={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,169,110,0.06)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--gold)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--gold-dim)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-dim)'
           }}
           style={{
             width: '100%',
             marginTop: '24px',
             background: 'transparent',
-            border: '1px solid var(--gold-dim)',
-            color: 'var(--gold)',
+            border: '1px solid var(--accent-dim)',
+            color: 'var(--accent)',
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
             fontWeight: 400,
@@ -221,7 +221,7 @@ export default function Home() {
             marginTop: '20px',
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
-            color: 'var(--text-dim)',
+            color: 'var(--fg-dim)',
             cursor: 'pointer',
           }}
         >
