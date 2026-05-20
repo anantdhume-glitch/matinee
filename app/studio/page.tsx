@@ -153,6 +153,36 @@ export default function Studio() {
           THE STUDIO
         </p>
 
+        {/* Begin a new film */}
+        <div
+          onClick={openModal}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '24px',
+            cursor: 'pointer',
+            paddingBottom: '32px',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <span style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '18px',
+            color: 'var(--gold)',
+            lineHeight: 1,
+          }}>+</span>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            letterSpacing: '0.12em',
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
+          }}>
+            BEGIN A NEW FILM
+          </span>
+        </div>
+
         {/* Film list */}
         <div style={{ borderTop: '1px solid var(--border)' }}>
 
@@ -184,7 +214,7 @@ export default function Studio() {
                 <p style={{
                   fontFamily: 'var(--font-serif)',
                   fontSize: '22px',
-                  fontWeight: 400,
+                  fontWeight: 500,
                   color: 'var(--text)',
                   marginBottom: '4px',
                   lineHeight: 1.2,
@@ -208,7 +238,8 @@ export default function Studio() {
                     fontFamily: 'var(--font-serif)',
                     fontSize: '13px',
                     fontStyle: 'italic',
-                    color: 'var(--text-dim)',
+                    color: 'var(--text)',
+                    opacity: 1,
                     lineHeight: 1.5,
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',
@@ -314,35 +345,6 @@ export default function Studio() {
               No films yet.
             </p>
           )}
-        </div>
-
-        {/* Begin a new film */}
-        <div
-          onClick={openModal}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginTop: '24px',
-            cursor: 'pointer',
-            paddingBottom: '32px',
-          }}
-        >
-          <span style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: '18px',
-            color: 'var(--gold)',
-            lineHeight: 1,
-          }}>+</span>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '10px',
-            letterSpacing: '0.12em',
-            color: 'var(--text-dim)',
-            textTransform: 'uppercase',
-          }}>
-            BEGIN A NEW FILM
-          </span>
         </div>
 
       </div>
