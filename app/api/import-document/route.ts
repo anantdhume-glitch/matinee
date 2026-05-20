@@ -3,11 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 function getExtractionPrompt(gateId: string, filmTitle: string, existingMemoryBlock: string): string {
   const ctx = existingMemoryBlock ? `${existingMemoryBlock}\n` : ''
 
@@ -151,6 +146,10 @@ Return only a JSON object with this exact shape. No preamble. No explanation out
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const filmId = formData.get('filmId') as string | null
