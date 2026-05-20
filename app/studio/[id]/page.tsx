@@ -448,7 +448,6 @@ export default function FilmStudio() {
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)

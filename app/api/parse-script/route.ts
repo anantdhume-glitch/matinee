@@ -4,13 +4,12 @@ import { buildExtractionPrompt, mergeMemoryFromExtraction } from '@/lib/filmMemo
 
 export const maxDuration = 60
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const filmId = formData.get('filmId') as string | null
