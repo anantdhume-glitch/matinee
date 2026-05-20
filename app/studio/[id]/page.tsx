@@ -168,6 +168,8 @@ const GATE_PREREQUISITES: Partial<Record<GateId, GateId>> = {
   shot_list:             'consistency_lock',
   camera_light_plan:     'shot_list',
   visual_prompt_package: 'camera_light_plan',
+  edit_plan:             'audio_direction',
+  music_cue_sheet:       'edit_plan',
 }
 
 const GATE_ICON_MAP: Record<GateId, React.ReactNode> = {
