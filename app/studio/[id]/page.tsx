@@ -164,6 +164,9 @@ const GATE_PREREQUISITES: Partial<Record<GateId, GateId>> = {
   hook_draft:           'mode_selection_brief',
   script_lock:          'hook_draft',
   audio_direction:      'script_lock',
+  consistency_lock:     'department_briefs',
+  shot_list:            'consistency_lock',
+  camera_light_plan:    'shot_list',
 }
 
 const GATE_ICON_MAP: Record<GateId, React.ReactNode> = {
