@@ -17,6 +17,11 @@
   --accent-dim: #6B5A38;
   --gate-review: #C8956E;
 
+  --dur-fast: 120ms;
+  --dur-slow: 420ms;
+  --ease-curtain: cubic-bezier(.5, 0, .1, 1);
+  --ease-stage: cubic-bezier(.2, .7, .2, 1);
+
   --font-serif: var(--font-cormorant);
   --font-mono: var(--font-dm-mono);
 }
