@@ -448,6 +448,7 @@ export default function FilmStudio() {
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -464,6 +465,7 @@ export default function FilmStudio() {
       const { data: filmData } = await supabase.from('films').select('*').eq('id', filmId).single()
       if (!filmData) { router.push('/studio'); return }
       setFilm(filmData)
+      await refreshPortrait()
       const { data: msgData } = await supabase.from('messages').select('*').eq('film_id', filmId).order('created_at')
       if (msgData && msgData.length > 0) { setMessages(msgData); setEntryMode('conversation') }
       else setEntryMode('choice')
