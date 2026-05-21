@@ -701,7 +701,7 @@ function buildSystemPrompt(
   messages: { role: string; content: string }[],
   gatesClosed: { gate: string; closed_at: string; status?: string; portrait_version?: string }[] = []
 ): string {
-  if (currentMode !== null) {
+  if (currentMode !== null && currentMode !== 'discovery') {
     const mode = currentMode as FilmMode
     const ctx: PromptContext = {
       filmMemory,
@@ -863,7 +863,7 @@ export async function POST(req: NextRequest) {
       : [{ role: 'user', content: 'Begin.' }]
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2500,
       system: systemPrompt,
       messages: apiMessages
