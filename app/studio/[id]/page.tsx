@@ -652,7 +652,7 @@ export default function FilmStudio() {
       } else {
         await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId, updated_at: new Date().toISOString() })
       }
-      if (contextPanelOpen && contextTab === 'portrait') await refreshPortrait()
+      await refreshPortrait()
     }
 
     setThinking(false)
