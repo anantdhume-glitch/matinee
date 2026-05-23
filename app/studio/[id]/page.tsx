@@ -1515,23 +1515,39 @@ export default function FilmStudio() {
 
           {/* INPUT */}
           <div style={{ borderTop: '1px solid var(--line)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
-            <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                placeholder="Speak..."
-                style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
-              />
-              <span
-                onClick={() => sendMessage()}
-                style={{ color: input.trim() ? 'var(--accent)' : 'var(--line)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
-              >
-                →
-              </span>
-            </div>
-          </div>
+  <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+    <input
+      ref={inputRef}
+      value={input}
+      onChange={e => setInput(e.target.value)}
+      onKeyDown={e => e.key === 'Enter' && sendMessage()}
+      placeholder="Speak..."
+      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
+    />
+    <span
+      onClick={() => sendMessage()}
+      style={{ color: input.trim() ? 'var(--accent)' : 'var(--line)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
+    >
+      →
+    </span>
+  </div>
+  {!film?.current_mode && (
+    <div style={{ maxWidth: '620px', margin: '0.75rem auto 0' }}>
+      <label style={{
+        fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em',
+        color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer',
+      }}>
+        UPLOAD SCRIPT
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx"
+          style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }}
+        />
+      </label>
+    </div>
+  )}
+</div>
         </div>
 
         {/* ── CONTEXT PANEL ── */}
