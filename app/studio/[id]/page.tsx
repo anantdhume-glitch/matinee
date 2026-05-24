@@ -1132,7 +1132,7 @@ export default function FilmStudio() {
   // ── DERIVED ────────────────────────────────────────────────────────────────
   const currentModeKey = film?.current_mode ?? ''
   const contextTabs = MODE_TABS[currentModeKey] ?? ['portrait']
-  const canPin = viewportWidth - 176 - 360 >= 600
+  const canPin = viewportWidth - 220 - 400 >= 600
 
   // ── MAIN STUDIO ────────────────────────────────────────────────────────────
   return (
@@ -1177,7 +1177,7 @@ export default function FilmStudio() {
 
         {/* ── LEFT RAIL ── */}
         <div style={{
-          width: railCollapsed ? '40px' : '176px',
+          width: railCollapsed ? '40px' : '220px',
           flexShrink: 0,
           height: '100%',
           backgroundColor: 'var(--bg-elev)',
@@ -1247,12 +1247,12 @@ export default function FilmStudio() {
                   style={{ padding: '10px 14px', cursor: 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
                 >
                   {!railCollapsed && (
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.06em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
                       DISCOVERY
                     </span>
                   )}
                   {railCollapsed && isActive && (
-                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
                   )}
                 </div>
               )
@@ -1275,7 +1275,7 @@ export default function FilmStudio() {
                 <div key={group.label}>
                   {/* Phase group header */}
                   {!railCollapsed ? (
-                    <div style={{ padding: '8px 14px 3px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
+                    <div style={{ padding: '8px 14px 3px', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', whiteSpace: 'nowrap' }}>
                       {group.label}
                     </div>
                   ) : (
@@ -1284,7 +1284,7 @@ export default function FilmStudio() {
                         {group.initial}
                       </span>
                       {groupHasAttention && (
-                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', marginTop: '3px' }} />
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', marginTop: '3px' }} />
                       )}
                     </div>
                   )}
@@ -1332,16 +1332,16 @@ export default function FilmStudio() {
                       >
                         {!railCollapsed && (
                           <>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.06em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {modeConfig.label}
                             </span>
                             {dotColor && (
-                              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0, marginLeft: '6px' }} />
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0, marginLeft: '6px' }} />
                             )}
                           </>
                         )}
                         {railCollapsed && isActive && (
-                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
                         )}
                       </div>
                     )
@@ -1364,16 +1364,16 @@ export default function FilmStudio() {
           )}
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
-            <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+            <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
               {messages.map((msg, i) => (
                 <div key={i}>
                   {msg.role === 'assistant' ? (
-                    <p style={{ fontSize: '1.15rem', lineHeight: '1.9', color: 'var(--fg)', fontWeight: 300 }}>
+                    <p style={{ fontSize: '19px', lineHeight: 1.8, color: 'var(--fg)', fontWeight: 300 }}>
                       {msg.content}
                     </p>
                   ) : (
                     <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--line)' }}>
-                      <p style={{ fontSize: '0.9rem', lineHeight: '1.75', color: '#5a5a5a' }}>
+                      <p style={{ fontSize: '19px', lineHeight: 1.8, color: '#5a5a5a' }}>
                         {msg.content}
                       </p>
                     </div>
@@ -1413,18 +1413,18 @@ export default function FilmStudio() {
 
           {/* INPUT */}
           <div style={{ borderTop: '1px solid var(--line)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
-  <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+  <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
     <input
       ref={inputRef}
       value={input}
       onChange={e => setInput(e.target.value)}
       onKeyDown={e => e.key === 'Enter' && sendMessage()}
       placeholder="Speak..."
-      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
+      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '16px', outline: 'none', fontFamily: 'var(--font-serif)' }}
     />
     <span
       onClick={() => sendMessage()}
-      style={{ color: input.trim() ? 'var(--accent)' : 'var(--line)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
+      style={{ color: input.trim() ? 'var(--accent)' : '#706C68', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
     >
       →
     </span>
@@ -1436,7 +1436,7 @@ export default function FilmStudio() {
         <div style={{
           position: 'relative',
           flexShrink: 0,
-          width: contextPanelOpen && panelDocked ? '360px' : '32px',
+          width: contextPanelOpen && panelDocked ? '400px' : '32px',
           transition: `width var(--dur-slow) var(--ease-curtain)`,
           height: '100%',
         }}>
@@ -1458,8 +1458,8 @@ export default function FilmStudio() {
             }}
           >
             <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.06em',
-              color: !contextPanelOpen && stripHovered ? 'var(--fg)' : 'var(--fg-dim)',
+              fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 500, letterSpacing: '0.06em',
+              color: !contextPanelOpen && stripHovered ? 'var(--fg)' : '#8A8682',
               writingMode: 'vertical-rl', transform: 'rotate(180deg)',
               marginBottom: '8px',
               transition: `color var(--dur-fast) var(--ease-stage)`,
@@ -1469,7 +1469,7 @@ export default function FilmStudio() {
             </span>
             <span style={{
               fontFamily: 'var(--font-mono)', fontSize: '8px', lineHeight: 1,
-              color: !contextPanelOpen && stripHovered ? 'var(--fg)' : 'var(--fg-dim)',
+              color: !contextPanelOpen && stripHovered ? 'var(--fg)' : '#8A8682',
               transition: `color var(--dur-fast) var(--ease-stage)`,
             }}>
               ‹
@@ -1480,7 +1480,7 @@ export default function FilmStudio() {
           {contextPanelOpen && (
             <div style={{
               position: 'absolute', right: 0, top: 0, bottom: 0,
-              width: '360px',
+              width: '400px',
               backgroundColor: 'var(--bg-elev)', borderLeft: '1px solid var(--line)',
               display: 'flex', flexDirection: 'column',
               overflow: 'hidden',
@@ -1524,10 +1524,10 @@ export default function FilmStudio() {
                     onClick={() => setContextTab(tab)}
                     style={{
                       padding: '10px 10px 8px',
-                      fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em',
+                      fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.06em',
                       textTransform: 'uppercase', cursor: 'pointer',
-                      color: isActive ? 'var(--accent)' : 'var(--fg-dim)',
-                      borderBottom: isActive ? '1px solid var(--accent)' : 'none',
+                      color: isActive ? '#F0EDE3' : '#8A8682',
+                      borderBottom: isActive ? '2px solid #C4974A' : 'none',
                       marginBottom: isActive ? '-1px' : 0,
                     }}
                   >
@@ -1687,7 +1687,7 @@ export default function FilmStudio() {
 
                     {/* SOURCE DOCUMENTS */}
                     <div style={{ borderBottom: '1px solid var(--line)', marginBottom: '0.75rem' }}>
-                      <div style={{ padding: '0.4rem 1rem', fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
+                      <div style={{ padding: '20px 1rem 6px', fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
                         Source Documents
                       </div>
 
@@ -1699,12 +1699,12 @@ export default function FilmStudio() {
                             {film?.source_documents?.script?.current ? (
                               <span
                                 onClick={() => setOpenSourceDocument({ type: 'script', data: film.source_documents!.script! })}
-                                style={{ fontSize: '0.72rem', color: 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)' }}
+                                style={{ fontSize: '13px', color: 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)' }}
                               >
                                 {film.source_documents.script.current.filename}
                               </span>
                             ) : (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                              <span style={{ fontSize: '13px', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
                                 No script uploaded.
                               </span>
                             )}
@@ -1738,7 +1738,7 @@ export default function FilmStudio() {
                               <FileText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />
                               <span
                                 onClick={() => setOpenSourceDocument({ type: 'research', data: doc })}
-                                style={{ fontSize: '0.72rem', color: 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)' }}
+                                style={{ fontSize: '13px', color: 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)' }}
                               >
                                 {doc.filename}
                               </span>
@@ -1799,7 +1799,7 @@ export default function FilmStudio() {
                       <>
                         {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
                           <div key={mode} style={{ marginBottom: '0.75rem' }}>
-                            <div style={{ fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '0.4rem 1rem' }}>
+                            <div style={{ fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '20px 1rem 6px' }}>
                               {mode.replace('_', ' ')}
                             </div>
                             {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
@@ -1824,8 +1824,8 @@ export default function FilmStudio() {
                                                             'var(--fg-dim)'
 
                               return (
-                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
                                     {/* Document name */}
@@ -1838,23 +1838,21 @@ export default function FilmStudio() {
                                       return isClickable ? (
                                         <span
                                           onClick={() => setOpenDocument(doc.gateId)}
-                                          style={{ fontSize: '0.72rem', color: isApproved ? 'var(--accent)' : isGenerated ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1, fontStyle: isGenerated ? 'normal' : 'italic' }}
+                                          style={{ fontSize: '13px', color: isApproved ? 'var(--accent)' : isGenerated ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1, fontStyle: isGenerated ? 'normal' : 'italic' }}
                                         >
                                           {doc.label}
                                         </span>
                                       ) : (
-                                        <span style={{ fontSize: '0.72rem', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1 }}>
+                                        <span style={{ fontSize: '13px', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1 }}>
                                           {doc.label}
                                         </span>
                                       )
                                     })()}
 
-                                    {/* State label */}
-                                    <span style={{
-                                      fontSize: '0.56rem', letterSpacing: '0.10em',
-                                      textTransform: 'uppercase', color: stateColor, flexShrink: 0,
-                                    }}>
-                                      {gateState}
+                                    {/* State pill */}
+                                    <span className={`gate-pill ${gateState === 'LOCKED' ? 'gate-pill-closed' : gateState === 'IN REVIEW' || gateState === 'REOPENED' ? 'gate-pill-review' : 'gate-pill-open'}`}>
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                                      {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : gateState === 'REOPENED' ? 'Reopened' : 'Open'}
                                     </span>
                                   </div>
                                 </div>
@@ -1927,8 +1925,9 @@ export default function FilmStudio() {
                   {doc.label}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ fontSize: '0.56rem', letterSpacing: '0.10em', textTransform: 'uppercase', color: stateColor }}>
-                    {gateState}
+                  <span className={`gate-pill ${gateState === 'LOCKED' ? 'gate-pill-closed' : gateState === 'IN REVIEW' ? 'gate-pill-review' : 'gate-pill-open'}`}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                    {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : 'Open'}
                   </span>
                   <button
                     onClick={() => setOpenDocument(null)}
