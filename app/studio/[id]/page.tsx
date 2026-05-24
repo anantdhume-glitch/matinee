@@ -479,6 +479,12 @@ export default function FilmStudio() {
       }
       research?: Array<{ id: string; filename: string; extracted_text: string; uploaded_at: string }>
     }
+    film_status?: 'active' | 'paused' | 'closed' | 'archived'
+    status_history?: Array<{
+      status: string
+      reason: string
+      changed_at: string
+    }>
   } | null>(null)
   const [filmBlocked, setFilmBlocked] = useState(false)
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
