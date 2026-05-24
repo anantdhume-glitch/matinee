@@ -98,7 +98,7 @@ export default function Home() {
 
         {/* Wordmark */}
         <h1 style={{
-          fontFamily: 'var(--font-serif)',
+          fontFamily: "'DM Sans', system-ui, sans-serif",
           fontSize: '24px',
           fontWeight: 500,
           letterSpacing: '0.4em',

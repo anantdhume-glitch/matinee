@@ -87,17 +87,17 @@ type EntryMode = 'uploading' | 'soul' | 'conversation'
 const btnPrimary: React.CSSProperties = {
   background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)',
   padding: '0.7rem 1.5rem', fontSize: '0.75rem', letterSpacing: '0.12em',
-  cursor: 'pointer', fontFamily: 'var(--font-serif)', transition: 'all 0.2s'
+  cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", transition: 'all 0.2s'
 }
 const btnSecondary: React.CSSProperties = {
   background: 'transparent', border: '1px solid var(--line)', color: 'var(--fg-dim)',
   padding: '0.7rem 1.5rem', fontSize: '0.75rem', letterSpacing: '0.1em',
-  cursor: 'pointer', fontFamily: 'var(--font-serif)', transition: 'all 0.2s'
+  cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", transition: 'all 0.2s'
 }
 const btnSmall: React.CSSProperties = {
   background: 'transparent', border: '1px solid var(--line)', color: 'var(--fg-dim)',
   padding: '4px 10px', fontSize: '0.62rem', letterSpacing: '0.1em',
-  cursor: 'pointer', fontFamily: 'var(--font-serif)', transition: 'all 0.2s'
+  cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", transition: 'all 0.2s'
 }
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -1002,7 +1002,7 @@ export default function FilmStudio() {
 
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) return (
-    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'var(--font-serif)', letterSpacing: '0.2em', fontSize: '0.85rem' }}>
+    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: "'DM Sans', system-ui, sans-serif", letterSpacing: '0.2em', fontSize: '0.85rem' }}>
       Setting the scene...
     </main>
   )
@@ -1010,8 +1010,8 @@ export default function FilmStudio() {
   // ── BLOCKED SCREEN ─────────────────────────────────────────────────────────
   if (filmBlocked && film) {
     return (
-      <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-serif)', color: 'var(--fg)', position: 'relative' }}>
-        <span style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
+      <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', system-ui, sans-serif", color: 'var(--fg)', position: 'relative' }}>
+        <span style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
           {film.title}
         </span>
         <div style={{ textAlign: 'center', maxWidth: '400px' }}>
@@ -1045,7 +1045,7 @@ export default function FilmStudio() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'var(--font-serif)',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
         color: 'var(--fg)',
         position: 'relative',
       }}>
@@ -1056,7 +1056,7 @@ export default function FilmStudio() {
           top: '20px',
           left: '50%',
           transform: 'translateX(-50%)',
-          fontFamily: 'var(--font-serif)',
+          fontFamily: "'DM Sans', system-ui, sans-serif",
           fontSize: '13px',
           fontStyle: 'italic',
           color: 'var(--fg-dim)',
@@ -1069,7 +1069,7 @@ export default function FilmStudio() {
         {entryMode === 'uploading' && (
           <div style={{ textAlign: 'center' }}>
             <p style={{
-              fontFamily: 'var(--font-serif)',
+              fontFamily: "'DM Sans', system-ui, sans-serif",
               fontSize: '19px',
               fontStyle: 'italic',
               color: 'var(--fg-dim)',
@@ -1104,7 +1104,7 @@ export default function FilmStudio() {
               WHAT THE FILM IS BECOMING
             </p>
             <p style={{
-              fontFamily: 'var(--font-serif)',
+              fontFamily: "'DM Sans', system-ui, sans-serif",
               fontSize: '22px',
               lineHeight: 1.8,
               color: 'var(--fg)',
@@ -1136,7 +1136,7 @@ export default function FilmStudio() {
 
   // ── MAIN STUDIO ────────────────────────────────────────────────────────────
   return (
-    <main style={{ backgroundColor: 'var(--bg)', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-serif)', color: 'var(--fg)', overflow: 'hidden' }}>
+    <main style={{ backgroundColor: 'var(--bg)', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', system-ui, sans-serif", color: 'var(--fg)', overflow: 'hidden' }}>
 
       {/* ── HEADER STRIP ── */}
       <nav style={{
@@ -1146,7 +1146,7 @@ export default function FilmStudio() {
       }}>
         {/* Wordmark */}
         <span style={{
-          fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500,
+          fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '15px', fontWeight: 500,
           letterSpacing: '0.3em', color: 'var(--accent)', textTransform: 'uppercase',
         }}>
           MATINEE
@@ -1201,7 +1201,7 @@ export default function FilmStudio() {
                 }}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
                 style={{
-                  fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic',
+                  fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '13px', fontStyle: 'italic',
                   color: 'var(--fg-dim)', outline: 'none', cursor: 'text',
                   display: 'block', lineHeight: 1.5,
                 }}
@@ -1244,7 +1244,7 @@ export default function FilmStudio() {
                   }}
                   onMouseEnter={() => setHoveredMode('__discovery__')}
                   onMouseLeave={() => setHoveredMode(null)}
-                  style={{ padding: '10px 14px', cursor: 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
+                  style={{ padding: '10px 14px 10px 20px', cursor: 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
                 >
                   {!railCollapsed && (
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.06em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
@@ -1275,7 +1275,7 @@ export default function FilmStudio() {
                 <div key={group.label}>
                   {/* Phase group header */}
                   {!railCollapsed ? (
-                    <div style={{ padding: '8px 14px 3px', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', whiteSpace: 'nowrap' }}>
+                    <div style={{ padding: '8px 14px 3px 12px', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', whiteSpace: 'nowrap' }}>
                       {group.label}
                     </div>
                   ) : (
@@ -1328,7 +1328,7 @@ export default function FilmStudio() {
                         }}
                         onMouseEnter={() => { if (!isGated) setHoveredMode(modeValue) }}
                         onMouseLeave={() => setHoveredMode(null)}
-                        style={{ padding: '10px 14px', cursor: isGated ? 'default' : 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
+                        style={{ padding: '10px 14px 10px 20px', cursor: isGated ? 'default' : 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
                       >
                         {!railCollapsed && (
                           <>
@@ -1368,12 +1368,12 @@ export default function FilmStudio() {
               {messages.map((msg, i) => (
                 <div key={i}>
                   {msg.role === 'assistant' ? (
-                    <p style={{ fontSize: '19px', lineHeight: 1.8, color: 'var(--fg)', fontWeight: 300 }}>
+                    <p style={{ fontSize: '16px', lineHeight: 1.65, color: 'var(--fg)', fontWeight: 300 }}>
                       {msg.content}
                     </p>
                   ) : (
                     <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--line)' }}>
-                      <p style={{ fontSize: '19px', lineHeight: 1.8, color: '#5a5a5a' }}>
+                      <p style={{ fontSize: '16px', lineHeight: 1.65, color: '#5a5a5a' }}>
                         {msg.content}
                       </p>
                     </div>
@@ -1420,7 +1420,7 @@ export default function FilmStudio() {
       onChange={e => setInput(e.target.value)}
       onKeyDown={e => e.key === 'Enter' && sendMessage()}
       placeholder="Speak..."
-      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '16px', outline: 'none', fontFamily: 'var(--font-serif)' }}
+      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '15px', outline: 'none', fontFamily: "'DM Sans', system-ui, sans-serif" }}
     />
     <span
       onClick={() => sendMessage()}
@@ -1598,7 +1598,7 @@ export default function FilmStudio() {
                                           style={{
                                             width: '100%', background: 'transparent',
                                             border: 'none', borderBottom: '1px solid var(--line)',
-                                            color: 'var(--fg)', fontFamily: 'var(--font-serif)', fontSize: '0.78rem',
+                                            color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
                                             lineHeight: 1.6, padding: '0.4rem 0',
                                             resize: 'vertical', minHeight: '70px',
                                             outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
@@ -1642,7 +1642,7 @@ export default function FilmStudio() {
                                             style={{
                                               width: '100%', background: 'transparent',
                                               border: 'none', borderBottom: '1px solid var(--line)',
-                                              color: 'var(--fg)', fontFamily: 'var(--font-serif)', fontSize: '0.78rem',
+                                              color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
                                               lineHeight: 1.6, padding: '0.4rem 0',
                                               resize: 'vertical', minHeight: '70px',
                                               outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
@@ -1687,12 +1687,12 @@ export default function FilmStudio() {
 
                     {/* SOURCE DOCUMENTS */}
                     <div style={{ borderBottom: '1px solid var(--line)', marginBottom: '0.75rem' }}>
-                      <div style={{ padding: '20px 1rem 6px', fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
+                      <div style={{ padding: '20px 1rem 6px 12px', fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
                         Source Documents
                       </div>
 
                       {/* Script row */}
-                      <div style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                      <div style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <ScrollText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />
@@ -1732,7 +1732,7 @@ export default function FilmStudio() {
 
                       {/* Research rows */}
                       {(film?.source_documents?.research ?? []).map(doc => (
-                        <div key={doc.id} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                        <div key={doc.id} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <FileText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />
@@ -1752,7 +1752,7 @@ export default function FilmStudio() {
 
                       {/* Upload research */}
                       {!film?.current_mode && (
-                        <div style={{ padding: '0.45rem 1rem' }}>
+                        <div style={{ padding: '0.45rem 1rem 0.45rem 20px' }}>
                           <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: uploadingResearch ? 'default' : 'pointer', opacity: uploadingResearch ? 0.5 : 1 }}>
                             {uploadingResearch ? 'Reading...' : '+ Upload Research'}
                             <input
@@ -1799,7 +1799,7 @@ export default function FilmStudio() {
                       <>
                         {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
                           <div key={mode} style={{ marginBottom: '0.75rem' }}>
-                            <div style={{ fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '20px 1rem 6px' }}>
+                            <div style={{ fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '20px 1rem 6px 12px' }}>
                               {mode.replace('_', ' ')}
                             </div>
                             {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
@@ -1824,7 +1824,7 @@ export default function FilmStudio() {
                                                             'var(--fg-dim)'
 
                               return (
-                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
+                                <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
@@ -1869,7 +1869,7 @@ export default function FilmStudio() {
               {/* PLACEHOLDER TABS */}
               {contextTab !== 'portrait' && contextTab !== 'archive' && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
-                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', textAlign: 'center' }}>
+                  <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', textAlign: 'center' }}>
                     Coming in the next story.
                   </p>
                 </div>
@@ -1941,11 +1941,11 @@ export default function FilmStudio() {
               {/* Content — scrollable */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 3rem' }}>
                 {isGenerated ? (
-                  <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
+                  <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                     {film?.documents_content?.[openDocument] ?? ''}
                   </div>
                 ) : (
-                  <p style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: 'var(--font-serif)' }}>
+                  <p style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                     This document hasn&apos;t been generated yet.
                   </p>
                 )}
@@ -1956,7 +1956,7 @@ export default function FilmStudio() {
                 {activeFlag && (
                   <div style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--gate-review)', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
                     <span>{doc.label} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
-                    <button onClick={() => dismissRippleFlag(activeFlag, openDocument)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.64rem', fontFamily: 'var(--font-serif)', flexShrink: 0 }}>
+                    <button onClick={() => dismissRippleFlag(activeFlag, openDocument)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.64rem', fontFamily: "'DM Sans', system-ui, sans-serif", flexShrink: 0 }}>
                       Dismiss
                     </button>
                   </div>
@@ -1973,10 +1973,10 @@ export default function FilmStudio() {
                 )}
                 {hasPendingImport && importDiscussing && (
                   <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.75rem' }}>
-                    <button onClick={confirmImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem', letterSpacing: '0.06em' }}>
+                    <button onClick={confirmImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.64rem', letterSpacing: '0.06em' }}>
                       Close gate
                     </button>
-                    <button onClick={discardImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-dim)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem' }}>
+                    <button onClick={discardImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-dim)', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.64rem' }}>
                       Discard
                     </button>
                   </div>
@@ -1987,11 +1987,11 @@ export default function FilmStudio() {
                       <button
                         onClick={() => canGenerate ? generateDocument(openDocument, doc.mode) : undefined}
                         disabled={generating === openDocument || !canGenerate}
-                        style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--bg)' : 'var(--fg-dim)', background: canGenerate ? 'var(--accent)' : 'transparent', border: `1px solid ${canGenerate ? 'var(--accent)' : 'var(--line)'}`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: 'var(--font-serif)' }}
+                        style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--bg)' : 'var(--fg-dim)', background: canGenerate ? 'var(--accent)' : 'transparent', border: `1px solid ${canGenerate ? 'var(--accent)' : 'var(--line)'}`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                       >
                         {generating === openDocument ? 'Generating...' : 'Generate'}
                       </button>
-                      <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', fontFamily: 'var(--font-serif)' }}>
+                      <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                         {importLoading === openDocument ? 'Reading...' : 'Import'}
                         <input
                           ref={importFileInputRef}
@@ -2006,7 +2006,7 @@ export default function FilmStudio() {
                   {gateState === 'IN REVIEW' && !hasPendingImport && (
                     <button
                       onClick={() => approveGate(openDocument)}
-                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: 'var(--font-serif)' }}
+                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                     >
                       Approve
                     </button>
@@ -2014,7 +2014,7 @@ export default function FilmStudio() {
                   {gateState === 'LOCKED' && (
                     <button
                       onClick={() => reopenGate(openDocument)}
-                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-dim)', background: 'none', border: '1px solid var(--line)', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: 'var(--font-serif)' }}
+                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-dim)', background: 'none', border: '1px solid var(--line)', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                     >
                       Reopen
                     </button>
@@ -2046,7 +2046,7 @@ export default function FilmStudio() {
 
             {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 3rem' }}>
-              <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
+              <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                 {openSourceDocument.type === 'script'
                   ? (openSourceDocument.data.current?.extracted_text ?? '')
                   : openSourceDocument.data.extracted_text}
@@ -2064,7 +2064,7 @@ export default function FilmStudio() {
               {openSourceDocument.type === 'script' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {!film?.current_mode && (
-                    <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', display: 'inline-block', fontFamily: 'var(--font-serif)' }}>
+                    <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', display: 'inline-block', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                       Replace Script
                       <input
                         type="file"
