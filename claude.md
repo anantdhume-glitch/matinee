@@ -80,3 +80,5 @@ Column names:
 
 Migration file: migrations/001_film_portrait_schema.sql
 TypeScript types: PortraitField, PortraitUnresolvedField, UnresolvedQuestion — defined in app/studio/[id]/page.tsx
+
+Design system reference: Matinee_Design_System_v1.md — read this before making any UI decision.

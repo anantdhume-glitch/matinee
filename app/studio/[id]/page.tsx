@@ -550,7 +550,7 @@ export default function FilmStudio() {
   const refreshPortrait = async () => {
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     setFilmMemory(memoryData)
-    setPortraitRefreshedAt(new Date().toISOString())
+    setPortraitRefreshedAt(memoryData?.updated_at ?? new Date().toISOString())
   }
 
   const openingMessage = async (title: string) => {
@@ -593,7 +593,7 @@ export default function FilmStudio() {
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
       const openingResponse = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filmId, messages: [], filmMemory: freshMemory, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null })
+        body: JSON.stringify({ filmId, messages: [], filmMemory: freshMemory, sessionType: 'SCRIPT_UPLOAD', filmTitle: film?.title, currentMode: film?.current_mode ?? null })
       })
       const openingData = await openingResponse.json()
       const openingText = openingData.content
@@ -652,7 +652,7 @@ export default function FilmStudio() {
       } else {
         await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId, updated_at: new Date().toISOString() })
       }
-      if (contextPanelOpen && contextTab === 'portrait') await refreshPortrait()
+      await refreshPortrait()
     }
 
     setThinking(false)
@@ -1515,23 +1515,39 @@ export default function FilmStudio() {
 
           {/* INPUT */}
           <div style={{ borderTop: '1px solid var(--line)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
-            <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                placeholder="Speak..."
-                style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
-              />
-              <span
-                onClick={() => sendMessage()}
-                style={{ color: input.trim() ? 'var(--accent)' : 'var(--line)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
-              >
-                →
-              </span>
-            </div>
-          </div>
+  <div style={{ maxWidth: '620px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+    <input
+      ref={inputRef}
+      value={input}
+      onChange={e => setInput(e.target.value)}
+      onKeyDown={e => e.key === 'Enter' && sendMessage()}
+      placeholder="Speak..."
+      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: '0.95rem', outline: 'none', fontFamily: 'var(--font-serif)' }}
+    />
+    <span
+      onClick={() => sendMessage()}
+      style={{ color: input.trim() ? 'var(--accent)' : 'var(--line)', cursor: 'pointer', fontSize: '1.1rem', transition: 'color 0.2s' }}
+    >
+      →
+    </span>
+  </div>
+  {!film?.current_mode && (
+    <div style={{ maxWidth: '620px', margin: '0.75rem auto 0' }}>
+      <label style={{
+        fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em',
+        color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer',
+      }}>
+        UPLOAD SCRIPT
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx"
+          style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }}
+        />
+      </label>
+    </div>
+  )}
+</div>
         </div>
 
         {/* ── CONTEXT PANEL ── */}
@@ -1724,8 +1740,8 @@ export default function FilmStudio() {
                                 <>
                                   {field.special === 'unresolved_questions' && Array.isArray(value) ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                      {(value as Array<{ question: string; category: string; added_at: string }>).map(item => (
-                                        <div key={item.added_at} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                      {(value as Array<{ question: string; category: string; added_at: string }>).map((item, idx) => (
+                                        <div key={`unresolved-${idx}`} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
                                           <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
                                           <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
                                         </div>
