@@ -1,0 +1,2 @@
+ALTER TABLE films ADD COLUMN IF NOT EXISTS film_status TEXT DEFAULT 'active';
+ALTER TABLE films ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb;

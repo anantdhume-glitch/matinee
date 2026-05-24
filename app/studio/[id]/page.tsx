@@ -81,7 +81,7 @@ type FilmMemory = {
   portrait_target_length?:        PortraitField | null
 }
 type DirectEditState = { field: string | null; value: string; saving: boolean }
-type EntryMode = 'choice' | 'uploading' | 'soul' | 'conversation'
+type EntryMode = 'uploading' | 'soul' | 'conversation'
 
 // ── BUTTON STYLES ─────────────────────────────────────────────────────────────
 const btnPrimary: React.CSSProperties = {
@@ -480,10 +480,12 @@ export default function FilmStudio() {
       research?: Array<{ id: string; filename: string; extracted_text: string; uploaded_at: string }>
     }
   } | null>(null)
+  const [filmBlocked, setFilmBlocked] = useState(false)
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
   const [scriptSoul, setScriptSoul] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingResearch, setUploadingResearch] = useState(false)
+  const [uploadingScript, setUploadingScript] = useState(false)
   const importFileInputRef = useRef<HTMLInputElement>(null)
   const [contextPanelOpen, setContextPanelOpen] = useState(false)
   const [contextTab, setContextTab] = useState<string>('portrait')
@@ -532,10 +534,20 @@ export default function FilmStudio() {
       const { data: filmData } = await supabase.from('films').select('*').eq('id', filmId).single()
       if (!filmData) { router.push('/studio'); return }
       setFilm(filmData)
+      if (filmData.film_status && filmData.film_status !== 'active') {
+        setFilmBlocked(true)
+        setLoading(false)
+        return
+      }
       await refreshPortrait()
       const { data: msgData } = await supabase.from('messages').select('*').eq('film_id', filmId).order('created_at')
-      if (msgData && msgData.length > 0) { setMessages(msgData); setEntryMode('conversation') }
-      else setEntryMode('choice')
+      if (msgData && msgData.length > 0) {
+        setMessages(msgData)
+        setEntryMode('conversation')
+      } else {
+        setEntryMode('conversation')
+        await openingMessage(filmData.title || 'Untitled Film')
+      }
       setLoading(false)
     }
     init()
@@ -600,7 +612,7 @@ export default function FilmStudio() {
 
       if (!response.ok || data.error) {
         setUploadError(data.error || 'Something went wrong reading your script.')
-        if (!wasInConversation) setEntryMode('choice')
+        if (!wasInConversation) setEntryMode('conversation')
         else setThinking(false)
         return
       }
@@ -634,7 +646,7 @@ export default function FilmStudio() {
       }
     } catch {
       setUploadError("The script couldn't be read. Try again — it's worth it.")
-      if (!wasInConversation) setEntryMode('choice')
+      if (!wasInConversation) setEntryMode('conversation')
       else setThinking(false)
     }
   }
@@ -989,6 +1001,34 @@ export default function FilmStudio() {
     </main>
   )
 
+  // ── BLOCKED SCREEN ─────────────────────────────────────────────────────────
+  if (filmBlocked && film) {
+    return (
+      <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-serif)', color: 'var(--fg)', position: 'relative' }}>
+        <span style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', fontFamily: 'var(--font-serif)', fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
+          {film.title}
+        </span>
+        <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.2em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>
+            {film.film_status?.toUpperCase()}
+          </p>
+          <p style={{ fontSize: '1.3rem', color: 'var(--fg)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+            This film is not active.
+          </p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: '2.5rem', lineHeight: 1.7 }}>
+            Return to the Studio to reopen it before continuing work.
+          </p>
+          <span
+            onClick={() => router.push('/studio')}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase', cursor: 'pointer' }}
+          >
+            RETURN TO THE STUDIO
+          </span>
+        </div>
+      </main>
+    )
+  }
+
   // ── ENTRY SCREENS ──────────────────────────────────────────────────────────
   if (entryMode !== 'conversation') {
     return (
@@ -1018,150 +1058,6 @@ export default function FilmStudio() {
         }}>
           {film?.title || 'Untitled Film'}
         </span>
-
-        {/* CHOICE */}
-        {entryMode === 'choice' && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <p style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: '27px',
-              fontWeight: 400,
-              color: 'var(--fg)',
-              textAlign: 'center',
-              marginBottom: '8px',
-            }}>
-              Where are you in this film&apos;s journey?
-            </p>
-            <p style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '9px',
-              letterSpacing: '0.12em',
-              color: 'var(--fg-dim)',
-              textTransform: 'uppercase',
-              textAlign: 'center',
-              marginBottom: '36px',
-            }}>
-              HOW YOU ARRIVE SHAPES HOW WE BEGIN
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '380px' }}>
-
-              {/* Card 1 — I have an idea */}
-              <button
-                onClick={beginFromConversation}
-                onMouseEnter={() => setHoveredCard('idea')}
-                onMouseLeave={() => setHoveredCard(null)}
-                style={{
-                  background: hoveredCard === 'idea' ? '#1A1A1F' : 'var(--bg-elev-2)',
-                  border: `1px solid ${hoveredCard === 'idea' ? 'var(--accent-dim)' : 'var(--line)'}`,
-                  padding: '20px 26px',
-                  textAlign: 'left',
-                  width: '100%',
-                  cursor: 'pointer',
-                  transition: 'background 200ms ease, border-color 200ms ease',
-                }}
-              >
-                <p style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: '19px',
-                  color: 'var(--accent)',
-                  marginBottom: '6px',
-                }}>
-                  I have an idea.
-                </p>
-                <p style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '9px',
-                  letterSpacing: '0.08em',
-                  color: 'var(--fg-dim)',
-                  textTransform: 'uppercase',
-                  lineHeight: 1.5,
-                }}>
-                  LET&apos;S FIND THE FILM TOGETHER THROUGH CONVERSATION
-                </p>
-              </button>
-
-              {/* Card 2 — I have a script (only in discovery) */}
-              {!film?.current_mode && (
-                <>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    onMouseEnter={() => setHoveredCard('script')}
-                    onMouseLeave={() => setHoveredCard(null)}
-                    style={{
-                      background: hoveredCard === 'script' ? '#1A1A1F' : 'var(--bg-elev-2)',
-                      border: `1px solid ${hoveredCard === 'script' ? 'var(--accent-dim)' : 'var(--line)'}`,
-                      padding: '20px 26px',
-                      textAlign: 'left',
-                      width: '100%',
-                      cursor: 'pointer',
-                      transition: 'background 200ms ease, border-color 200ms ease',
-                    }}
-                  >
-                    <p style={{
-                      fontFamily: 'var(--font-serif)',
-                      fontSize: '19px',
-                      color: 'var(--accent)',
-                      marginBottom: '6px',
-                    }}>
-                      I have a script.
-                    </p>
-                    <p style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '9px',
-                      letterSpacing: '0.08em',
-                      color: 'var(--fg-dim)',
-                      textTransform: 'uppercase',
-                      lineHeight: 1.5,
-                    }}>
-                      LET MATINEE READ IT FIRST · PDF OR WORD DOCUMENT
-                    </p>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleScriptUpload(f) }}
-                  />
-                </>
-              )}
-            </div>
-
-            {uploadError && (
-              <p style={{
-                marginTop: '16px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '10px',
-                color: 'var(--fg-dim)',
-                textAlign: 'center',
-              }}>
-                {uploadError}
-              </p>
-            )}
-
-            {/* Cancel link */}
-            <span
-              onClick={async () => {
-                await supabase.from('messages').delete().eq('film_id', filmId)
-                await supabase.from('film_memory').delete().eq('film_id', filmId)
-                await supabase.from('films').delete().eq('id', filmId)
-                router.push('/studio')
-              }}
-              style={{
-                marginTop: '24px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '9px',
-                letterSpacing: '0.1em',
-                color: 'var(--fg-dim)',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-              }}
-            >
-              CANCEL — RETURN TO THE STUDIO
-            </span>
-          </div>
-        )}
 
         {/* UPLOADING */}
         {entryMode === 'uploading' && (
@@ -1808,8 +1704,8 @@ export default function FilmStudio() {
                             )}
                           </div>
                           {!film?.current_mode && (
-                            <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer' }}>
-                              {film?.source_documents?.script?.current ? 'Replace' : 'Upload'}
+                            <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: uploadingScript ? 'default' : 'pointer', opacity: uploadingScript ? 0.5 : 1 }}>
+                              {uploadingScript ? 'Reading...' : (film?.source_documents?.script?.current ? 'Replace' : 'Upload')}
                               <input
                                 type="file"
                                 accept=".pdf,.doc,.docx"
@@ -1819,7 +1715,8 @@ export default function FilmStudio() {
                                   if (!f) return
                                   if (f.size > 10 * 1024 * 1024) { setUploadError('File too large. Please upload a document under 10MB.'); return }
                                   e.target.value = ''
-                                  handleScriptUpload(f)
+                                  setUploadingScript(true)
+                                  handleScriptUpload(f).finally(() => setUploadingScript(false))
                                 }}
                               />
                             </label>
@@ -1850,8 +1747,8 @@ export default function FilmStudio() {
                       {/* Upload research */}
                       {!film?.current_mode && (
                         <div style={{ padding: '0.45rem 1rem' }}>
-                          <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer' }}>
-                            + Upload Research
+                          <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: uploadingResearch ? 'default' : 'pointer', opacity: uploadingResearch ? 0.5 : 1 }}>
+                            {uploadingResearch ? 'Reading...' : '+ Upload Research'}
                             <input
                               type="file"
                               accept=".pdf,.doc,.docx"
@@ -1861,14 +1758,23 @@ export default function FilmStudio() {
                                 if (!f) return
                                 if (f.size > 10 * 1024 * 1024) { setUploadError('File too large. Please upload a document under 10MB.'); return }
                                 e.target.value = ''
-                                const formData = new FormData()
-                                formData.append('file', f)
-                                formData.append('filmId', filmId)
-                                const res = await fetch('/api/upload-research', { method: 'POST', body: formData })
-                                const data = await res.json()
-                                if (data.success) {
-                                  const { data: freshFilm } = await supabase.from('films').select('*').eq('id', filmId).single()
-                                  if (freshFilm) setFilm(freshFilm)
+                                setUploadingResearch(true)
+                                try {
+                                  const formData = new FormData()
+                                  formData.append('file', f)
+                                  formData.append('filmId', filmId)
+                                  const res = await fetch('/api/upload-research', { method: 'POST', body: formData })
+                                  const data = await res.json()
+                                  if (data.success) {
+                                    const { data: freshFilm } = await supabase.from('films').select('*').eq('id', filmId).single()
+                                    if (freshFilm) setFilm(freshFilm)
+                                  } else {
+                                    setUploadError(data.error || 'Something went wrong uploading your research. Try again.')
+                                  }
+                                } catch {
+                                  setUploadError('Something went wrong uploading your research. Try again.')
+                                } finally {
+                                  setUploadingResearch(false)
                                 }
                               }}
                             />
