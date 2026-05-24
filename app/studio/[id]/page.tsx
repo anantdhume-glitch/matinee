@@ -1354,7 +1354,7 @@ export default function FilmStudio() {
         </div>
 
         {/* ── CONVERSATION ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: '600px', backgroundColor: 'var(--bg)', position: 'relative' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, backgroundColor: 'var(--bg)', position: 'relative' }}>
           {/* Overlay — closes floating panel on outside click */}
           {contextPanelOpen && !panelDocked && (
             <div
