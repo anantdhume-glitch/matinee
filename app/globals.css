@@ -1,4 +1,4 @@
-﻿*, *::before, *::after {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -6,9 +6,9 @@
 
 :root {
   --bg: #161616;
-  --bg-elev: #1E1B17;
-  --bg-elev-2: #252219;
-  --line: #2A2420;
+  --bg-elev: #1E1E1E;
+  --bg-elev-2: #242424;
+  --line: #282828;
   --fg: #E8E2D9;
   --fg-dim: #8A8682;
   --fg-dim-2: #706C68;
@@ -52,8 +52,8 @@ body {
   white-space: nowrap;
 }
 .gate-pill-open {
-  background: #231F1B;
-  border: 0.5px solid #363028;
+  background: #222222;
+  border: 0.5px solid #333333;
   color: #8A8682;
 }
 .gate-pill-review {
