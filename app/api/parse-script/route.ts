@@ -29,6 +29,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Please upload a document under 10MB.' },
+        { status: 400 }
+      )
+    }
+
     const { data: existingMemory } = await supabaseAdmin
       .from('film_memory').select('*').eq('film_id', filmId).single()
 
@@ -141,6 +149,34 @@ export async function POST(request: NextRequest) {
     } else {
       await supabaseAdmin.from('film_memory').insert({ ...memoryPayload, film_id: filmId })
     }
+
+    // Persist script to source_documents
+    const { data: filmRow } = await supabaseAdmin
+      .from('films')
+      .select('source_documents')
+      .eq('id', filmId)
+      .single()
+
+    const existing = filmRow?.source_documents ?? {}
+    const currentScript = existing.script?.current ?? null
+
+    const newScript = {
+      filename: file.name,
+      extracted_text: scriptText,
+      uploaded_at: now,
+    }
+
+    const updatedScript = {
+      current: newScript,
+      history: currentScript
+        ? [...(existing.script?.history ?? []), currentScript]
+        : (existing.script?.history ?? []),
+    }
+
+    await supabaseAdmin
+      .from('films')
+      .update({ source_documents: { ...existing, script: updatedScript } })
+      .eq('id', filmId)
 
     return NextResponse.json({ success: true, emotional_core: extracted.memory?.emotional_core })
 

@@ -258,7 +258,7 @@ const FALLBACK_PORTRAIT_FIELD_KEYS = [
 
 // Tab map: mode value → ordered tab keys (first is default)
 const MODE_TABS: Record<string, string[]> = {
-  '':              ['portrait'],
+  '':              ['archive', 'portrait'],
   'producer':      ['brief', 'archive', 'portrait'],
   'director':      ['treatment', 'archive', 'portrait'],
   'narrator':      ['segments', 'archive', 'portrait'],
@@ -472,6 +472,13 @@ export default function FilmStudio() {
     gates_closed: GateClosed[]
     documents_generated: DocumentGenerated[]
     documents_content: Partial<Record<GateId, string>>
+    source_documents?: {
+      script?: {
+        current?: { filename: string; extracted_text: string; uploaded_at: string }
+        history?: Array<{ filename: string; extracted_text: string; uploaded_at: string }>
+      }
+      research?: Array<{ id: string; filename: string; extracted_text: string; uploaded_at: string }>
+    }
   } | null>(null)
   const [entryMode, setEntryMode] = useState<EntryMode>('conversation')
   const [scriptSoul, setScriptSoul] = useState<string | null>(null)
@@ -482,6 +489,14 @@ export default function FilmStudio() {
   const [contextTab, setContextTab] = useState<string>('portrait')
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [openDocument, setOpenDocument] = useState<GateId | null>(null)
+  const [openSourceDocument, setOpenSourceDocument] = useState<{
+    type: 'script'
+    data: { current?: { filename: string; extracted_text: string; uploaded_at: string }; history?: Array<{ filename: string; extracted_text: string; uploaded_at: string }> }
+  } | {
+    type: 'research'
+    data: { id: string; filename: string; extracted_text: string; uploaded_at: string }
+  } | null>(null)
+  const [showScriptHistory, setShowScriptHistory] = useState(false)
   const [generating, setGenerating] = useState<GateId | null>(null)
   const [importPending, setImportPending] = useState<{
     gateId: GateId
@@ -1434,25 +1449,6 @@ export default function FilmStudio() {
             })}
           </div>
 
-          {/* Upload Script — bottom, only in discovery + expanded */}
-          {!film?.current_mode && !railCollapsed && (
-            <div style={{ borderTop: '1px solid var(--line)', flexShrink: 0 }}>
-              <label style={{
-                display: 'block', padding: '14px',
-                fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em',
-                color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer',
-              }}>
-                UPLOAD SCRIPT
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  style={{ display: 'none' }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }}
-                />
-              </label>
-            </div>
-          )}
         </div>
 
         {/* ── CONVERSATION ── */}
@@ -1531,22 +1527,6 @@ export default function FilmStudio() {
       →
     </span>
   </div>
-  {!film?.current_mode && (
-    <div style={{ maxWidth: '620px', margin: '0.75rem auto 0' }}>
-      <label style={{
-        fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em',
-        color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer',
-      }}>
-        UPLOAD SCRIPT
-        <input
-          type="file"
-          accept=".pdf,.doc,.docx"
-          style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; if (f) { e.target.value = ''; handleScriptUpload(f) } }}
-        />
-      </label>
-    </div>
-  )}
 </div>
         </div>
 
@@ -1803,6 +1783,100 @@ export default function FilmStudio() {
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0' }}>
 
+                    {/* SOURCE DOCUMENTS */}
+                    <div style={{ borderBottom: '1px solid var(--line)', marginBottom: '0.75rem' }}>
+                      <div style={{ padding: '0.4rem 1rem', fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
+                        Source Documents
+                      </div>
+
+                      {/* Script row */}
+                      <div style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ScrollText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />
+                            {film?.source_documents?.script?.current ? (
+                              <span
+                                onClick={() => setOpenSourceDocument({ type: 'script', data: film.source_documents!.script! })}
+                                style={{ fontSize: '0.72rem', color: 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)' }}
+                              >
+                                {film.source_documents.script.current.filename}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                                No script uploaded.
+                              </span>
+                            )}
+                          </div>
+                          {!film?.current_mode && (
+                            <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer' }}>
+                              {film?.source_documents?.script?.current ? 'Replace' : 'Upload'}
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx"
+                                style={{ display: 'none' }}
+                                onChange={e => {
+                                  const f = e.target.files?.[0]
+                                  if (!f) return
+                                  if (f.size > 10 * 1024 * 1024) { setUploadError('File too large. Please upload a document under 10MB.'); return }
+                                  e.target.value = ''
+                                  handleScriptUpload(f)
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Research rows */}
+                      {(film?.source_documents?.research ?? []).map(doc => (
+                        <div key={doc.id} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <FileText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />
+                              <span
+                                onClick={() => setOpenSourceDocument({ type: 'research', data: doc })}
+                                style={{ fontSize: '0.72rem', color: 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)' }}
+                              >
+                                {doc.filename}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.56rem', color: 'var(--fg-dim)' }}>
+                              {formatDate(doc.uploaded_at)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Upload research */}
+                      {!film?.current_mode && (
+                        <div style={{ padding: '0.45rem 1rem' }}>
+                          <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer' }}>
+                            + Upload Research
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx"
+                              style={{ display: 'none' }}
+                              onChange={async e => {
+                                const f = e.target.files?.[0]
+                                if (!f) return
+                                if (f.size > 10 * 1024 * 1024) { setUploadError('File too large. Please upload a document under 10MB.'); return }
+                                e.target.value = ''
+                                const formData = new FormData()
+                                formData.append('file', f)
+                                formData.append('filmId', filmId)
+                                const res = await fetch('/api/upload-research', { method: 'POST', body: formData })
+                                const data = await res.json()
+                                if (data.success) {
+                                  const { data: freshFilm } = await supabase.from('films').select('*').eq('id', filmId).single()
+                                  if (freshFilm) setFilm(freshFilm)
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
                     {!film?.current_mode && (
                       <div style={{ padding: '1rem', color: 'var(--fg-dim)', fontSize: '0.73rem', lineHeight: 1.7, fontStyle: 'italic' }}>
                         Production documents are generated in production modes. Enter a mode to begin.
@@ -1811,9 +1885,6 @@ export default function FilmStudio() {
 
                     {film?.current_mode && (
                       <>
-                        <div style={{ padding: '0 1rem 0.5rem', fontSize: '0.62rem', color: 'var(--fg-dim)', fontStyle: 'italic', lineHeight: 1.5 }}>
-                          Generate opens a conversation with the mode. The document follows when you&apos;re ready.
-                        </div>
                         {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
                           <div key={mode} style={{ marginBottom: '0.75rem' }}>
                             <div style={{ fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '0.4rem 1rem' }}>
@@ -1825,12 +1896,6 @@ export default function FilmStudio() {
                               const isReopened = gateEntry?.status === 'reopened'
                               const isApproved = !!gateEntry && !isReopened
                               const hasPendingImport = importPending?.gateId === doc.gateId
-                              const prereqGateId = GATE_PREREQUISITES[doc.gateId]
-                              const prereqMet = prereqGateId
-                                ? film.gates_closed?.some(g => g.gate === prereqGateId && !!g.closed_at) ?? false
-                                : true
-                              const isOwningMode = film.current_mode === doc.mode
-                              const canGenerate = prereqMet && isOwningMode
                               const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' | 'REOPENED' =
                                 isReopened ? 'REOPENED' :
                                 isApproved ? 'LOCKED' :
@@ -1845,26 +1910,32 @@ export default function FilmStudio() {
                                 gateState === 'REOPENED'  ? 'var(--gate-review)' :
                                 gateState === 'IN REVIEW' ? 'var(--fg-dim)' :
                                                             'var(--fg-dim)'
-                              const activeFlag = getActiveRippleFlag(doc.gateId)
 
                               return (
                                 <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem', borderBottom: '1px solid var(--line)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.25rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
                                     {/* Document name */}
-                                    {isGenerated ? (
-                                      <span
-                                        onClick={() => setOpenDocument(doc.gateId)}
-                                        style={{ fontSize: '0.72rem', color: isApproved ? 'var(--accent)' : 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1 }}
-                                      >
-                                        {doc.label}
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: '0.72rem', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1 }}>
-                                        {doc.label}
-                                      </span>
-                                    )}
+                                    {(() => {
+                                      const prereqGateId = GATE_PREREQUISITES[doc.gateId]
+                                      const prereqMet = prereqGateId
+                                        ? film.gates_closed?.some(g => g.gate === prereqGateId && !!g.closed_at) ?? false
+                                        : true
+                                      const isClickable = isGenerated || prereqMet
+                                      return isClickable ? (
+                                        <span
+                                          onClick={() => setOpenDocument(doc.gateId)}
+                                          style={{ fontSize: '0.72rem', color: isApproved ? 'var(--accent)' : isGenerated ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1, fontStyle: isGenerated ? 'normal' : 'italic' }}
+                                        >
+                                          {doc.label}
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1 }}>
+                                          {doc.label}
+                                        </span>
+                                      )
+                                    })()}
 
                                     {/* State label */}
                                     <span style={{
@@ -1874,97 +1945,6 @@ export default function FilmStudio() {
                                       {gateState}
                                     </span>
                                   </div>
-
-                                  {/* Action buttons */}
-                                  {!isGenerated && !hasPendingImport && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', paddingLeft: '18px' }}>
-                                      <button
-                                        onClick={() => canGenerate ? generateDocument(doc.gateId, doc.mode) : undefined}
-                                        disabled={generating === doc.gateId || !canGenerate}
-                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--accent)' : 'var(--accent-dim)', background: 'none', border: `1px solid ${canGenerate ? 'var(--accent-dim)' : 'var(--line)'}`, padding: '0.25rem 0.5rem', cursor: canGenerate ? 'pointer' : 'not-allowed' }}
-                                      >
-                                        {generating === doc.gateId ? '...' : 'Generate'}
-                                      </button>
-                                      <label style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: importLoading === doc.gateId ? 'var(--fg-dim)' : 'var(--fg-dim)', cursor: importLoading === doc.gateId ? 'default' : 'pointer', padding: '0.25rem 0.5rem' }}>
-                                        {importLoading === doc.gateId ? 'Reading...' : 'Import'}
-                                        <input
-                                          ref={importFileInputRef}
-                                          type="file"
-                                          accept=".pdf,.doc,.docx"
-                                          style={{ display: 'none' }}
-                                          onChange={e => {
-                                            const file = e.target.files?.[0]
-                                            if (file) importDocument(doc.gateId, file)
-                                            e.target.value = ''
-                                          }}
-                                        />
-                                      </label>
-                                    </div>
-                                  )}
-                                  {isGenerated && !isApproved && (
-                                    <div style={{ paddingLeft: '18px', marginTop: '0.2rem' }}>
-                                      <button
-                                        onClick={() => approveGate(doc.gateId)}
-                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
-                                      >
-                                        Approve
-                                      </button>
-                                    </div>
-                                  )}
-                                  {isApproved && (
-                                    <div style={{ paddingLeft: '18px', marginTop: '0.2rem' }}>
-                                      <button
-                                        onClick={() => reopenGate(doc.gateId)}
-                                        style={{ fontSize: '0.56rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-dim)', background: 'none', border: '1px solid var(--line)', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
-                                      >
-                                        Reopen
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* Prerequisite note */}
-                                  {!isGenerated && !hasPendingImport && !prereqMet && prereqGateId && (
-                                    <div style={{ marginTop: '0.2rem', paddingLeft: '18px', fontSize: '0.6rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
-                                      Needs {GATE_LABELS[prereqGateId]} approved first.
-                                    </div>
-                                  )}
-                                  {/* Wrong-mode note */}
-                                  {!isGenerated && !hasPendingImport && prereqMet && !isOwningMode && (
-                                    <div style={{ marginTop: '0.2rem', paddingLeft: '18px', fontSize: '0.6rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
-                                      Switch to {doc.mode.replace('_', ' ')} mode to generate.
-                                    </div>
-                                  )}
-
-                                  {/* Ripple flag */}
-                                  {activeFlag && (
-                                    <div style={{ marginTop: '0.3rem', paddingLeft: '18px', display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.64rem', color: 'var(--gate-review)', lineHeight: 1.5 }}>
-                                      <span>{doc.label} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
-                                      <button
-                                        onClick={() => dismissRippleFlag(activeFlag, doc.gateId)}
-                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', fontSize: '0.64rem', fontFamily: 'var(--font-serif)', flexShrink: 0 }}
-                                      >
-                                        Dismiss
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* Import pending — close/discard */}
-                                  {hasPendingImport && importDiscussing && (
-                                    <div style={{ marginTop: '0.3rem', paddingLeft: '18px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.64rem' }}>
-                                      <button
-                                        onClick={confirmImport}
-                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem', letterSpacing: '0.06em' }}
-                                      >
-                                        Close gate
-                                      </button>
-                                      <button
-                                        onClick={discardImport}
-                                        style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-dim)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem' }}
-                                      >
-                                        Discard
-                                      </button>
-                                    </div>
-                                  )}
                                 </div>
                               )
                             })}
@@ -2000,21 +1980,218 @@ export default function FilmStudio() {
       `}</style>
 
       {/* DOCUMENT OVERLAY */}
-      {openDocument && (
+      {openDocument && (() => {
+        const doc = ARCHIVE_DOCUMENTS.find(d => d.gateId === openDocument)
+        if (!doc) return null
+        const isGenerated = film?.documents_generated?.some(d => d.document === openDocument)
+        const gateEntry = film?.gates_closed?.find(g => g.gate === openDocument)
+        const isReopened = gateEntry?.status === 'reopened'
+        const isApproved = !!gateEntry && !isReopened
+        const hasPendingImport = importPending?.gateId === openDocument
+        const prereqGateId = GATE_PREREQUISITES[openDocument]
+        const prereqMet = prereqGateId
+          ? film?.gates_closed?.some(g => g.gate === prereqGateId && !!g.closed_at) ?? false
+          : true
+        const isOwningMode = film?.current_mode === doc.mode
+        const canGenerate = prereqMet && isOwningMode
+        const activeFlag = getActiveRippleFlag(openDocument)
+
+        const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' =
+          isApproved ? 'LOCKED' :
+          (isGenerated || hasPendingImport) ? 'IN REVIEW' : 'OPEN'
+
+        const stateColor =
+          gateState === 'LOCKED'    ? 'var(--accent)' :
+          gateState === 'IN REVIEW' ? 'var(--fg)' :
+                                      'var(--fg-dim)'
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div style={{ background: 'var(--bg-elev)', maxWidth: '700px', width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--line)', position: 'relative' }}>
+
+              {/* Header */}
+              <div style={{ padding: '1.5rem 3rem 1rem', borderBottom: '1px solid var(--line)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
+                  {doc.label}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ fontSize: '0.56rem', letterSpacing: '0.10em', textTransform: 'uppercase', color: stateColor }}>
+                    {gateState}
+                  </span>
+                  <button
+                    onClick={() => setOpenDocument(null)}
+                    style={{ background: 'none', border: 'none', color: 'var(--fg-dim)', fontSize: '1rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Content — scrollable */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 3rem' }}>
+                {isGenerated ? (
+                  <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
+                    {film?.documents_content?.[openDocument] ?? ''}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: 'var(--font-serif)' }}>
+                    This document hasn&apos;t been generated yet.
+                  </p>
+                )}
+              </div>
+
+              {/* Footer — fixed */}
+              <div style={{ borderTop: '1px solid var(--line)', padding: '1rem 3rem', flexShrink: 0 }}>
+                {activeFlag && (
+                  <div style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--gate-review)', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+                    <span>{doc.label} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
+                    <button onClick={() => dismissRippleFlag(activeFlag, openDocument)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.64rem', fontFamily: 'var(--font-serif)', flexShrink: 0 }}>
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+                {!prereqMet && prereqGateId && (
+                  <p style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                    Needs {GATE_LABELS[prereqGateId]} approved first.
+                  </p>
+                )}
+                {prereqMet && !isOwningMode && !isGenerated && (
+                  <p style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                    Switch to {doc.mode.replace('_', ' ')} mode to generate.
+                  </p>
+                )}
+                {hasPendingImport && importDiscussing && (
+                  <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.75rem' }}>
+                    <button onClick={confirmImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem', letterSpacing: '0.06em' }}>
+                      Close gate
+                    </button>
+                    <button onClick={discardImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-dim)', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.64rem' }}>
+                      Discard
+                    </button>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  {gateState === 'OPEN' && (
+                    <>
+                      <button
+                        onClick={() => canGenerate ? generateDocument(openDocument, doc.mode) : undefined}
+                        disabled={generating === openDocument || !canGenerate}
+                        style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--bg)' : 'var(--fg-dim)', background: canGenerate ? 'var(--accent)' : 'transparent', border: `1px solid ${canGenerate ? 'var(--accent)' : 'var(--line)'}`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: 'var(--font-serif)' }}
+                      >
+                        {generating === openDocument ? 'Generating...' : 'Generate'}
+                      </button>
+                      <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', fontFamily: 'var(--font-serif)' }}>
+                        {importLoading === openDocument ? 'Reading...' : 'Import'}
+                        <input
+                          ref={importFileInputRef}
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          style={{ display: 'none' }}
+                          onChange={e => { const file = e.target.files?.[0]; if (file) { importDocument(openDocument, file); e.target.value = '' } }}
+                        />
+                      </label>
+                    </>
+                  )}
+                  {gateState === 'IN REVIEW' && !hasPendingImport && (
+                    <button
+                      onClick={() => approveGate(openDocument)}
+                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: 'var(--font-serif)' }}
+                    >
+                      Approve
+                    </button>
+                  )}
+                  {gateState === 'LOCKED' && (
+                    <button
+                      onClick={() => reopenGate(openDocument)}
+                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-dim)', background: 'none', border: '1px solid var(--line)', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: 'var(--font-serif)' }}
+                    >
+                      Reopen
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* SOURCE DOCUMENT OVERLAY */}
+      {openSourceDocument && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-          <div style={{ background: 'var(--bg-elev)', maxWidth: '700px', width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '2.5rem 3rem', position: 'relative', border: '1px solid var(--line)' }}>
-            <div style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)', marginBottom: '2rem' }}>
-              {ARCHIVE_DOCUMENTS.find(d => d.gateId === openDocument)?.label}
+          <div style={{ background: 'var(--bg-elev)', maxWidth: '700px', width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--line)', position: 'relative' }}>
+
+            {/* Header */}
+            <div style={{ padding: '1.5rem 3rem 1rem', borderBottom: '1px solid var(--line)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
+                {openSourceDocument.type === 'script' ? 'Uploaded Script' : 'Research Document'}
+              </span>
+              <button
+                onClick={() => { setOpenSourceDocument(null); setShowScriptHistory(false) }}
+                style={{ background: 'none', border: 'none', color: 'var(--fg-dim)', fontSize: '1rem', cursor: 'pointer', padding: 0 }}
+              >
+                ✕
+              </button>
             </div>
-            <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
-              {film?.documents_content?.[openDocument] ?? ''}
+
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 3rem' }}>
+              <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)' }}>
+                {openSourceDocument.type === 'script'
+                  ? (openSourceDocument.data.current?.extracted_text ?? '')
+                  : openSourceDocument.data.extracted_text}
+              </div>
             </div>
-            <button
-              onClick={() => setOpenDocument(null)}
-              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'var(--fg-dim)', fontSize: '1rem', cursor: 'pointer' }}
-            >
-              ✕
-            </button>
+
+            {/* Footer */}
+            <div style={{ borderTop: '1px solid var(--line)', padding: '1rem 3rem', flexShrink: 0 }}>
+              <p style={{ fontSize: '0.6rem', color: 'var(--fg-dim)', marginBottom: '0.75rem' }}>
+                {openSourceDocument.type === 'script'
+                  ? `Uploaded ${formatDate(openSourceDocument.data.current?.uploaded_at ?? '')}`
+                  : `Uploaded ${formatDate(openSourceDocument.data.uploaded_at)}`}
+              </p>
+
+              {openSourceDocument.type === 'script' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {!film?.current_mode && (
+                    <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', display: 'inline-block', fontFamily: 'var(--font-serif)' }}>
+                      Replace Script
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          if (f.size > 10 * 1024 * 1024) { setUploadError('File too large. Please upload a document under 10MB.'); return }
+                          e.target.value = ''
+                          setOpenSourceDocument(null)
+                          handleScriptUpload(f)
+                        }}
+                      />
+                    </label>
+                  )}
+                  {(openSourceDocument.data.history ?? []).length > 0 && (
+                    <div>
+                      <span
+                        onClick={() => setShowScriptHistory(prev => !prev)}
+                        style={{ fontSize: '0.6rem', color: 'var(--fg-dim)', cursor: 'pointer', textDecoration: 'underline', letterSpacing: '0.08em' }}
+                      >
+                        {showScriptHistory ? 'Hide' : 'View'} previous versions ({openSourceDocument.data.history!.length})
+                      </span>
+                      {showScriptHistory && (
+                        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {openSourceDocument.data.history!.map((v, i) => (
+                            <div key={i} style={{ fontSize: '0.6rem', color: 'var(--fg-dim)' }}>
+                              {v.filename} · {formatDate(v.uploaded_at)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
