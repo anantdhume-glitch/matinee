@@ -550,7 +550,7 @@ export default function FilmStudio() {
   const refreshPortrait = async () => {
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     setFilmMemory(memoryData)
-    setPortraitRefreshedAt(new Date().toISOString())
+    setPortraitRefreshedAt(memoryData?.updated_at ?? new Date().toISOString())
   }
 
   const openingMessage = async (title: string) => {
@@ -1740,8 +1740,8 @@ export default function FilmStudio() {
                                 <>
                                   {field.special === 'unresolved_questions' && Array.isArray(value) ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                      {(value as Array<{ question: string; category: string; added_at: string }>).map(item => (
-                                        <div key={item.added_at} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                      {(value as Array<{ question: string; category: string; added_at: string }>).map((item, idx) => (
+                                        <div key={`unresolved-${idx}`} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
                                           <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
                                           <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
                                         </div>
