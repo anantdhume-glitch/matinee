@@ -144,11 +144,11 @@ export default function Studio() {
   )
 
   return (
-    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', fontFamily: 'var(--font-serif)', color: 'var(--fg)' }}>
+    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', fontFamily: "'DM Sans', system-ui, sans-serif", color: 'var(--fg)' }}>
 
       {/* HEADER */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2rem', height: '44px', borderBottom: '1px solid var(--line)', backgroundColor: 'var(--bg-elev)' }}>
-        <span style={{ fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500, letterSpacing: '0.3em', color: 'var(--accent)', textTransform: 'uppercase' }}>
+        <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '15px', fontWeight: 500, letterSpacing: '0.3em', color: 'var(--accent)', textTransform: 'uppercase' }}>
           MATINEE
         </span>
         <span onClick={() => supabase.auth.signOut().then(() => router.push('/'))} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer' }}>
@@ -457,7 +457,7 @@ export default function Studio() {
                 style={{
                   width: '100%', background: 'transparent', border: 'none',
                   borderBottom: '1px solid var(--line)', color: 'var(--fg)',
-                  fontFamily: 'var(--font-serif)', fontSize: '0.9rem', lineHeight: 1.6,
+                  fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.9rem', lineHeight: 1.6,
                   padding: '0.5rem 0', resize: 'none', minHeight: '60px',
                   outline: 'none', boxSizing: 'border-box',
                 }}
@@ -470,7 +470,7 @@ export default function Studio() {
                 onClick={handleStatusAction}
                 disabled={statusSaving || (statusModal.action !== 'reopen' && !statusReason.trim())}
                 style={{
-                  fontFamily: 'var(--font-serif)', fontSize: '0.72rem', letterSpacing: '0.08em',
+                  fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.72rem', letterSpacing: '0.08em',
                   textTransform: 'uppercase', padding: '0.5rem 1.25rem',
                   background: statusModal.action === 'delete' ? '#c0392b' : 'var(--accent)',
                   color: 'var(--bg)', border: 'none', cursor: statusSaving || (statusModal.action !== 'reopen' && !statusReason.trim()) ? 'not-allowed' : 'pointer',
@@ -488,7 +488,7 @@ export default function Studio() {
               </button>
               <button
                 onClick={() => { setStatusModal(null); setStatusReason('') }}
-                style={{ fontFamily: 'var(--font-serif)', fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0.5rem 1.25rem', background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--line)', cursor: 'pointer' }}
+                style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0.5rem 1.25rem', background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--line)', cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -533,7 +533,8 @@ export default function Studio() {
               }}
               style={{
                 width: '100%',
-                fontFamily: 'var(--font-serif)',
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontStyle: 'italic',
                 fontSize: '19px',
                 color: 'var(--fg)',
                 background: 'transparent',

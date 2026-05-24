@@ -1,13 +1,11 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
-
-*, *::before, *::after {
+﻿*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
 :root {
-  --bg: #171410;
+  --bg: #161616;
   --bg-elev: #1E1B17;
   --bg-elev-2: #252219;
   --line: #2A2420;
@@ -23,21 +21,21 @@
   --ease-curtain: cubic-bezier(.5, 0, .1, 1);
   --ease-stage: cubic-bezier(.2, .7, .2, 1);
 
-  --font-serif: var(--font-cormorant);
+  --font-sans: var(--font-sans-dm);
   --font-mono: var(--font-dm-mono);
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
-  --font-sans: var(--font-cormorant);
+  --font-sans: var(--font-sans-dm);
   --font-mono: var(--font-dm-mono);
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans-dm), 'DM Sans', system-ui, sans-serif;
 }
 
 .gate-pill {
