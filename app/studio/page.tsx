@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
@@ -8,7 +8,22 @@ type Film = {
   id: string
   title: string
   created_at: string
+  updated_at: string
   current_mode: string | null
+  film_status?: 'active' | 'paused' | 'closed' | 'archived'
+  status_history?: Array<{
+    status: string
+    reason: string
+    changed_at: string
+  }>
+}
+
+function getFilmPhase(mode: string | null): 'PRE-PRODUCTION' | 'PRODUCTION' | 'POST-PRODUCTION' {
+  if (!mode) return 'PRE-PRODUCTION'
+  if (['producer'].includes(mode)) return 'PRE-PRODUCTION'
+  if (['director', 'narrator', 'cinematographer', 'ai_specialist'].includes(mode)) return 'PRODUCTION'
+  if (['editor'].includes(mode)) return 'POST-PRODUCTION'
+  return 'PRE-PRODUCTION'
 }
 
 export default function Studio() {
@@ -17,8 +32,17 @@ export default function Studio() {
   const [newTitle, setNewTitle] = useState('')
   const [creating, setCreating] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const [heroMessage, setHeroMessage] = useState<string | null>(null)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [statusModal, setStatusModal] = useState<{
+    filmId: string
+    filmTitle: string
+    action: 'pause' | 'close' | 'archive' | 'delete' | 'reopen' | 'unarchive'
+  } | null>(null)
+  const [statusReason, setStatusReason] = useState('')
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [archiveExpanded, setArchiveExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [menuOpenFilmId, setMenuOpenFilmId] = useState<string | null>(null)
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -28,23 +52,9 @@ export default function Studio() {
       if (!user) { router.push('/'); return }
       const { data } = await supabase
         .from('films')
-        .select('id, title, created_at, current_mode')
-        .order('created_at', { ascending: false })
-      const filmList = data || []
-      setFilms(filmList)
-
-      if (filmList.length > 0) {
-        const { data: msgData } = await supabase
-          .from('messages')
-          .select('content')
-          .eq('film_id', filmList[0].id)
-          .eq('role', 'assistant')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-        if (msgData) setHeroMessage(msgData.content)
-      }
-
+        .select('id, title, created_at, updated_at, current_mode, film_status, status_history')
+        .order('updated_at', { ascending: false })
+      setFilms(data || [])
       setLoading(false)
     }
     init()
@@ -61,19 +71,60 @@ export default function Studio() {
     if (data) router.push(`/studio/${data.id}`)
   }
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
-  const formatDate = (ts: string) =>
-    new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()
-
-  const modeDisplay = (mode: string | null) =>
-    mode ? mode.replace('_', ' ').toUpperCase() : 'DISCOVERY'
-
   const openModal = () => { setNewTitle(''); setModalOpen(true) }
   const closeModal = () => { setModalOpen(false); setNewTitle('') }
+
+  const handleStatusAction = async () => {
+    if (!statusModal) return
+    const { filmId, action } = statusModal
+
+    if ((action === 'pause' || action === 'close' || action === 'archive' || action === 'delete') && !statusReason.trim()) return
+
+    setStatusSaving(true)
+
+    try {
+      if (action === 'delete') {
+        await supabase.from('messages').delete().eq('film_id', filmId)
+        await supabase.from('film_memory').delete().eq('film_id', filmId)
+        await supabase.from('films').delete().eq('id', filmId)
+        setFilms(prev => prev.filter(f => f.id !== filmId))
+      } else {
+        const newStatus =
+          action === 'pause'     ? 'paused' :
+          action === 'close'     ? 'closed' :
+          action === 'archive'   ? 'archived' :
+          action === 'reopen'    ? 'active' :
+          action === 'unarchive' ? 'active' : 'active'
+
+        const historyEntry = {
+          status: newStatus,
+          reason: statusReason.trim() || '',
+          changed_at: new Date().toISOString(),
+        }
+
+        const film = films.find(f => f.id === filmId)
+        const existingHistory = film?.status_history ?? []
+
+        await supabase
+          .from('films')
+          .update({
+            film_status: newStatus,
+            status_history: [...existingHistory, historyEntry],
+          })
+          .eq('id', filmId)
+
+        setFilms(prev => prev.map(f =>
+          f.id === filmId
+            ? { ...f, film_status: newStatus, status_history: [...(f.status_history ?? []), historyEntry] }
+            : f
+        ))
+      }
+    } finally {
+      setStatusSaving(false)
+      setStatusModal(null)
+      setStatusReason('')
+    }
+  }
 
   if (loading) return (
     <main style={{
@@ -92,262 +143,359 @@ export default function Studio() {
     </main>
   )
 
-  const [heroFilm, ...restFilms] = films
-
   return (
-    <main style={{
-      backgroundColor: 'var(--bg)',
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      color: 'var(--fg)',
-    }}>
+    <main style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', fontFamily: 'var(--font-serif)', color: 'var(--fg)' }}>
 
-      {/* HEADER STRIP */}
-      <header style={{
-        height: '56px',
-        borderBottom: '1px solid var(--line)',
-        padding: '0 32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0,
-      }}>
-        <span style={{
-          fontFamily: 'var(--font-serif)',
-          fontSize: '15px',
-          fontWeight: 500,
-          letterSpacing: '0.3em',
-          color: 'var(--accent)',
-          textTransform: 'uppercase',
-        }}>
+      {/* HEADER */}
+      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2rem', height: '44px', borderBottom: '1px solid var(--line)', backgroundColor: 'var(--bg-elev)' }}>
+        <span style={{ fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500, letterSpacing: '0.3em', color: 'var(--accent)', textTransform: 'uppercase' }}>
           MATINEE
         </span>
-        <span
-          onClick={signOut}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '9px',
-            letterSpacing: '0.15em',
-            color: 'var(--fg-dim)',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-          }}
-        >
+        <span onClick={() => supabase.auth.signOut().then(() => router.push('/'))} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer' }}>
           LEAVE
         </span>
-      </header>
+      </nav>
 
-      {/* BODY */}
-      <div style={{ padding: '32px 32px 0', flex: 1, overflowY: 'auto' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 2rem 6rem' }}>
 
-        {/* Section label */}
-        <p style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '9px',
-          letterSpacing: '0.2em',
-          color: 'var(--fg-dim)',
-          textTransform: 'uppercase',
-          marginBottom: '24px',
-        }}>
+        {/* PAGE LABEL */}
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.2em', color: 'var(--fg-dim)', textTransform: 'uppercase', marginBottom: '2.5rem' }}>
           THE STUDIO
         </p>
 
-        {/* Begin a new film */}
+        {/* BEGIN A NEW FILM */}
         <div
           onClick={openModal}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginTop: '24px',
-            cursor: 'pointer',
-            paddingBottom: '32px',
-            marginBottom: '1.5rem',
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '3rem', cursor: 'pointer' }}
         >
-          <span style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: '18px',
-            color: 'var(--accent)',
-            lineHeight: 1,
-          }}>+</span>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '10px',
-            letterSpacing: '0.12em',
-            color: 'var(--fg-dim)',
-            textTransform: 'uppercase',
-          }}>
-            BEGIN A NEW FILM
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase' }}>
+            + BEGIN A NEW FILM
           </span>
         </div>
 
-        {/* Film list */}
-        <div style={{ borderTop: '1px solid var(--line)' }}>
+        {(() => {
+          const activeFilms = films.filter(f => !f.film_status || f.film_status === 'active' || f.film_status === 'paused')
+          const closedFilms = films.filter(f => f.film_status === 'closed' || f.film_status === 'archived')
 
-          {/* Hero row */}
-          {heroFilm && (
-            <div
-              onClick={() => router.push(`/studio/${heroFilm.id}`)}
-              style={{
-                padding: '20px 0',
-                borderBottom: '1px solid var(--line)',
-                position: 'relative',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-              }}
-            >
-              {/* Gold left border — always present on hero */}
-              <div style={{
-                position: 'absolute',
-                left: '-32px',
-                top: 0,
-                bottom: 0,
-                width: '2px',
-                background: 'var(--accent)',
-              }} />
+          const sortedActive = [...activeFilms].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          const heroFilm = sortedActive[0] ?? null
+          const remainingFilms = sortedActive.slice(1)
+          const visibleRemaining = showAll ? remainingFilms : remainingFilms.slice(0, 5)
 
-              <div style={{ flex: 1, minWidth: 0, paddingRight: '16px' }}>
-                <p style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: '22px',
-                  fontWeight: 500,
-                  color: 'var(--fg)',
-                  marginBottom: '4px',
-                  lineHeight: 1.2,
-                }}>
-                  {heroFilm.title}
-                </p>
-                <p style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '9px',
-                  textTransform: 'uppercase',
-                  color: 'var(--fg-dim)',
-                  marginBottom: heroMessage ? '8px' : 0,
-                }}>
-                  In{' '}
-                  <span style={{ color: 'var(--accent)' }}>
-                    {modeDisplay(heroFilm.current_mode)}
-                  </span>
-                </p>
-                {heroMessage && (
-                  <p style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: '13px',
-                    fontStyle: 'italic',
-                    color: 'var(--fg)',
-                    opacity: 1,
-                    lineHeight: 1.5,
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis',
-                  }}>
-                    {heroMessage}
-                  </p>
-                )}
-              </div>
+          const phases: Array<'PRE-PRODUCTION' | 'PRODUCTION' | 'POST-PRODUCTION'> = ['PRE-PRODUCTION', 'PRODUCTION', 'POST-PRODUCTION']
 
-              <p style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '9px',
-                color: 'var(--fg-dim)',
-                textTransform: 'uppercase',
-                flexShrink: 0,
-                paddingTop: '4px',
-              }}>
-                {formatDate(heroFilm.created_at)}
-              </p>
-            </div>
-          )}
+          const filmCard = (film: Film, isHero: boolean) => {
+            const phase = getFilmPhase(film.current_mode)
+            const isMenuOpen = menuOpenFilmId === film.id
 
-          {/* Standard rows */}
-          {restFilms.map(film => {
-            const isUntitled = !film.title || film.title === 'Untitled Film'
-            const isHovered = hoveredId === film.id
             return (
               <div
                 key={film.id}
-                onClick={() => router.push(`/studio/${film.id}`)}
-                onMouseEnter={() => setHoveredId(film.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                style={{
-                  padding: '16px 0',
-                  borderBottom: '1px solid var(--line)',
-                  position: 'relative',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                }}
+                style={{ position: 'relative' }}
               >
-                {/* Gold hover border */}
-                <div style={{
-                  position: 'absolute',
-                  left: '-32px',
-                  top: 0,
-                  bottom: 0,
-                  width: '2px',
-                  background: 'var(--accent)',
-                  opacity: isHovered ? 1 : 0,
-                  transition: 'opacity 200ms ease',
-                }} />
+                <div
+                  onClick={() => router.push(`/studio/${film.id}`)}
+                  style={{
+                    padding: isHero ? '2rem 2rem 2rem 2.5rem' : '1.25rem 2rem 1.25rem 2.5rem',
+                    borderLeft: isHero ? '2px solid var(--accent)' : '1px solid var(--line)',
+                    borderBottom: '1px solid var(--line)',
+                    cursor: 'pointer',
+                    opacity: film.film_status === 'paused' ? 0.5 : 1,
+                    transition: 'opacity 0.2s',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Mode badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>
+                      {`IN ${film.current_mode ? film.current_mode.replace('_', ' ').toUpperCase() : 'DISCOVERY'}`}
+                    </p>
+                    {film.film_status && film.film_status !== 'active' && (
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em',
+                        textTransform: 'uppercase', padding: '2px 6px',
+                        border: '1px solid var(--line)',
+                        color: film.film_status === 'paused' ? 'var(--fg-dim)' :
+                               film.film_status === 'closed' ? 'var(--accent-dim)' :
+                               film.film_status === 'archived' ? 'var(--fg-dim)' : 'var(--fg-dim)',
+                      }}>
+                        {film.film_status.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
 
-                <div style={{ flex: 1, minWidth: 0, paddingRight: '16px' }}>
-                  <p style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: isUntitled ? '17px' : '19px',
-                    fontWeight: 400,
-                    fontStyle: isUntitled ? 'italic' : 'normal',
-                    color: isUntitled ? 'var(--fg-dim)' : 'var(--fg)',
-                    marginBottom: '4px',
-                    lineHeight: 1.2,
-                  }}>
+                  {/* Title */}
+                  <p style={{ fontSize: isHero ? '1.5rem' : '1.1rem', fontWeight: 400, color: 'var(--fg)', marginBottom: '0.5rem', lineHeight: 1.3 }}>
                     {film.title}
                   </p>
-                  <p style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '9px',
-                    textTransform: 'uppercase',
-                    color: 'var(--fg-dim)',
-                  }}>
-                    In{' '}
-                    <span style={{ color: 'var(--accent)' }}>
-                      {modeDisplay(film.current_mode)}
-                    </span>
+
+                  {/* Date */}
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.08em', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                    {new Date(film.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
 
-                <p style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '9px',
-                  color: 'var(--fg-dim)',
-                  textTransform: 'uppercase',
-                  flexShrink: 0,
-                  paddingTop: '2px',
-                }}>
-                  {formatDate(film.created_at)}
-                </p>
+                {/* ••• menu trigger — appears on row hover */}
+                <div
+                  onClick={e => { e.stopPropagation(); setMenuOpenFilmId(isMenuOpen ? null : film.id) }}
+                  style={{
+                    position: 'absolute', top: '50%', right: '1rem', transform: 'translateY(-50%)',
+                    fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--fg-dim)',
+                    cursor: 'pointer', padding: '0.25rem 0.5rem',
+                    opacity: 1,
+                  }}
+                >
+                  •••
+                </div>
+
+                {/* Dropdown menu */}
+                {isMenuOpen && (
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      position: 'absolute', right: '1rem', top: 'calc(50% + 16px)',
+                      backgroundColor: 'var(--bg-elev-2)', border: '1px solid var(--line)',
+                      zIndex: 20, minWidth: '140px',
+                    }}
+                  >
+                    {(film.film_status === 'active' || !film.film_status) && (
+                      <div
+                        onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'pause' }); setMenuOpenFilmId(null) }}
+                        style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', borderBottom: '1px solid var(--line)' }}
+                      >
+                        Pause
+                      </div>
+                    )}
+                    {film.film_status === 'paused' && (
+                      <div
+                        onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'reopen' }); setMenuOpenFilmId(null) }}
+                        style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', borderBottom: '1px solid var(--line)' }}
+                      >
+                        Resume
+                      </div>
+                    )}
+                    <div
+                      onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'close' }); setMenuOpenFilmId(null) }}
+                      style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', borderBottom: '1px solid var(--line)' }}
+                    >
+                      Close
+                    </div>
+                    <div
+                      onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'archive' }); setMenuOpenFilmId(null) }}
+                      style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', borderBottom: '1px solid var(--line)' }}
+                    >
+                      Archive
+                    </div>
+                    <div
+                      onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'delete' }); setMenuOpenFilmId(null) }}
+                      style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c0392b', cursor: 'pointer' }}
+                    >
+                      Delete
+                    </div>
+                  </div>
+                )}
               </div>
             )
-          })}
+          }
 
-          {films.length === 0 && (
-            <p style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: '17px',
-              fontStyle: 'italic',
-              color: 'var(--fg-dim)',
-              padding: '24px 0',
-            }}>
-              No films yet.
-            </p>
-          )}
-        </div>
+          return (
+            <>
+              {/* HERO */}
+              {heroFilm && filmCard(heroFilm, true)}
 
+              {/* PHASE GROUPS */}
+              {phases.map(phase => {
+                const phaseFilms = visibleRemaining.filter(f => getFilmPhase(f.current_mode) === phase)
+                if (phaseFilms.length === 0) return null
+                return (
+                  <div key={phase} style={{ marginTop: '2.5rem' }}>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.2em', color: 'var(--fg-dim)', textTransform: 'uppercase', marginBottom: '1rem', paddingLeft: '2.5rem' }}>
+                      {phase}
+                    </p>
+                    {phaseFilms.map(f => filmCard(f, false))}
+                  </div>
+                )
+              })}
+
+              {/* SHOW ALL / LESS */}
+              {remainingFilms.length > 5 && (
+                <div style={{ marginTop: '1.5rem', paddingLeft: '2.5rem' }}>
+                  <span
+                    onClick={() => setShowAll(prev => !prev)}
+                    style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    {showAll ? 'SHOW LESS' : `SHOW ALL (${remainingFilms.length})`}
+                  </span>
+                </div>
+              )}
+
+              {/* ARCHIVE SECTION */}
+              {closedFilms.length > 0 && (
+                <div style={{ marginTop: '4rem', borderTop: '1px solid var(--line)', paddingTop: '2rem' }}>
+                  <div
+                    onClick={() => setArchiveExpanded(prev => !prev)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', paddingLeft: '2.5rem', marginBottom: archiveExpanded ? '1.5rem' : 0 }}
+                  >
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.2em', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                      ARCHIVE ({closedFilms.length})
+                    </p>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-dim)' }}>
+                      {archiveExpanded ? '↑' : '↓'}
+                    </span>
+                  </div>
+
+                  {archiveExpanded && closedFilms.map(film => (
+                    <div key={film.id} style={{ position: 'relative' }}>
+                      <div
+                        onClick={() => router.push(`/studio/${film.id}`)}
+                        style={{ padding: '1rem 2rem 1rem 2.5rem', borderBottom: '1px solid var(--line)', cursor: 'pointer', opacity: 0.4 }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>
+                            {`IN ${film.current_mode ? film.current_mode.replace('_', ' ').toUpperCase() : 'DISCOVERY'}`}
+                          </p>
+                          {film.film_status && film.film_status !== 'active' && (
+                            <span style={{
+                              fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em',
+                              textTransform: 'uppercase', padding: '2px 6px',
+                              border: '1px solid var(--line)',
+                              color: film.film_status === 'paused' ? 'var(--fg-dim)' :
+                                     film.film_status === 'closed' ? 'var(--accent-dim)' :
+                                     film.film_status === 'archived' ? 'var(--fg-dim)' : 'var(--fg-dim)',
+                            }}>
+                              {film.film_status.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '1rem', color: 'var(--fg)', marginBottom: '0.3rem' }}>
+                          {film.title}
+                        </p>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                          {new Date(film.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+
+                      {/* ••• menu for archived films */}
+                      <div
+                        onClick={e => { e.stopPropagation(); setMenuOpenFilmId(menuOpenFilmId === film.id ? null : film.id) }}
+                        style={{ position: 'absolute', top: '50%', right: '1rem', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.25rem 0.5rem', opacity: 1 }}
+                      >
+                        •••
+                      </div>
+
+                      {menuOpenFilmId === film.id && (
+                        <div
+                          onClick={e => e.stopPropagation()}
+                          style={{ position: 'absolute', right: '1rem', top: 'calc(50% + 16px)', backgroundColor: 'var(--bg-elev-2)', border: '1px solid var(--line)', zIndex: 20, minWidth: '140px' }}
+                        >
+                          <div
+                            onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'reopen' }); setMenuOpenFilmId(null) }}
+                            style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', borderBottom: '1px solid var(--line)' }}
+                          >
+                            Reopen
+                          </div>
+                          <div
+                            onClick={() => { setStatusModal({ filmId: film.id, filmTitle: film.title, action: 'delete' }); setMenuOpenFilmId(null) }}
+                            style={{ padding: '0.6rem 1rem', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c0392b', cursor: 'pointer' }}
+                          >
+                            Delete
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )
+        })()}
       </div>
+
+      {/* STATUS MODAL */}
+      {statusModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div style={{ background: 'var(--bg-elev)', maxWidth: '480px', width: '100%', border: '1px solid var(--line)', padding: '2rem 2.5rem' }}>
+
+            {/* Title */}
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)', marginBottom: '1rem' }}>
+              {statusModal.action === 'delete'    ? 'Delete Film' :
+               statusModal.action === 'pause'     ? 'Pause Film' :
+               statusModal.action === 'close'     ? 'Close Film' :
+               statusModal.action === 'archive'   ? 'Archive Film' :
+               statusModal.action === 'reopen'    ? 'Reopen Film' :
+               statusModal.action === 'unarchive' ? 'Unarchive Film' : ''}
+            </p>
+
+            {/* Film name */}
+            <p style={{ fontSize: '1.1rem', color: 'var(--fg)', marginBottom: '1.5rem', fontStyle: 'italic' }}>
+              {statusModal.filmTitle}
+            </p>
+
+            {/* Warning for delete */}
+            {statusModal.action === 'delete' && (
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color: '#c0392b', textTransform: 'uppercase', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                This will permanently delete this film and everything built from it. This cannot be undone.
+              </p>
+            )}
+
+            {/* Reason input */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-dim)', marginBottom: '0.5rem' }}>
+                {statusModal.action === 'reopen' ? 'What\'s bringing you back? (optional)' : 'Reason'}
+              </p>
+              <textarea
+                value={statusReason}
+                onChange={e => setStatusReason(e.target.value)}
+                placeholder={
+                  statusModal.action === 'delete'  ? 'Why are you deleting this film?' :
+                  statusModal.action === 'pause'   ? 'Why are you pausing?' :
+                  statusModal.action === 'close'   ? 'Why are you closing this film?' :
+                  statusModal.action === 'archive' ? 'Why are you archiving?' :
+                  statusModal.action === 'reopen'  ? 'What\'s bringing you back...' : ''
+                }
+                style={{
+                  width: '100%', background: 'transparent', border: 'none',
+                  borderBottom: '1px solid var(--line)', color: 'var(--fg)',
+                  fontFamily: 'var(--font-serif)', fontSize: '0.9rem', lineHeight: 1.6,
+                  padding: '0.5rem 0', resize: 'none', minHeight: '60px',
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <button
+                onClick={handleStatusAction}
+                disabled={statusSaving || (statusModal.action !== 'reopen' && !statusReason.trim())}
+                style={{
+                  fontFamily: 'var(--font-serif)', fontSize: '0.72rem', letterSpacing: '0.08em',
+                  textTransform: 'uppercase', padding: '0.5rem 1.25rem',
+                  background: statusModal.action === 'delete' ? '#c0392b' : 'var(--accent)',
+                  color: 'var(--bg)', border: 'none', cursor: statusSaving || (statusModal.action !== 'reopen' && !statusReason.trim()) ? 'not-allowed' : 'pointer',
+                  opacity: statusSaving || (statusModal.action !== 'reopen' && !statusReason.trim()) ? 0.5 : 1,
+                }}
+              >
+                {statusSaving ? 'Saving...' : (
+                  statusModal.action === 'delete'    ? 'Delete permanently' :
+                  statusModal.action === 'pause'     ? 'Pause film' :
+                  statusModal.action === 'close'     ? 'Close film' :
+                  statusModal.action === 'archive'   ? 'Archive film' :
+                  statusModal.action === 'reopen'    ? 'Reopen film' :
+                  statusModal.action === 'unarchive' ? 'Unarchive film' : 'Confirm'
+                )}
+              </button>
+              <button
+                onClick={() => { setStatusModal(null); setStatusReason('') }}
+                style={{ fontFamily: 'var(--font-serif)', fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0.5rem 1.25rem', background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--line)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* NEW FILM MODAL */}
       {modalOpen && (
