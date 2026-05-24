@@ -7,12 +7,13 @@
 }
 
 :root {
-  --bg: #09090B;
-  --bg-elev: #111113;
-  --bg-elev-2: #16161A;
-  --line: #2A2A30;
+  --bg: #171410;
+  --bg-elev: #1E1B17;
+  --bg-elev-2: #252219;
+  --line: #2A2420;
   --fg: #E8E2D9;
-  --fg-dim: #7A7670;
+  --fg-dim: #8A8682;
+  --fg-dim-2: #706C68;
   --accent: #C8A96E;
   --accent-dim: #6B5A38;
   --gate-review: #C8956E;
@@ -37,6 +38,35 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-serif);
+}
+
+.gate-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.gate-pill-open {
+  background: #231F1B;
+  border: 0.5px solid #363028;
+  color: #8A8682;
+}
+.gate-pill-review {
+  background: #2A1E08;
+  border: 0.5px solid #4A3410;
+  color: #C4880E;
+}
+.gate-pill-closed {
+  background: #0E1E16;
+  border: 0.5px solid #183028;
+  color: #28976E;
 }
 
 input:-webkit-autofill,

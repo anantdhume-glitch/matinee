@@ -207,9 +207,10 @@ export default function Studio() {
                 >
                   {/* Mode badge */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.07em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>
                       {`IN ${film.current_mode ? film.current_mode.replace('_', ' ').toUpperCase() : 'DISCOVERY'}`}
                     </p>
+
                     {film.film_status && film.film_status !== 'active' && (
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em',
@@ -230,7 +231,7 @@ export default function Studio() {
                   </p>
 
                   {/* Date */}
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.08em', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.08em', color: 'var(--fg-dim)', textTransform: 'uppercase', opacity: 0.5 }}>
                     {new Date(film.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
@@ -351,7 +352,7 @@ export default function Studio() {
                         style={{ padding: '1rem 2rem 1rem 2.5rem', borderBottom: '1px solid var(--line)', cursor: 'pointer', opacity: 0.4 }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>
+                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.07em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>
                             {`IN ${film.current_mode ? film.current_mode.replace('_', ' ').toUpperCase() : 'DISCOVERY'}`}
                           </p>
                           {film.film_status && film.film_status !== 'active' && (
@@ -370,7 +371,7 @@ export default function Studio() {
                         <p style={{ fontSize: '1rem', color: 'var(--fg)', marginBottom: '0.3rem' }}>
                           {film.title}
                         </p>
-                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--fg-dim)', textTransform: 'uppercase', opacity: 0.5 }}>
                           {new Date(film.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </p>
                       </div>
