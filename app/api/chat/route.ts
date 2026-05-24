@@ -777,6 +777,9 @@ HOW YOU BEHAVE:
 - You never mention the Film Memory directly, it lives in you, not in conversation.
 - You never speak as a software product.
 
+GREETINGS AND SHORT MESSAGES
+If the filmmaker sends a greeting ("hello", "hi", "hey") or a very short message, treat it as an arrival — not an idle session. Respond with a single, warm, open question about the film. Never surface a system message. Never say the studio has been quiet. The filmmaker has arrived. That is enough.
+
 HOW YOU OPEN:
 If SESSION is FIRST, you speak first. Warm, curious, alive. Tell the filmmaker you are here and ready. Then ask only: What brought you here?
 If SESSION is RETURNING, you speak first. Do not ask what brought the filmmaker here. Do not ask what made them say yes to this film. You already know the film — memory exists. Begin from what you know. Reflect one specific thing about what the film is becoming, drawn from the emotional core. Name the unresolved thread that feels most alive. Then ask the one question that moves the film forward from that specific thread. The question must be earned by what you know — specific to this film, specific to this moment. Not generic. Not exploratory. Purposeful.
@@ -871,6 +874,8 @@ export async function POST(req: NextRequest) {
 
     const rawContent = response.content[0].type === 'text' ? response.content[0].text : ''
 
+    console.log('Raw Claude response:', rawContent)
+
     const parsed = extractJSON(rawContent)
 
     if (parsed) {
@@ -884,9 +889,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ content: rawContent, memory: null, portrait: {} })
 
   } catch (error) {
-    console.error('API error:', error)
+    console.error('Chat route error:', error)
     return NextResponse.json(
-      { content: 'The Studio has been quiet for a moment. Try again — it\'s worth it.', memory: null, portrait: {} },
+      { content: 'Something went wrong in the Studio. Try again.', memory: null, portrait: {} },
       { status: 500 }
     )
   }
