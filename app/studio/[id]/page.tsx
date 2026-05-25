@@ -519,6 +519,12 @@ export default function FilmStudio() {
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
   const [directEdit, setDirectEdit] = useState<DirectEditState>({ field: null, value: '', saving: false })
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<Array<{ id: string; film_id: string; created_at: string; title: string | null; is_active: boolean; mode_at_creation: string | null }>>([])
+  const [visibleSessionCount, setVisibleSessionCount] = useState(5)
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null)
+  const [viewingMessages, setViewingMessages] = useState<Array<{ id: string; role: string; content: string }>>([])
+  const [deleteConfirmSessionId, setDeleteConfirmSessionId] = useState<string | null>(null)
   const [railCollapsed, setRailCollapsed] = useState(false)
   const [panelDocked, setPanelDocked] = useState(false)
   const [hoveredMode, setHoveredMode] = useState<string | null>(null)
@@ -528,6 +534,7 @@ export default function FilmStudio() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const archiveRowRefs = useRef<Partial<Record<GateId, HTMLDivElement>>>({})
+  const hasGreeted = useRef(false)
   const router = useRouter()
   const params = useParams()
   const filmId = params.id as string
@@ -546,14 +553,55 @@ export default function FilmStudio() {
         return
       }
       await refreshPortrait()
-      const { data: msgData } = await supabase.from('messages').select('*').eq('film_id', filmId).order('created_at')
-      if (msgData && msgData.length > 0) {
-        setMessages(msgData)
-        setEntryMode('conversation')
+
+      // Find or create the active session for this film
+      const { data: activeSessionData } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('film_id', filmId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      let sessionId: string
+      if (activeSessionData && activeSessionData.length > 0) {
+        sessionId = activeSessionData[0].id
+        setActiveSessionId(sessionId)
+        const { data: msgData } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('film_id', filmId)
+          .eq('session_id', sessionId)
+          .order('created_at')
+        if (msgData && msgData.length > 0) {
+          setMessages(msgData)
+          setEntryMode('conversation')
+        } else {
+          const { count: priorCount } = await supabase
+            .from('sessions')
+            .select('*', { count: 'exact', head: true })
+            .eq('film_id', filmId)
+            .eq('is_active', false)
+          setEntryMode('conversation')
+          await openingMessage(filmData.title || 'Untitled Film', priorCount && priorCount > 0 ? 'RETURNING' : 'FIRST', sessionId)
+        }
       } else {
+        // No active session — check for prior sessions to determine greeting type
+        const { count: priorCount } = await supabase
+          .from('sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('film_id', filmId)
+        const { data: newSession } = await supabase
+          .from('sessions')
+          .insert({ film_id: filmId, is_active: true, mode_at_creation: filmData.current_mode ?? 'discovery' })
+          .select()
+          .single()
+        sessionId = newSession.id
+        setActiveSessionId(sessionId)
         setEntryMode('conversation')
-        await openingMessage(filmData.title || 'Untitled Film')
+        await openingMessage(filmData.title || 'Untitled Film', priorCount && priorCount > 0 ? 'RETURNING' : 'FIRST', sessionId)
       }
+      await fetchSessions()
       setLoading(false)
     }
     init()
@@ -586,20 +634,68 @@ export default function FilmStudio() {
     setPortraitRefreshedAt(memoryData?.updated_at ?? new Date().toISOString())
   }
 
-  const openingMessage = async (title: string) => {
+  const openingMessage = async (title: string, sessionType: 'FIRST' | 'RETURNING' = 'FIRST', sessionId?: string) => {
+    if (hasGreeted.current) return
+    hasGreeted.current = true
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: [], filmMemory: memoryData, sessionType: 'FIRST', filmTitle: title, currentMode: film?.current_mode ?? null })
+      body: JSON.stringify({ filmId, messages: [], filmMemory: memoryData, sessionType, filmTitle: title, currentMode: film?.current_mode ?? null })
     })
     const data = await response.json()
-    await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId })
+    await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId, session_id: sessionId ?? null })
     setMessages([{ id: 'opening', role: 'assistant', content: data.content }])
   }
 
   const beginFromConversation = async () => {
+    if (hasGreeted.current) return
     setEntryMode('conversation')
-    await openingMessage(film?.title || 'Untitled Film')
+    await openingMessage(film?.title || 'Untitled Film', 'FIRST', activeSessionId ?? undefined)
+  }
+
+  const startNewConversation = async () => {
+    if (!film) return
+    if (activeSessionId) {
+      await supabase.from('sessions').update({ is_active: false }).eq('id', activeSessionId)
+    }
+    const { data: newSession } = await supabase
+      .from('sessions')
+      .insert({ film_id: filmId, is_active: true, mode_at_creation: film.current_mode ?? 'discovery' })
+      .select()
+      .single()
+    if (!newSession) return
+    setActiveSessionId(newSession.id)
+    setMessages([])
+    hasGreeted.current = false
+    await openingMessage(film.title || 'Untitled Film', 'RETURNING', newSession.id)
+    await fetchSessions()
+  }
+
+  const fetchSessions = async () => {
+    const { data } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('film_id', filmId)
+      .order('created_at', { ascending: false })
+    if (data) setSessions(data)
+  }
+
+  const viewSession = async (sessionId: string) => {
+    setViewingSessionId(sessionId)
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at')
+    setViewingMessages(data ?? [])
+  }
+
+  const deleteSession = async (sessionId: string) => {
+    await supabase.from('messages').delete().eq('session_id', sessionId)
+    await supabase.from('sessions').delete().eq('id', sessionId)
+    if (viewingSessionId === sessionId) setViewingSessionId(null)
+    setDeleteConfirmSessionId(null)
+    await fetchSessions()
   }
 
   const handleScriptUpload = async (file: File) => {
@@ -631,7 +727,7 @@ export default function FilmStudio() {
       const openingData = await openingResponse.json()
       const openingText = openingData.content
 
-      await supabase.from('messages').insert({ role: 'assistant', content: openingText, film_id: filmId })
+      await supabase.from('messages').insert({ role: 'assistant', content: openingText, film_id: filmId, session_id: activeSessionId })
 
       if (wasInConversation) {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: openingText }])
@@ -663,7 +759,20 @@ export default function FilmStudio() {
     setInput('')
     setThinking(true)
 
-    const userMessage = { role: 'user', content: t, film_id: filmId }
+    // Auto-title: fire on the first user message in this session
+    const isFirstUserMessage = activeSessionId && !messages.some(m => m.role === 'user')
+    if (isFirstUserMessage) {
+      fetch('/api/sessions/auto-title', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: activeSessionId, firstMessage: t }),
+      }).then(r => r.json()).then(data => {
+        if (data.title) {
+          setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, title: data.title } : s))
+        }
+      }).catch(() => {})
+    }
+
+    const userMessage = { role: 'user', content: t, film_id: filmId, session_id: activeSessionId }
     await supabase.from('messages').insert(userMessage)
     const updated = [...messages, { id: Date.now().toString(), role: 'user', content: t }]
     setMessages(updated)
@@ -675,7 +784,7 @@ export default function FilmStudio() {
     })
     const data = await response.json()
 
-    await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId })
+    await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId, session_id: activeSessionId })
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content }])
 
     if (data.memory) {
@@ -917,7 +1026,7 @@ export default function FilmStudio() {
       const data = await response.json()
 
       if (data.summary) {
-        await supabase.from('messages').insert({ role: 'assistant', content: data.summary, film_id: filmId })
+        await supabase.from('messages').insert({ role: 'assistant', content: data.summary, film_id: filmId, session_id: activeSessionId })
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.summary }])
         setImportPending({
           gateId,
@@ -1230,6 +1339,171 @@ export default function FilmStudio() {
           {/* Scrollable mode list */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
 
+            {/* Session list section */}
+            {!railCollapsed && (
+              <div style={{ borderBottom: '1px solid var(--line)', position: 'relative' }}>
+
+                {/* New Conversation button */}
+                <div style={{ padding: '8px 14px 6px' }}>
+                  <button
+                    onClick={startNewConversation}
+                    style={{
+                      width: '100%', background: 'transparent',
+                      border: '1px solid var(--line)',
+                      color: 'var(--fg-dim)',
+                      fontFamily: 'var(--font-mono)', fontSize: '9px',
+                      letterSpacing: '0.1em', textTransform: 'uppercase',
+                      padding: '5px 0', cursor: 'pointer', borderRadius: '2px',
+                    }}
+                  >
+                    + New Conversation
+                  </button>
+                </div>
+
+                {/* Session rows */}
+                {sessions.slice(0, visibleSessionCount).map(session => {
+                  const isActive = session.id === activeSessionId
+                  const isViewing = session.id === viewingSessionId
+                  const sessionDate = new Date(session.created_at)
+                  const dateLabel = sessionDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                  const timeLabel = sessionDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                  const modeLabel = session.mode_at_creation
+                    ? session.mode_at_creation.charAt(0).toUpperCase() + session.mode_at_creation.slice(1)
+                    : 'Discovery'
+                  const defaultTitle = `${dateLabel} · ${modeLabel}`
+                  const displayTitle = session.title || defaultTitle
+
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={() => { if (!isActive) viewSession(session.id) }}
+                      style={{
+                        padding: '7px 14px 7px 12px',
+                        display: 'flex', alignItems: 'flex-start', gap: '8px',
+                        backgroundColor: isViewing ? 'var(--bg-elev-2)' : 'transparent',
+                        cursor: isActive ? 'default' : 'pointer',
+                      }}
+                    >
+                      {/* Indicator dot */}
+                      <span style={{
+                        width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, marginTop: '4px',
+                        backgroundColor: isActive ? 'var(--accent)' : 'rgba(255,255,255,0.15)',
+                      }} />
+
+                      {/* Name + timestamp */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span
+                          contentEditable
+                          suppressContentEditableWarning
+                          onClick={e => e.stopPropagation()}
+                          onBlur={async (e) => {
+                            const newTitle = e.currentTarget.textContent?.trim()
+                            if (!newTitle || newTitle === displayTitle) return
+                            await supabase.from('sessions').update({ title: newTitle }).eq('id', session.id)
+                            await fetchSessions()
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() }
+                            e.stopPropagation()
+                          }}
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.04em',
+                            color: isActive ? 'var(--fg)' : 'var(--fg-dim)',
+                            display: 'block', lineHeight: 1.4, outline: 'none', cursor: 'text',
+                            overflow: 'hidden', whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {displayTitle}
+                        </span>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: '9px',
+                          color: 'var(--fg-dim-2)', display: 'block', marginTop: '2px',
+                        }}>
+                          {dateLabel} · {timeLabel}
+                        </span>
+                      </div>
+
+                      {/* ••• menu — past sessions only */}
+                      {!isActive && (
+                        <span
+                          onClick={e => { e.stopPropagation(); setDeleteConfirmSessionId(session.id) }}
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontSize: '10px',
+                            color: 'var(--fg-dim-2)', cursor: 'pointer',
+                            letterSpacing: '0.05em', padding: '2px 0', flexShrink: 0,
+                          }}
+                        >
+                          •••
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* More button */}
+                {sessions.length > visibleSessionCount && (
+                  <div
+                    onClick={() => setVisibleSessionCount(prev => prev + 5)}
+                    style={{
+                      padding: '4px 14px 8px 26px',
+                      fontFamily: 'var(--font-mono)', fontSize: '9px',
+                      letterSpacing: '0.08em', textTransform: 'uppercase',
+                      color: 'var(--fg-dim-2)', cursor: 'pointer',
+                    }}
+                  >
+                    More ↓
+                  </div>
+                )}
+
+                {/* Delete confirmation overlay */}
+                {deleteConfirmSessionId && sessions.find(s => s.id === deleteConfirmSessionId && !s.is_active) && (
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    backgroundColor: 'var(--bg-elev)', zIndex: 20,
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                    padding: '16px 14px',
+                  }}>
+                    <p style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '10px',
+                      color: 'var(--fg)', marginBottom: '6px',
+                    }}>
+                      Delete this session?
+                    </p>
+                    <p style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '9px',
+                      color: 'var(--fg-dim)', marginBottom: '12px', lineHeight: 1.5,
+                    }}>
+                      Messages deleted. Film Memory unaffected.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => deleteSession(deleteConfirmSessionId)}
+                        style={{
+                          fontFamily: 'var(--font-mono)', fontSize: '9px',
+                          letterSpacing: '0.08em', textTransform: 'uppercase',
+                          backgroundColor: 'transparent', border: '1px solid var(--line)',
+                          color: 'var(--fg)', padding: '4px 10px', cursor: 'pointer', borderRadius: '2px',
+                        }}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmSessionId(null)}
+                        style={{
+                          fontFamily: 'var(--font-mono)', fontSize: '9px',
+                          letterSpacing: '0.08em', textTransform: 'uppercase',
+                          backgroundColor: 'transparent', border: 'none',
+                          color: 'var(--fg-dim)', padding: '4px 8px', cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Discovery row */}
             {(() => {
               const isActive = (film?.current_mode ?? null) === null
@@ -1363,9 +1637,24 @@ export default function FilmStudio() {
             />
           )}
 
+          {/* Past session banner */}
+          {viewingSessionId && (
+            <div
+              onClick={() => setViewingSessionId(null)}
+              style={{
+                padding: '10px 3rem', flexShrink: 0,
+                backgroundColor: 'var(--bg-elev)', borderBottom: '1px solid var(--line)',
+                fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.06em',
+                color: 'var(--fg-dim)', cursor: 'pointer',
+              }}
+            >
+              Past session · Return to current conversation →
+            </div>
+          )}
+
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
             <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-              {messages.map((msg, i) => (
+              {(viewingSessionId ? viewingMessages : messages).map((msg, i) => (
                 <div key={i}>
                   {msg.role === 'assistant' ? (
                     <p style={{ fontSize: '16px', lineHeight: 1.65, color: 'var(--fg)', fontWeight: 300 }}>
@@ -1382,7 +1671,7 @@ export default function FilmStudio() {
               ))}
 
               {/* THINKING — animated dots */}
-              {thinking && (
+              {thinking && !viewingSessionId && (
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingTop: '0.25rem' }}>
                   {[0, 1, 2].map(i => (
                     <span key={i} style={{
@@ -1396,7 +1685,7 @@ export default function FilmStudio() {
               )}
 
               {/* Import approve / discuss */}
-              {importPending && !importDiscussing && (
+              {importPending && !importDiscussing && !viewingSessionId && (
                 <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.25rem' }}>
                   <button
                     onClick={() => { setImportDiscussing(true); setContextPanelOpen(true); setContextTab('archive') }}
@@ -1411,8 +1700,8 @@ export default function FilmStudio() {
             </div>
           </div>
 
-          {/* INPUT */}
-          <div style={{ borderTop: '1px solid var(--line)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
+          {/* INPUT — hidden when viewing a past session */}
+          {!viewingSessionId && <div style={{ borderTop: '1px solid var(--line)', padding: '1.25rem 3rem 1.75rem', flexShrink: 0 }}>
   <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
     <input
       ref={inputRef}
@@ -1429,7 +1718,7 @@ export default function FilmStudio() {
       →
     </span>
   </div>
-</div>
+</div>}
         </div>
 
         {/* ── CONTEXT PANEL ── */}
