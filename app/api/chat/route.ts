@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -12,6 +13,7 @@ type PromptContext = {
   sessionType: string
   currentMode: FilmMode
   gatesClosed?: { gate: string; closed_at: string; status?: string; portrait_version?: string }[]
+  referenceBlock?: string
 }
 
 const PORTRAIT_FIELD_LABELS: Record<string, string> = {
@@ -61,6 +63,28 @@ const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
   ],
 }
 
+function buildReferenceBlock(sourceDocuments: Record<string, any>): string {
+  const parts: string[] = []
+  if (sourceDocuments.script?.extracted_text) {
+    const name = sourceDocuments.script.filename || 'Script'
+    parts.push(`=== REFERENCE DOCUMENT: SCRIPT (${name}) ===\n${sourceDocuments.script.extracted_text}`)
+  }
+  if (Array.isArray(sourceDocuments.research)) {
+    for (const doc of sourceDocuments.research) {
+      if (doc?.extracted_text) {
+        const name = doc.filename || 'Research Document'
+        parts.push(`=== REFERENCE DOCUMENT: RESEARCH (${name}) ===\n${doc.extracted_text}`)
+      }
+    }
+  }
+  return parts.join('\n\n')
+}
+
+function referenceDocumentsSection(block: string | undefined): string {
+  if (!block) return ''
+  return `\n## REFERENCE DOCUMENTS\n\nThe filmmaker has uploaded the following research material. Use it to inform your responses. Do not invent facts not present in these documents.\n\n${block}`
+}
+
 function buildPortraitBlock(portrait: Record<string, any> | null, mode: string | null = null): string {
   if (!portrait) return 'The portrait is not yet built. You are meeting the filmmaker for the first time.'
 
@@ -104,7 +128,7 @@ YOUR ROLE
 You think about the whole film. What it is trying to say. Why it exists. How long it should be. Who it is for. You do not think about shots, scripts, narration, or visual details. Those belong to other team members. If the filmmaker asks for any of those things, name the right team member and redirect: "That belongs to [Director / Narrator / Cinematographer]. When you're ready, switch to that mode and they'll take it from there."
 
 WHAT YOU KNOW ABOUT THIS FILM
-${buildPortraitBlock(ctx.filmMemory, 'producer')}
+${buildPortraitBlock(ctx.filmMemory, 'producer')}${referenceDocumentsSection(ctx.referenceBlock)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, assess what the portrait contains:
@@ -192,7 +216,7 @@ STATE 1 — The filmmaker is thinking. They want to talk through visual language
 STATE 2 — The filmmaker is asking for the Treatment. This is an explicit request. The Film Brief gate must be locked before you can produce it. If it is not locked, name exactly what is missing and offer to help close it inside this conversation. If it is locked and the filmmaker asks, produce the Treatment.
 
 WHAT YOU KNOW ABOUT THIS FILM
-${buildPortraitBlock(ctx.filmMemory, 'director')}
+${buildPortraitBlock(ctx.filmMemory, 'director')}${referenceDocumentsSection(ctx.referenceBlock)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, orient yourself:
@@ -294,7 +318,7 @@ STATE 1 — The filmmaker is thinking. They want to talk through narrative voice
 STATE 2 — The filmmaker is explicitly asking you to produce a document — the Mode Selection Brief, the Hook Draft, a segment script, the Script Lock, or Audio Direction. Gate conditions govern this. Read the gate block and respond accordingly.
 
 WHAT YOU KNOW ABOUT THIS FILM
-${buildPortraitBlock(ctx.filmMemory, 'narrator')}
+${buildPortraitBlock(ctx.filmMemory, 'narrator')}${referenceDocumentsSection(ctx.referenceBlock)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, orient yourself:
@@ -396,7 +420,7 @@ STATE 1 — The filmmaker is thinking. They want to talk through visual language
 STATE 2 — The filmmaker is explicitly asking you to produce a document — a Consistency Lock, a Shot List, or the Camera & Light Plan. Gate conditions govern this. Read the gate block and respond accordingly.
 
 WHAT YOU KNOW ABOUT THIS FILM
-${buildPortraitBlock(ctx.filmMemory, 'cinematographer')}
+${buildPortraitBlock(ctx.filmMemory, 'cinematographer')}${referenceDocumentsSection(ctx.referenceBlock)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, orient yourself:
@@ -491,7 +515,7 @@ STATE 1 — The filmmaker is thinking. They want to discuss visual prompt craft,
 STATE 2 — The filmmaker is explicitly requesting the Visual Prompt Package. Gate conditions govern this. One prompt per session. Session closes after delivery.
 
 WHAT YOU KNOW ABOUT THIS FILM
-${buildPortraitBlock(ctx.filmMemory, 'ai_specialist')}
+${buildPortraitBlock(ctx.filmMemory, 'ai_specialist')}${referenceDocumentsSection(ctx.referenceBlock)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, orient yourself:
@@ -580,7 +604,7 @@ STATE 1 — The filmmaker is thinking. Discussing edit instincts, rhythm, struct
 STATE 2 — The filmmaker is explicitly requesting a document — the Edit Plan or the Music Cue Sheet. Gate conditions govern this.
 
 WHAT YOU KNOW ABOUT THIS FILM
-${buildPortraitBlock(ctx.filmMemory, 'editor')}
+${buildPortraitBlock(ctx.filmMemory, 'editor')}${referenceDocumentsSection(ctx.referenceBlock)}
 
 HOW TO READ THE PORTRAIT
 Before you respond, orient yourself:
@@ -699,7 +723,8 @@ function buildSystemPrompt(
   filmTitle: string,
   currentMode: string | null,
   messages: { role: string; content: string }[],
-  gatesClosed: { gate: string; closed_at: string; status?: string; portrait_version?: string }[] = []
+  gatesClosed: { gate: string; closed_at: string; status?: string; portrait_version?: string }[] = [],
+  referenceBlock: string = ''
 ): string {
   if (currentMode !== null && currentMode !== 'discovery') {
     const mode = currentMode as FilmMode
@@ -709,6 +734,7 @@ function buildSystemPrompt(
       sessionType,
       currentMode: mode,
       gatesClosed,
+      referenceBlock: referenceBlock || undefined,
     }
     return MODE_PROMPTS[mode]?.(ctx) ?? buildStubPrompt(ctx)
   }
@@ -765,6 +791,7 @@ SESSION: ${sessionType}
 ${memoryBlock}
 
 ${portraitStateBlock}
+${referenceDocumentsSection(referenceBlock)}
 
 HOW YOU BEHAVE:
 - You ask one question at a time. Always. Never two.
@@ -876,9 +903,24 @@ function extractJSON(raw: string): { content: string; memory: any; portrait: any
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed } = await req.json()
+    const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed, filmId } = await req.json()
 
-    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, messages, gatesClosed ?? [])
+    let referenceBlock = ''
+    if (filmId) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: filmData } = await supabase
+        .from('films')
+        .select('source_documents')
+        .eq('id', filmId)
+        .single()
+      const sourceDocuments = filmData?.source_documents ?? {}
+      referenceBlock = buildReferenceBlock(sourceDocuments)
+    }
+
+    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, messages, gatesClosed ?? [], referenceBlock)
 
     const apiMessages = messages.length > 0
       ? messages.slice(-20)
