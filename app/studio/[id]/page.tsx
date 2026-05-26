@@ -6,7 +6,8 @@ import { useRouter, useParams } from 'next/navigation'
 import {
   FileText, Clapperboard, LayoutList, Radio, Anchor,
   ScrollText, Mic, Lock, List, LayoutTemplate,
-  Aperture, Sparkles, Scissors, Music, Pin
+  Aperture, Sparkles, Scissors, Music, Pin,
+  Sun, Wand2, Film, ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 type Message = { id: string; role: string; content: string }
@@ -218,6 +219,16 @@ const PHASE_GROUPS: Array<{ label: string; initial: string; modes: string[] }> =
   { label: 'PRE-PRODUCTION', initial: 'P', modes: ['producer'] },
   { label: 'PRODUCTION',     initial: 'P', modes: ['director', 'narrator', 'cinematographer', 'ai_specialist'] },
   { label: 'POST',           initial: 'P', modes: ['editor'] },
+]
+
+const MODE_CONFIG = [
+  { key: 'discovery',       label: 'Discovery',      Icon: Sparkles     },
+  { key: 'producer',        label: 'Producer',        Icon: Clapperboard },
+  { key: 'director',        label: 'Director',        Icon: Sun          },
+  { key: 'narrator',        label: 'Narrator',        Icon: Mic          },
+  { key: 'cinematographer', label: 'Cinematographer', Icon: Aperture     },
+  { key: 'ai_specialist',   label: 'AI Specialist',   Icon: Wand2        },
+  { key: 'editor',          label: 'Editor',          Icon: Film         },
 ]
 
 const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
@@ -689,6 +700,8 @@ export default function FilmStudio() {
       .order('created_at')
     setViewingMessages(data ?? [])
   }
+
+  const returnToCurrentSession = () => setViewingSessionId(null)
 
   const deleteSession = async (sessionId: string) => {
     await supabase.from('messages').delete().eq('session_id', sessionId)
@@ -1286,18 +1299,20 @@ export default function FilmStudio() {
 
         {/* ── LEFT RAIL ── */}
         <div style={{
-          width: railCollapsed ? '40px' : '220px',
+          width: railCollapsed ? '52px' : '220px',
           flexShrink: 0,
           height: '100%',
           backgroundColor: 'var(--bg-elev)',
           borderRight: '1px solid var(--line)',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
-          transition: `width var(--dur-slow) var(--ease-curtain)`,
+          overflow: railCollapsed ? 'visible' : 'hidden',
+          transition: 'width 0.2s ease',
         }}>
-          {/* Film title — hidden when collapsed */}
-          {!railCollapsed && (
+          {/* Film title row */}
+          {railCollapsed ? (
+            <div style={{ height: '48px', borderBottom: '1px solid var(--line)', flexShrink: 0 }} />
+          ) : (
             <div style={{ padding: '16px 14px 12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
               <span
                 contentEditable
@@ -1320,31 +1335,103 @@ export default function FilmStudio() {
             </div>
           )}
 
-          {/* Collapse toggle */}
-          <div
-            onClick={() => setRailCollapsed(prev => !prev)}
-            style={{
-              height: '32px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-              borderBottom: '1px solid var(--line)',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--fg-dim)', lineHeight: 1 }}>
-              {railCollapsed ? '›' : '‹'}
-            </span>
-          </div>
+          {/* Scrollable area */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
-          {/* Scrollable mode list */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {/* Mode list */}
+            <div>
+              {MODE_CONFIG.map(({ key, label, Icon }) => {
+                const modeValue = key === 'discovery' ? null : key
+                const isActive = (film?.current_mode ?? null) === modeValue
+                const isHov = hoveredMode === key
+                const modeDocs = modeValue !== null ? ARCHIVE_DOCUMENTS.filter(d => d.mode === modeValue) : []
+                let isGated = false
+                if (modeDocs.length > 0) {
+                  const firstDoc = modeDocs[0]
+                  const prereqId = GATE_PREREQUISITES[firstDoc.gateId]
+                  if (prereqId) {
+                    const prereqMet = film?.gates_closed?.some(g => g.gate === prereqId && !!g.closed_at) ?? false
+                    isGated = !prereqMet
+                  }
+                }
+                const iconColor = isActive ? 'var(--accent)' : 'var(--fg-dim-2)'
+                const bgColor = isActive ? 'rgba(200,169,110,0.07)' : (isHov && !isGated) ? 'var(--bg-elev-2)' : 'transparent'
+                const handleModeClick = async () => {
+                  if (isGated) return
+                  const { error } = await supabase.from('films').update({ current_mode: modeValue }).eq('id', filmId)
+                  if (!error) setFilm(prev => prev ? { ...prev, current_mode: modeValue } : null)
+                }
 
-            {/* Session list section */}
+                if (railCollapsed) {
+                  return (
+                    <div
+                      key={key}
+                      onClick={handleModeClick}
+                      onMouseEnter={() => { if (!isGated) setHoveredMode(key) }}
+                      onMouseLeave={() => setHoveredMode(null)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '8px 0', cursor: isGated ? 'default' : 'pointer',
+                        backgroundColor: bgColor, position: 'relative',
+                      }}
+                    >
+                      <Icon size={16} strokeWidth={1.5} color={iconColor} />
+                      {isActive && (
+                        <span style={{
+                          position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
+                          width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--accent)',
+                        }} />
+                      )}
+                      {isHov && (
+                        <div style={{
+                          position: 'absolute', left: '46px',
+                          backgroundColor: 'var(--bg-elev)', border: '1px solid var(--line)',
+                          color: 'var(--fg)', fontSize: '10px', letterSpacing: '0.07em',
+                          textTransform: 'uppercase', padding: '3px 8px',
+                          borderRadius: '4px', whiteSpace: 'nowrap', zIndex: 50,
+                          pointerEvents: 'none',
+                        }}>
+                          {label}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+
+                return (
+                  <div
+                    key={key}
+                    onClick={handleModeClick}
+                    onMouseEnter={() => { if (!isGated) setHoveredMode(key) }}
+                    onMouseLeave={() => setHoveredMode(null)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      padding: '7px 14px', cursor: isGated ? 'default' : 'pointer',
+                      backgroundColor: bgColor,
+                    }}
+                  >
+                    <Icon size={16} strokeWidth={1.5} color={iconColor} />
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.07em',
+                      textTransform: 'uppercase', color: isActive ? 'var(--fg)' : 'var(--fg-dim-2)',
+                      flex: 1,
+                    }}>
+                      {label}
+                    </span>
+                    {isActive && (
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--accent)', flexShrink: 0 }} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Sessions section */}
             {!railCollapsed && (
-              <div style={{ borderBottom: '1px solid var(--line)', position: 'relative' }}>
+              <div style={{ borderTop: '1px solid var(--line)', marginTop: '6px', paddingTop: '6px', position: 'relative' }}>
 
                 {/* New Conversation button */}
-                <div style={{ padding: '8px 14px 6px' }}>
+                <div style={{ padding: '0 14px 6px' }}>
                   <button
                     onClick={startNewConversation}
                     style={{
@@ -1376,12 +1463,12 @@ export default function FilmStudio() {
                   return (
                     <div
                       key={session.id}
-                      onClick={() => { if (!isActive) viewSession(session.id) }}
+                      onClick={() => { if (isActive) { if (viewingSessionId) returnToCurrentSession() } else { viewSession(session.id) } }}
                       style={{
                         padding: '7px 14px 7px 12px',
                         display: 'flex', alignItems: 'flex-start', gap: '8px',
                         backgroundColor: isViewing ? 'var(--bg-elev-2)' : 'transparent',
-                        cursor: isActive ? 'default' : 'pointer',
+                        cursor: isActive && !viewingSessionId ? 'default' : 'pointer',
                       }}
                     >
                       {/* Indicator dot */}
@@ -1504,125 +1591,22 @@ export default function FilmStudio() {
               </div>
             )}
 
-            {/* Discovery row */}
-            {(() => {
-              const isActive = (film?.current_mode ?? null) === null
-              const isHov = hoveredMode === '__discovery__'
-              const nameColor = isActive ? 'var(--accent)' : 'var(--fg)'
-              const modeBg = isActive ? 'rgba(200,169,110,0.07)' : isHov ? 'var(--bg-elev-2)' : 'transparent'
-              return (
-                <div
-                  onClick={async () => {
-                    const { error } = await supabase.from('films').update({ current_mode: null }).eq('id', filmId)
-                    if (!error) setFilm(prev => prev ? { ...prev, current_mode: null } : null)
-                  }}
-                  onMouseEnter={() => setHoveredMode('__discovery__')}
-                  onMouseLeave={() => setHoveredMode(null)}
-                  style={{ padding: '10px 14px 10px 20px', cursor: 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
-                >
-                  {!railCollapsed && (
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.06em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
-                      DISCOVERY
-                    </span>
-                  )}
-                  {railCollapsed && isActive && (
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
-                  )}
-                </div>
-              )
-            })()}
+          </div>
 
-            {/* Phase groups */}
-            {PHASE_GROUPS.map(group => {
-              const isGroupActive = group.modes.includes(film?.current_mode ?? '')
-              const groupHasAttention = group.modes.some(mv => {
-                const docs = ARCHIVE_DOCUMENTS.filter(d => d.mode === mv)
-                return docs.some(doc => {
-                  const gen = film?.documents_generated?.some(d => d.document === doc.gateId)
-                  const gate = film?.gates_closed?.find(g => g.gate === doc.gateId)
-                  const locked = !!gate && gate.status !== 'reopened' && !!gate.closed_at
-                  return gen && !locked
-                })
-              })
-
-              return (
-                <div key={group.label}>
-                  {/* Phase group header */}
-                  {!railCollapsed ? (
-                    <div style={{ padding: '8px 14px 3px 12px', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', whiteSpace: 'nowrap' }}>
-                      {group.label}
-                    </div>
-                  ) : (
-                    <div style={{ padding: '6px 0 3px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: isGroupActive ? 'var(--accent)' : 'var(--fg-dim)', lineHeight: 1 }}>
-                        {group.initial}
-                      </span>
-                      {groupHasAttention && (
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', marginTop: '3px' }} />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Mode rows */}
-                  {group.modes.map(modeValue => {
-                    const modeConfig = MODES.find(m => m.value === modeValue)
-                    if (!modeConfig) return null
-                    const isActive = film?.current_mode === modeValue
-                    const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === modeValue)
-                    const isHov = hoveredMode === modeValue
-
-                    let isGated = false
-                    if (modeDocs.length > 0) {
-                      const firstDoc = modeDocs[0]
-                      const prereqId = GATE_PREREQUISITES[firstDoc.gateId]
-                      if (prereqId) {
-                        const prereqMet = film?.gates_closed?.some(g => g.gate === prereqId && !!g.closed_at) ?? false
-                        isGated = !prereqMet
-                      }
-                    }
-
-                    const hasReviewDoc = modeDocs.some(doc => {
-                      const gen = film?.documents_generated?.some(d => d.document === doc.gateId)
-                      const gate = film?.gates_closed?.find(g => g.gate === doc.gateId)
-                      const locked = !!gate && gate.status !== 'reopened' && !!gate.closed_at
-                      return gen && !locked
-                    })
-                    const hasAnyDoc = film?.documents_generated?.some(d => modeDocs.some(doc => doc.gateId === d.document))
-                    const dotColor = hasReviewDoc ? 'var(--accent)' : hasAnyDoc ? 'var(--fg-dim)' : null
-
-                    const nameColor = isActive ? 'var(--accent)' : isGated ? 'var(--fg-dim)' : 'var(--fg)'
-                    const modeBg = isActive ? 'rgba(200,169,110,0.07)' : (!isGated && isHov) ? 'var(--bg-elev-2)' : 'transparent'
-
-                    return (
-                      <div
-                        key={modeValue}
-                        onClick={async () => {
-                          const { error } = await supabase.from('films').update({ current_mode: modeValue }).eq('id', filmId)
-                          if (!error) setFilm(prev => prev ? { ...prev, current_mode: modeValue } : null)
-                        }}
-                        onMouseEnter={() => { if (!isGated) setHoveredMode(modeValue) }}
-                        onMouseLeave={() => setHoveredMode(null)}
-                        style={{ padding: '10px 14px 10px 20px', cursor: isGated ? 'default' : 'pointer', backgroundColor: modeBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}
-                      >
-                        {!railCollapsed && (
-                          <>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.06em', textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {modeConfig.label}
-                            </span>
-                            {dotColor && (
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0, marginLeft: '6px' }} />
-                            )}
-                          </>
-                        )}
-                        {railCollapsed && isActive && (
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'block', margin: '0 auto', flexShrink: 0 }} />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
+          {/* Chevron toggle at bottom */}
+          <div
+            onClick={() => setRailCollapsed(prev => !prev)}
+            style={{
+              borderTop: '1px solid var(--line)', cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center',
+              justifyContent: railCollapsed ? 'center' : 'flex-end',
+              padding: railCollapsed ? '8px 0' : '8px 12px',
+            }}
+          >
+            {railCollapsed
+              ? <ChevronRight size={14} strokeWidth={1.5} color="var(--fg-dim-2)" />
+              : <ChevronLeft size={14} strokeWidth={1.5} color="var(--fg-dim-2)" />
+            }
           </div>
 
         </div>
@@ -1640,7 +1624,7 @@ export default function FilmStudio() {
           {/* Past session banner */}
           {viewingSessionId && (
             <div
-              onClick={() => setViewingSessionId(null)}
+              onClick={returnToCurrentSession}
               style={{
                 padding: '10px 3rem', flexShrink: 0,
                 backgroundColor: 'var(--bg-elev)', borderBottom: '1px solid var(--line)',
