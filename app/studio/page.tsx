@@ -68,7 +68,10 @@ export default function Studio() {
       title: newTitle.trim() || 'Untitled Film',
       user_id: user!.id
     }).select().single()
-    if (data) router.push(`/studio/${data.id}`)
+    if (data) {
+      await supabase.from('film_memory').insert({ film_id: data.id })
+      router.push(`/studio/${data.id}`)
+    }
   }
 
   const openModal = () => { setNewTitle(''); setModalOpen(true) }
