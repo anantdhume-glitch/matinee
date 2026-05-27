@@ -119,8 +119,20 @@ function buildPortraitBlock(portrait: Record<string, any> | null, mode: string |
   return `FILM PORTRAIT:\n${lines.join('\n')}`
 }
 
+const FORMAT_PREAMBLE = `CRITICAL: You must respond with a valid JSON object only. No prose. No markdown. No explanation. Raw JSON only, in this exact shape:
+
+{
+  "content": "your response to the filmmaker here",
+  "memory": { ... },
+  "portrait": { ... }
+}
+
+Anything that is not a valid JSON object in this shape will break the application.
+
+`
+
 function buildProducerPrompt(ctx: PromptContext): string {
-  return `You are Matinee — the filmmaker's producer.
+  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's producer.
 
 The film is: ${ctx.filmTitle}
 
@@ -201,7 +213,7 @@ The Film Brief is not yet locked. The Treatment cannot be produced until it is.
 The Film Brief holds five things: the emotional premise, the narrative approach, the target length, what this film is for, and what success looks like for this film. These are the decisions the Treatment builds from — without them, the Treatment has no foundation to stand on.
 If the filmmaker asks for the Treatment, name these five fields directly. Tell them where the gaps are and offer to work through them now, inside this conversation, before they go to the Producer. Never say you cannot produce the Treatment — say what it needs and open the path toward it.`
 
-  return `You are Matinee — the filmmaker's director.
+  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's director.
 
 The film is: ${ctx.filmTitle}
 
@@ -303,7 +315,7 @@ One segment per session. Never two. Each segment is produced only on explicit re
 Script Lock requires the filmmaker's explicit confirmation that all segments are complete and approved.
 Audio Direction requires the Script Lock to be locked.${scriptLockLocked ? '\nThe Script Lock is approved. Audio Direction may now be produced on explicit request.' : ''}`
 
-  return `You are Matinee — the filmmaker's narrator.
+  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's narrator.
 
 The film is: ${ctx.filmTitle}
 
@@ -405,7 +417,7 @@ The Camera & Light Plan translates the Shot List into precise visual production 
 The Camera & Light Plan is approved. The Cinematographer's visual production chain for this segment is complete.
 You remain available for conversation about the next segment, a new subject's Consistency Lock, or any visual question the filmmaker brings.`
 
-  return `You are Matinee — the filmmaker's cinematographer.
+  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's cinematographer.
 
 The film is: ${ctx.filmTitle}
 
@@ -500,7 +512,7 @@ The Visual Prompt Package is one shot. One session. The session closes after the
 The Visual Prompt Package for this session is delivered and approved. This session is closed.
 The AI Specialist remains available for conversation about prompt craft, generation strategy, or preparation for the next shot session.`
 
-  return `You are Matinee — the filmmaker's AI specialist.
+  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's AI specialist.
 
 The film is: ${ctx.filmTitle}
 
@@ -589,7 +601,7 @@ The Edit Plan is approved. The Editor may now produce the Music Cue Sheet. The M
     : `PRODUCTION GATE STATE:
 The Music Cue Sheet is approved. The Editor's document chain is complete. The Editor remains available for conversation about assembly, pacing, or the DaVinci Resolve handoff.`
 
-  return `You are Matinee — the filmmaker's editor.
+  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's editor.
 
 The film is: ${ctx.filmTitle}
 
@@ -672,7 +684,7 @@ content is your response to the filmmaker — what they will see.`
 }
 
 function buildStubPrompt(ctx: PromptContext): string {
-  return `You are Matinee.
+  return `${FORMAT_PREAMBLE}You are Matinee.
 
 The filmmaker has entered a mode that is still being prepared. Tell them warmly — in one or two sentences — that this mode is not yet active, and suggest they return to Discovery to continue developing the film for now.
 
@@ -772,7 +784,7 @@ The portrait fields to extract:
 
 CRITICAL — Field 11 (Director's Intent) does not exist in portrait extraction. Never attempt to extract or populate portrait_directors_intent. It is not part of your task.` : ''
 
-  return `You are Matinee, a filmmaker's creative companion. Not an assistant. Not a tool. A companion. The most attentive, most honest collaborator a filmmaker has ever had.
+  return `${FORMAT_PREAMBLE}You are Matinee, a filmmaker's creative companion. Not an assistant. Not a tool. A companion. The most attentive, most honest collaborator a filmmaker has ever had.
 
 You are not here to make films. You are here to help a filmmaker make theirs.
 
@@ -930,15 +942,14 @@ export async function POST(req: NextRequest) {
       model: 'claude-sonnet-4-6',
       max_tokens: 2500,
       system: systemPrompt,
-      messages: [...apiMessages, { role: 'assistant', content: '{' }]
+      messages: apiMessages
     })
 
     console.log('RAW RESPONSE:', JSON.stringify(response.content, null, 2))
 
-    const rawText = response.content[0].type === 'text' ? response.content[0].text : ''
-    const jsonText = '{' + rawText
+    const rawContent = response.content[0].type === 'text' ? response.content[0].text : ''
 
-    const parsed = extractJSON(jsonText)
+    const parsed = extractJSON(rawContent)
 
     if (parsed) {
       if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
@@ -947,8 +958,8 @@ export async function POST(req: NextRequest) {
 
     // Last resort — return the raw text as content so the filmmaker
     // never sees a broken screen, and log for debugging
-    console.error('Could not parse Matinee response as JSON:', rawText)
-    return NextResponse.json({ content: rawText, memory: null, portrait: {} })
+    console.error('Could not parse Matinee response as JSON:', rawContent)
+    return NextResponse.json({ content: rawContent, memory: null, portrait: {} })
 
   } catch (error) {
     console.error('Chat route error:', error)
