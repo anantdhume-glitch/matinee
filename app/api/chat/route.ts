@@ -926,23 +926,19 @@ export async function POST(req: NextRequest) {
       ? messages.slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
-    console.log('SYSTEM PROMPT LENGTH:', systemPrompt.length)
-    console.log('SYSTEM PROMPT TAIL:', systemPrompt.slice(-500))
-
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2500,
       system: systemPrompt,
-      messages: apiMessages
+      messages: [...apiMessages, { role: 'assistant', content: '{' }]
     })
 
     console.log('RAW RESPONSE:', JSON.stringify(response.content, null, 2))
 
-    const rawContent = response.content[0].type === 'text' ? response.content[0].text : ''
+    const rawText = response.content[0].type === 'text' ? response.content[0].text : ''
+    const jsonText = '{' + rawText
 
-    console.log('Raw Claude response:', rawContent)
-
-    const parsed = extractJSON(rawContent)
+    const parsed = extractJSON(jsonText)
 
     if (parsed) {
       if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
@@ -951,8 +947,8 @@ export async function POST(req: NextRequest) {
 
     // Last resort — return the raw text as content so the filmmaker
     // never sees a broken screen, and log for debugging
-    console.error('Could not parse Matinee response as JSON:', rawContent)
-    return NextResponse.json({ content: rawContent, memory: null, portrait: {} })
+    console.error('Could not parse Matinee response as JSON:', rawText)
+    return NextResponse.json({ content: rawText, memory: null, portrait: {} })
 
   } catch (error) {
     console.error('Chat route error:', error)
