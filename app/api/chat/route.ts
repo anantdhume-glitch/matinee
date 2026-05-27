@@ -926,6 +926,9 @@ export async function POST(req: NextRequest) {
       ? messages.slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
+    console.log('SYSTEM PROMPT LENGTH:', systemPrompt.length)
+    console.log('SYSTEM PROMPT TAIL:', systemPrompt.slice(-500))
+
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2500,
