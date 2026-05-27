@@ -933,6 +933,8 @@ export async function POST(req: NextRequest) {
       messages: apiMessages
     })
 
+    console.log('RAW RESPONSE:', JSON.stringify(response.content, null, 2))
+
     const rawContent = response.content[0].type === 'text' ? response.content[0].text : ''
 
     console.log('Raw Claude response:', rawContent)
