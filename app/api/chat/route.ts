@@ -63,17 +63,24 @@ const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
   ],
 }
 
-function buildReferenceBlock(sourceDocuments: Record<string, any>): string {
+// Research docs: useful for creative/development modes
+const RESEARCH_MODES = new Set(['discovery', 'producer', 'director', 'narrator'])
+// Script docs: useful for narrative/writing/edit modes
+const SCRIPT_MODES   = new Set(['narrator', 'director', 'editor'])
+
+function buildReferenceBlock(sourceDocuments: Record<string, any>, mode: string = 'discovery'): string {
   const parts: string[] = []
-  if (sourceDocuments.script?.extracted_text) {
+  if (SCRIPT_MODES.has(mode) && sourceDocuments.script?.extracted_text) {
     const name = sourceDocuments.script.filename || 'Script'
-    parts.push(`=== REFERENCE DOCUMENT: SCRIPT (${name}) ===\n${sourceDocuments.script.extracted_text}`)
+    const capped = sourceDocuments.script.extracted_text.slice(0, 6000)
+    parts.push(`=== REFERENCE DOCUMENT: SCRIPT (${name}) ===\n${capped}`)
   }
-  if (Array.isArray(sourceDocuments.research)) {
+  if (RESEARCH_MODES.has(mode) && Array.isArray(sourceDocuments.research)) {
     for (const doc of sourceDocuments.research) {
       if (doc?.extracted_text) {
         const name = doc.filename || 'Research Document'
-        parts.push(`=== REFERENCE DOCUMENT: RESEARCH (${name}) ===\n${doc.extracted_text}`)
+        const capped = doc.extracted_text.slice(0, 6000)
+        parts.push(`=== REFERENCE DOCUMENT: RESEARCH (${name}) ===\n${capped}`)
       }
     }
   }
@@ -589,10 +596,14 @@ function shouldExtract(messages: { role: string; content: string }[]): boolean {
   if (messages.length === 0) return false
   const last = messages[messages.length - 1]
   if (last.role !== 'user') return false
+
+  // Fire on every even exchange (exchanges 2, 4, 6… → messages.length 3, 7, 11…)
+  // This gives a ~50% floor rate regardless of message length.
+  if (messages.length % 4 === 3) return true
+
   const text = last.content.trim()
-  if (text.length < 80) return false
   if (CONFIRMATORY_PHRASES.has(text.toLowerCase())) return false
-  return true
+  return text.length >= 40
 }
 
 async function extractMemoryAndPortrait(
@@ -751,7 +762,7 @@ export async function POST(req: NextRequest) {
         .eq('id', filmId)
         .single()
       const sourceDocuments = filmData?.source_documents ?? {}
-      referenceBlock = buildReferenceBlock(sourceDocuments)
+      referenceBlock = buildReferenceBlock(sourceDocuments, currentMode ?? 'discovery')
     }
 
     const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
