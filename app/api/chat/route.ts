@@ -616,15 +616,29 @@ async function extractMemoryAndPortrait(
 Return only a valid JSON object in this exact shape:
 {
   "memory": {
-    "logline": "",
-    "themes": "",
     "emotional_core": "",
+    "characters": "",
+    "decisions_made": "",
     "filmmakers_words": "",
-    "key_decisions": ""
+    "unresolved_threads": ""
   },
-  "portrait": {}
+  "portrait": {
+    "portrait_logline": "",
+    "portrait_emotional_core": "",
+    "portrait_story": "",
+    "portrait_world": "",
+    "portrait_subjects": "",
+    "portrait_themes": "",
+    "portrait_approach": "",
+    "portrait_tone": "",
+    "portrait_visual_world": "",
+    "portrait_audience": "",
+    "portrait_unresolved_questions": "",
+    "portrait_comparable_films": "",
+    "portrait_target_length": ""
+  }
 }
-Return empty strings for memory fields where nothing meaningful was shared. Return empty object for portrait unless clear portrait signal exists. Raw JSON only. Nothing else.`
+Return empty string for any field where nothing meaningful was shared. Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
 
   try {
     const response = await anthropic.messages.create({
