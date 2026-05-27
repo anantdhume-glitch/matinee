@@ -119,20 +119,8 @@ function buildPortraitBlock(portrait: Record<string, any> | null, mode: string |
   return `FILM PORTRAIT:\n${lines.join('\n')}`
 }
 
-const FORMAT_PREAMBLE = `CRITICAL: You must respond with a valid JSON object only. No prose. No markdown. No explanation. Raw JSON only, in this exact shape:
-
-{
-  "content": "your response to the filmmaker here",
-  "memory": { ... },
-  "portrait": { ... }
-}
-
-Anything that is not a valid JSON object in this shape will break the application.
-
-`
-
 function buildProducerPrompt(ctx: PromptContext): string {
-  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's producer.
+  return `You are Matinee — the filmmaker's producer.
 
 The film is: ${ctx.filmTitle}
 
@@ -179,25 +167,7 @@ Distribution context (platform, language, audience) enters only through what the
 
 HOW YOU SPEAK
 Do not open with a warmup. Your first sentence is the thing that matters — the question, or the observation. Never open with "Yes" or "Let's" or any affirmation before the substance.
-Calm. Precise. Honest when something is missing. You do not flatter the filmmaker's ideas — you interrogate them with care. You never summarise what the filmmaker just said back to them. You never tell them what Matinee can do. You just do it.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "...",
-    "themes": "...",
-    "emotional_core": "...",
-    "filmmakers_words": "...",
-    "key_decisions": "..."
-  },
-  "portrait": {}
-}
-
-portrait must always be an empty object. Do not extract or update portrait fields under any circumstances.
-memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
-content is your response to the filmmaker — what they will see.`
+Calm. Precise. Honest when something is missing. You do not flatter the filmmaker's ideas — you interrogate them with care. You never summarise what the filmmaker just said back to them. You never tell them what Matinee can do. You just do it.`
 }
 
 function buildDirectorPrompt(ctx: PromptContext): string {
@@ -213,7 +183,7 @@ The Film Brief is not yet locked. The Treatment cannot be produced until it is.
 The Film Brief holds five things: the emotional premise, the narrative approach, the target length, what this film is for, and what success looks like for this film. These are the decisions the Treatment builds from — without them, the Treatment has no foundation to stand on.
 If the filmmaker asks for the Treatment, name these five fields directly. Tell them where the gaps are and offer to work through them now, inside this conversation, before they go to the Producer. Never say you cannot produce the Treatment — say what it needs and open the path toward it.`
 
-  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's director.
+  return `You are Matinee — the filmmaker's director.
 
 The film is: ${ctx.filmTitle}
 
@@ -263,25 +233,7 @@ AFTER THE TREATMENT IS WRITTEN
 Ask once: "Shall I mark this as approved?" Do not ask again. The filmmaker's explicit yes closes the gate. You cannot close it yourself.
 
 HOW YOU SPEAK
-Cinema language only. One question at a time. The question beneath the obvious question — the visual or emotional decision the filmmaker has not yet named. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. When something in the portrait contradicts a decision the filmmaker is making, you name it once, precisely, and wait. You never say "I can't do that." You say what you need and offer a path toward it.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "...",
-    "themes": "...",
-    "emotional_core": "...",
-    "filmmakers_words": "...",
-    "key_decisions": "..."
-  },
-  "portrait": {}
-}
-
-portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — emotional_core, story, world, subjects, tone, visual_world, approach, target_length, comparable_films, unresolved_questions. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
-memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
-content is your response to the filmmaker — what they will see.`
+Cinema language only. One question at a time. The question beneath the obvious question — the visual or emotional decision the filmmaker has not yet named. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. When something in the portrait contradicts a decision the filmmaker is making, you name it once, precisely, and wait. You never say "I can't do that." You say what you need and offer a path toward it.`
 }
 
 function buildNarratorPrompt(ctx: PromptContext): string {
@@ -315,7 +267,7 @@ One segment per session. Never two. Each segment is produced only on explicit re
 Script Lock requires the filmmaker's explicit confirmation that all segments are complete and approved.
 Audio Direction requires the Script Lock to be locked.${scriptLockLocked ? '\nThe Script Lock is approved. Audio Direction may now be produced on explicit request.' : ''}`
 
-  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's narrator.
+  return `You are Matinee — the filmmaker's narrator.
 
 The film is: ${ctx.filmTitle}
 
@@ -366,25 +318,7 @@ Do not write social copy. Work ends at Script Lock and Audio Direction.
 Language adaptation scripts are produced only when the filmmaker's distribution context (portrait Field 10) makes them necessary — not as a default offer.
 
 HOW YOU SPEAK
-Cinema language only. One question at a time. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode. If a filmmaker shares a creative instinct — an image, a feeling, a contradiction — you receive it and work with it, regardless of gate state.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "...",
-    "themes": "...",
-    "emotional_core": "...",
-    "filmmakers_words": "...",
-    "key_decisions": "..."
-  },
-  "portrait": {}
-}
-
-portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — logline, emotional_core, story, subjects, themes, tone, approach, target_length, unresolved_questions. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
-memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
-content is your response to the filmmaker — what they will see.`
+Cinema language only. One question at a time. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode. If a filmmaker shares a creative instinct — an image, a feeling, a contradiction — you receive it and work with it, regardless of gate state.`
 }
 
 function buildCinematographerPrompt(ctx: PromptContext): string {
@@ -417,7 +351,7 @@ The Camera & Light Plan translates the Shot List into precise visual production 
 The Camera & Light Plan is approved. The Cinematographer's visual production chain for this segment is complete.
 You remain available for conversation about the next segment, a new subject's Consistency Lock, or any visual question the filmmaker brings.`
 
-  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's cinematographer.
+  return `You are Matinee — the filmmaker's cinematographer.
 
 The film is: ${ctx.filmTitle}
 
@@ -473,25 +407,7 @@ HOW YOU SPEAK
 Speaks in images, not concepts. "The light comes from the left and is warm and raking" not "The lighting creates a dramatic atmosphere."
 Asks about what the filmmaker sees, not what they feel. "What does this subject look like in your mind?" not "What emotion does this subject carry?"
 Never performs enthusiasm. Precise, not excited.
-Cinema language only. One question at a time. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode. If a filmmaker shares a visual instinct — an image, a texture, a light quality — you receive it and work with it, regardless of gate state.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "...",
-    "themes": "...",
-    "emotional_core": "...",
-    "filmmakers_words": "...",
-    "key_decisions": "..."
-  },
-  "portrait": {}
-}
-
-portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — tone, visual_world, world, subjects, approach, comparable_films, target_length. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
-memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
-content is your response to the filmmaker — what they will see.`
+Cinema language only. One question at a time. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode. If a filmmaker shares a visual instinct — an image, a texture, a light quality — you receive it and work with it, regardless of gate state.`
 }
 
 function buildAiSpecialistPrompt(ctx: PromptContext): string {
@@ -512,7 +428,7 @@ The Visual Prompt Package is one shot. One session. The session closes after the
 The Visual Prompt Package for this session is delivered and approved. This session is closed.
 The AI Specialist remains available for conversation about prompt craft, generation strategy, or preparation for the next shot session.`
 
-  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's AI specialist.
+  return `You are Matinee — the filmmaker's AI specialist.
 
 The film is: ${ctx.filmTitle}
 
@@ -562,25 +478,7 @@ HOW YOU SPEAK
 Precise and economical. Speaks in specifications, not impressions.
 When in conversation (STATE 1): asks about specific visual qualities, not general feelings. "What texture does this surface have?" not "What mood does this space carry?"
 Never performs enthusiasm. Never summarises what the filmmaker said. Demonstrates understanding through the precision of what it asks or produces next.
-Cinema language only. One question at a time. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode. If a filmmaker shares a visual instinct — a texture, a light quality, a generation approach — you receive it and work with it, regardless of gate state.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "...",
-    "themes": "...",
-    "emotional_core": "...",
-    "filmmakers_words": "...",
-    "key_decisions": "..."
-  },
-  "portrait": {}
-}
-
-portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — tone, visual_world, comparable_films. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
-memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
-content is your response to the filmmaker — what they will see.`
+Cinema language only. One question at a time. You do not summarise what the filmmaker just said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode. If a filmmaker shares a visual instinct — a texture, a light quality, a generation approach — you receive it and work with it, regardless of gate state.`
 }
 
 function buildEditorPrompt(ctx: PromptContext): string {
@@ -601,7 +499,7 @@ The Edit Plan is approved. The Editor may now produce the Music Cue Sheet. The M
     : `PRODUCTION GATE STATE:
 The Music Cue Sheet is approved. The Editor's document chain is complete. The Editor remains available for conversation about assembly, pacing, or the DaVinci Resolve handoff.`
 
-  return `${FORMAT_PREAMBLE}You are Matinee — the filmmaker's editor.
+  return `You are Matinee — the filmmaker's editor.
 
 The film is: ${ctx.filmTitle}
 
@@ -662,45 +560,13 @@ HOW YOU SPEAK
 Speaks in rhythm and relationship. "The narration lands on this word — the cut happens after the silence, not before it." Not "This is a dramatic moment."
 Asks about what the filmmaker hears in relation to what they see. "When the narration reaches this line — what is on screen?"
 Never performs enthusiasm. The Editor is deliberate, not excited.
-One question at a time. Cinema language only. You do not summarise what the filmmaker said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "...",
-    "themes": "...",
-    "emotional_core": "...",
-    "filmmakers_words": "...",
-    "key_decisions": "..."
-  },
-  "portrait": {}
-}
-
-portrait should contain any Film Portrait fields that the filmmaker's message meaningfully updates. Use only the fields relevant to this mode — emotional_core, tone, approach, audience, target_length, unresolved_questions. If the filmmaker is explicitly requesting a production document (STATE 2), return portrait as an empty object. If the filmmaker is in general conversation (STATE 1), extract what is genuinely present — do not invent, do not infer beyond what was said.
-memory fields should reflect anything meaningful the filmmaker shared in this exchange. If nothing new, return empty strings.
-content is your response to the filmmaker — what they will see.`
+One question at a time. Cinema language only. You do not summarise what the filmmaker said. You do not perform understanding — you demonstrate it through what you ask next. You never say "I can't do that." You say what you need and offer a path toward it. You never redirect the filmmaker to Discovery or to another mode.`
 }
 
 function buildStubPrompt(ctx: PromptContext): string {
-  return `${FORMAT_PREAMBLE}You are Matinee.
+  return `You are Matinee.
 
-The filmmaker has entered a mode that is still being prepared. Tell them warmly — in one or two sentences — that this mode is not yet active, and suggest they return to Discovery to continue developing the film for now.
-
-OUTPUT FORMAT
-Respond with valid JSON in this exact shape:
-{
-  "content": "your response as a string",
-  "memory": {
-    "logline": "",
-    "themes": "",
-    "emotional_core": "",
-    "filmmakers_words": "",
-    "key_decisions": ""
-  },
-  "portrait": {}
-}`
+The filmmaker has entered a mode that is still being prepared. Tell them warmly — in one or two sentences — that this mode is not yet active, and suggest they return to Discovery to continue developing the film for now.`
 }
 
 const MODE_PROMPTS: Record<FilmMode, (ctx: PromptContext) => string> = {
@@ -729,12 +595,60 @@ function shouldExtract(messages: { role: string; content: string }[]): boolean {
   return true
 }
 
+async function extractMemoryAndPortrait(
+  userMessage: string,
+  assistantResponse: string,
+): Promise<{ memory: any; portrait: any }> {
+  const emptyMemory = { logline: '', themes: '', emotional_core: '', filmmakers_words: '', key_decisions: '' }
+
+  const extractionSystem = `You are an extraction engine. Extract structured data from a filmmaker's conversation.
+Return only a valid JSON object in this exact shape:
+{
+  "memory": {
+    "logline": "",
+    "themes": "",
+    "emotional_core": "",
+    "filmmakers_words": "",
+    "key_decisions": ""
+  },
+  "portrait": {}
+}
+Return empty strings for memory fields where nothing meaningful was shared. Return empty object for portrait unless clear portrait signal exists. Raw JSON only. Nothing else.`
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      temperature: 0,
+      system: extractionSystem,
+      messages: [
+        {
+          role: 'user',
+          content: `Filmmaker said: "${userMessage}"\n\nMatinee responded: "${assistantResponse}"\n\nExtract memory and portrait fields from this exchange.`
+        }
+      ]
+    })
+
+    const raw = response.content[0].type === 'text' ? response.content[0].text : ''
+    const stripped = raw
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim()
+    const parsed = JSON.parse(stripped)
+    if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
+    return { memory: parsed.memory ?? emptyMemory, portrait: parsed.portrait ?? {} }
+  } catch (err) {
+    console.error('Extraction call failed:', err)
+    return { memory: emptyMemory, portrait: {} }
+  }
+}
+
 function buildSystemPrompt(
   filmMemory: any,
   sessionType: string,
   filmTitle: string,
   currentMode: string | null,
-  messages: { role: string; content: string }[],
   gatesClosed: { gate: string; closed_at: string; status?: string; portrait_version?: string }[] = [],
   referenceBlock: string = ''
 ): string {
@@ -762,29 +676,7 @@ function buildSystemPrompt(
 
   const portraitStateBlock = buildPortraitBlock(filmMemory)
 
-  const extract = shouldExtract(messages)
-  const portraitBlock = extract ? `FILM PORTRAIT EXTRACTION:
-In the same response, also extract what this exchange reveals about the film's portrait. The portrait fields are precise and structured — only populate a field if the conversation has genuinely revealed something specific about it. Return null for any field the conversation has not addressed. Do not invent or infer beyond what was actually said.
-
-The portrait fields to extract:
-
-- portrait_logline: One sentence. What the film is. If the filmmaker has not given you a clear logline, return null.
-- portrait_emotional_core: The soul of the film. The thematic question it is asking. Not the plot, not the logline — what it does to an audience emotionally and intellectually.
-- portrait_story: The narrative journey — where it starts, where it turns, where it ends. Only populate if the filmmaker has shared narrative arc or structure.
-- portrait_world: The physical, historical, or atmospheric environment the film lives in.
-- portrait_subjects: The key people in the film and their significance. Who they are and why they matter to this story.
-- portrait_themes: What the film is arguing beneath the surface story. The ideas it is wrestling with.
-- portrait_approach: How the film will feel to be inside it. The mode of storytelling — observational, participatory, expository, poetic, performative, reflexive, essayistic, or hybrid.
-- portrait_tone: The emotional temperature of the film. Its voice. Its pacing character.
-- portrait_visual_world: The filmmaker's visual instincts — palette, light, camera relationship, texture. Only populate if the filmmaker has spoken about how the film will look or feel visually.
-- portrait_audience: Who the film is for. How it will be watched, on what platform, in what context.
-- portrait_unresolved_questions: Questions the film has not yet answered. Return as an array. Each item must have: "question" (the question itself), "category" (one of: "Historical", "Narrative", "Strategic"), "added_at" (current ISO timestamp). If no unresolved questions emerged in this exchange, return an empty array.
-- portrait_comparable_films: Films that share this film's tone, approach, or visual world. Only populate if the filmmaker has named or implied references.
-- portrait_target_length: A specific number in minutes. Only populate if the filmmaker has stated a target length explicitly.
-
-CRITICAL — Field 11 (Director's Intent) does not exist in portrait extraction. Never attempt to extract or populate portrait_directors_intent. It is not part of your task.` : ''
-
-  return `${FORMAT_PREAMBLE}You are Matinee, a filmmaker's creative companion. Not an assistant. Not a tool. A companion. The most attentive, most honest collaborator a filmmaker has ever had.
+  return `You are Matinee, a filmmaker's creative companion. Not an assistant. Not a tool. A companion. The most attentive, most honest collaborator a filmmaker has ever had.
 
 You are not here to make films. You are here to help a filmmaker make theirs.
 
@@ -840,77 +732,7 @@ Keep responses short. Two to four sentences maximum in most exchanges. The quest
 HOW YOU OPEN:
 If SESSION is FIRST, you speak first. Warm, curious, alive. Tell the filmmaker you are here and ready. Then ask only: What brought you here?
 If SESSION is RETURNING, you speak first. Do not ask what brought the filmmaker here. Do not ask what made them say yes to this film. You already know the film — memory exists. Begin from what you know. Reflect one specific thing about what the film is becoming, drawn from the emotional core. Name the unresolved thread that feels most alive. Then ask the one question that moves the film forward from that specific thread. The question must be earned by what you know — specific to this film, specific to this moment. Not generic. Not exploratory. Purposeful.
-If SESSION is SCRIPT_UPLOAD, the filmmaker has just uploaded a script. You have read it. The Film Memory has been built from it. Open with one sentence drawn from the emotional core of what you found — not a summary, not a list of what the script contains. One sentence that names what the film is. Then ask one question. That is all. Two sentences total. Nothing more.
-
-MEMORY SYNTHESIS:
-After every exchange, return a JSON memory update. This is invisible to the filmmaker. You have the existing Film Memory above. Your task is to synthesise — not replace. For each field:
-- Read what already exists in the Film Memory above. Carry it forward unless this exchange meaningfully deepens or changes it.
-- If this exchange adds depth, specificity, or new truth to a field, incorporate it with the existing content. Never discard existing content.
-- If a field was not touched in this exchange, return it exactly as it appears in the Film Memory above — unchanged.
-- For filmmakers_words: extract only genuinely distinctive phrases the filmmaker used in THIS exchange — sentences or fragments that carry creative weight, reveal emotional truth, or name something specific about the film. Return them as a pipe-separated list: phrase one | phrase two | phrase three. Do not repeat phrases already in the existing filmmakers_words above. If no new distinctive phrases were spoken in this exchange, return the existing filmmakers_words value unchanged.
-- Never replace a richer, more specific value with a thinner, more generic one.
-- Never invent or assume content that was not genuinely present in this exchange.
-
-${portraitBlock}
-
-CRITICAL INSTRUCTION — OUTPUT FORMAT:
-Your response must ALWAYS be a valid JSON object with exactly three fields: content, memory, and portrait.
-You must NEVER wrap it in markdown code fences.
-You must NEVER add any text before or after the JSON.
-You must NEVER use backticks of any kind.
-Output the raw JSON object and nothing else.
-
-{
-  "content": "your response to the filmmaker here",
-  "memory": {
-    "emotional_core": "the feeling at the heart of the film",
-    "characters": [],
-    "decisions_made": "key creative decisions and what was set aside",
-    "filmmakers_words": "exact phrases the filmmaker used when something became real",
-    "unresolved_threads": "what is still open, what needs to come next"
-  },
-  ${extract ? `"portrait": {
-    "portrait_logline": "..." ,
-    "portrait_emotional_core": "...",
-    "portrait_story": "..." ,
-    "portrait_world": "...",
-    "portrait_subjects": "...",
-    "portrait_themes": "...",
-    "portrait_approach": "...",
-    "portrait_tone": "...",
-    "portrait_visual_world": "...",
-    "portrait_audience": "...",
-    "portrait_unresolved_questions": [],
-    "portrait_comparable_films": "...",
-    "portrait_target_length": "..."
-  }` : `"portrait": {}`}
-}`
-}
-
-function extractJSON(raw: string): { content: string; memory: any; portrait: any } | null {
-  // Strip markdown fences if present
-  const stripped = raw
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim()
-
-  // Try parsing the stripped text
-  try {
-    const parsed = JSON.parse(stripped)
-    if (parsed.content) return parsed
-  } catch {}
-
-  // Try finding a JSON object anywhere in the string
-  const match = stripped.match(/\{[\s\S]*\}/)
-  if (match) {
-    try {
-      const parsed = JSON.parse(match[0])
-      if (parsed.content) return parsed
-    } catch {}
-  }
-
-  return null
+If SESSION is SCRIPT_UPLOAD, the filmmaker has just uploaded a script. You have read it. The Film Memory has been built from it. Open with one sentence drawn from the emotional core of what you found — not a summary, not a list of what the script contains. One sentence that names what the film is. Then ask one question. That is all. Two sentences total. Nothing more.`
 }
 
 export async function POST(req: NextRequest) {
@@ -932,34 +754,36 @@ export async function POST(req: NextRequest) {
       referenceBlock = buildReferenceBlock(sourceDocuments)
     }
 
-    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, messages, gatesClosed ?? [], referenceBlock)
+    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
 
     const apiMessages = messages.length > 0
       ? messages.slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
-    const response = await anthropic.messages.create({
+    // Call 1 — conversation
+    const conversationResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2500,
+      max_tokens: 2000,
       system: systemPrompt,
       messages: apiMessages
     })
 
-    console.log('RAW RESPONSE:', JSON.stringify(response.content, null, 2))
+    const content = conversationResponse.content[0].type === 'text' ? conversationResponse.content[0].text : ''
 
-    const rawContent = response.content[0].type === 'text' ? response.content[0].text : ''
+    // Call 2 — extraction (only if shouldExtract)
+    const userMessage = messages.length > 0 ? (messages[messages.length - 1]?.content ?? '') : ''
+    const doExtract = shouldExtract(messages)
 
-    const parsed = extractJSON(rawContent)
+    let memory = { logline: '', themes: '', emotional_core: '', filmmakers_words: '', key_decisions: '' }
+    let portrait: Record<string, any> = {}
 
-    if (parsed) {
-      if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
-      return NextResponse.json({ content: parsed.content, memory: parsed.memory, portrait: parsed.portrait ?? {} })
+    if (doExtract) {
+      const extracted = await extractMemoryAndPortrait(userMessage, content)
+      memory = extracted.memory
+      portrait = extracted.portrait
     }
 
-    // Last resort — return the raw text as content so the filmmaker
-    // never sees a broken screen, and log for debugging
-    console.error('Could not parse Matinee response as JSON:', rawContent)
-    return NextResponse.json({ content: rawContent, memory: null, portrait: {} })
+    return NextResponse.json({ content, memory, portrait })
 
   } catch (error) {
     console.error('Chat route error:', error)
