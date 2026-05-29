@@ -519,6 +519,7 @@ export default function FilmStudio() {
   } | null>(null)
   const [showScriptHistory, setShowScriptHistory] = useState(false)
   const [generating, setGenerating] = useState<GateId | null>(null)
+  const [generateError, setGenerateError] = useState<GateId | null>(null)
   const [importPending, setImportPending] = useState<{
     gateId: GateId
     filename: string
@@ -1012,29 +1013,33 @@ export default function FilmStudio() {
 
   const generateDocument = async (gateId: GateId, owningMode: string) => {
     setGenerating(gateId)
+    setGenerateError(null)
     // Reset staleness before generating
     const staleReset = { ...(film?.documents_stale ?? {}), [gateId]: false }
     await supabase.from('films').update({ documents_stale: staleReset }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, documents_stale: staleReset } : null)
     try {
       const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-      const docLabel = ARCHIVE_DOCUMENTS.find(d => d.gateId === gateId)?.label ?? gateId
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/generate-document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filmId,
-          messages: [{ role: 'user', content: `Produce the ${docLabel}.` }],
-          filmMemory: memoryData,
-          sessionType: 'RETURNING',
+          gateId,
           filmTitle: film?.title,
-          currentMode: owningMode,
+          filmMemory: memoryData,
+          portrait: memoryData,
           gatesClosed: film?.gates_closed ?? [],
+          closedDocumentContent: film?.documents_content ?? {},
         })
       })
 
       const data = await response.json()
+
+      if (!data.success) {
+        setGenerateError(gateId)
+        return
+      }
 
       const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: data.content }
       const newGenerated = { document: gateId, generated_at: new Date().toISOString() }
@@ -1113,25 +1118,23 @@ export default function FilmStudio() {
     }
 
     const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-    const docLabel = ARCHIVE_DOCUMENTS.find(d => d.gateId === gateId)?.label ?? gateId
-    const owningMode = gateId === 'film_brief' ? 'producer' : gateId === 'treatment' ? 'director' : gateId === 'department_briefs' ? 'director' : 'producer'
     let documentContent = summary
     try {
-      const genResponse = await fetch('/api/chat', {
+      const genResponse = await fetch('/api/generate-document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filmId,
-          messages: [{ role: 'user', content: `Produce the ${docLabel}.` }],
-          filmMemory: freshMemory,
-          sessionType: 'RETURNING',
+          gateId,
           filmTitle: film?.title,
-          currentMode: owningMode,
+          filmMemory: freshMemory,
+          portrait: freshMemory,
           gatesClosed: film?.gates_closed ?? [],
+          closedDocumentContent: film?.documents_content ?? {},
+          importedContent: summary,
         })
       })
       const genData = await genResponse.json()
-      documentContent = genData.content ?? summary
+      if (genData.success) documentContent = genData.content
     } catch {}
 
     const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: documentContent }
@@ -2247,7 +2250,7 @@ export default function FilmStudio() {
                     {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : 'Open'}
                   </span>
                   <button
-                    onClick={() => setOpenDocument(null)}
+                    onClick={() => { setOpenDocument(null); setGenerateError(null) }}
                     style={{ background: 'none', border: 'none', color: 'var(--fg-dim)', fontSize: '1rem', cursor: 'pointer', padding: 0 }}
                   >
                     ✕
@@ -2312,6 +2315,11 @@ export default function FilmStudio() {
                       Discard
                     </button>
                   </div>
+                )}
+                {generateError === openDocument && (
+                  <p style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--gate-review)', fontStyle: 'italic' }}>
+                    The document could not be produced. The portrait may not have enough to build from. Try again after adding more to the conversation.
+                  </p>
                 )}
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   {gateState === 'OPEN' && (
