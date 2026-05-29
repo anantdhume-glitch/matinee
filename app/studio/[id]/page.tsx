@@ -869,7 +869,7 @@ export default function FilmStudio() {
 
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: effectiveMode, gatesClosed: film?.gates_closed ?? [], inReviewDocument })
+      body: JSON.stringify({ filmId, messages: updated.filter(m => (m as any).type !== 'mode_divider').map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: effectiveMode, gatesClosed: film?.gates_closed ?? [], inReviewDocument })
     })
     const data = await response.json()
 
