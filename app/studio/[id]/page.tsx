@@ -1637,22 +1637,35 @@ export default function FilmStudio() {
           )}
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
-            <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-              {(viewingSessionId ? viewingMessages : messages).map((msg, i) => (
-                <div key={i}>
-                  {msg.role === 'assistant' ? (
-                    <p style={{ fontSize: '16px', lineHeight: 1.65, color: 'var(--fg)', fontWeight: 300 }}>
-                      {msg.content}
-                    </p>
-                  ) : (
-                    <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--line)' }}>
-                      <p style={{ fontSize: '16px', lineHeight: 1.65, color: '#5a5a5a' }}>
-                        {msg.content}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0' }}>
+              {(viewingSessionId ? viewingMessages : messages).map((msg, i, arr) => {
+                const isUser = msg.role === 'user'
+                // Show separator before a Matinee message that follows a user message
+                const showSeparator = !isUser && i > 0 && arr[i - 1].role === 'user'
+                return (
+                  <div key={i}>
+                    {showSeparator && (
+                      <hr style={{
+                        border: 'none', borderTop: '1px solid var(--line)',
+                        margin: '24px 0', width: '100%'
+                      }} />
+                    )}
+                    {isUser ? (
+                      <div style={{ marginLeft: '25%', marginBottom: '1.5rem', marginTop: i === 0 ? 0 : '1.5rem' }}>
+                        <p style={{ fontSize: '0.9rem', lineHeight: 1.65, color: 'var(--fg-dim)', fontWeight: 400, margin: 0 }}>
+                          {msg.content}
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <p style={{ fontSize: '16px', lineHeight: 1.65, color: 'var(--fg)', fontWeight: 300, margin: 0 }}>
+                          {msg.content}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
 
               {/* THINKING — animated dots */}
               {thinking && !viewingSessionId && (
