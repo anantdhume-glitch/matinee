@@ -628,11 +628,6 @@ export default function FilmStudio() {
     setContextTab(getDefaultTab(film?.current_mode ?? null))
   }, [film?.current_mode])
 
-  // railCollapsed syncs with panelDocked
-  useEffect(() => {
-    if (panelDocked) setRailCollapsed(true)
-    else setRailCollapsed(false)
-  }, [panelDocked])
 
   // Track viewport width for pin affordance check
   useEffect(() => {
