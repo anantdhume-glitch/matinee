@@ -648,6 +648,25 @@ export default function FilmStudio() {
     setPortraitRefreshedAt(memoryData?.updated_at ?? new Date().toISOString())
   }
 
+  const switchMode = async (modeValue: string | null, fromConversation: boolean = false) => {
+    const { error } = await supabase.from('films').update({ current_mode: modeValue }).eq('id', filmId)
+    if (!error) {
+      setFilm(prev => prev ? { ...prev, current_mode: modeValue } : null)
+      if (fromConversation) {
+        const displayName = (
+          MODE_CONFIG.find(m => m.key === (modeValue ?? 'discovery'))?.label ?? 'Discovery'
+        ).toUpperCase()
+        const divider = {
+          id: crypto.randomUUID(),
+          type: 'mode_divider' as const,
+          mode: displayName,
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, divider as any])
+      }
+    }
+  }
+
   const openingMessage = async (title: string, sessionType: 'FIRST' | 'RETURNING' = 'FIRST', sessionId?: string) => {
     if (hasGreeted.current) return
     hasGreeted.current = true
@@ -794,6 +813,38 @@ export default function FilmStudio() {
     setMessages(updated)
 
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+
+    // Conversational mode detection
+    const MODE_NAME_MAP: Array<{ names: string[]; key: string | null }> = [
+      { names: ['discovery'], key: null },
+      { names: ['producer'], key: 'producer' },
+      { names: ['director'], key: 'director' },
+      { names: ['narrator'], key: 'narrator' },
+      { names: ['cinematographer'], key: 'cinematographer' },
+      { names: ['ai specialist', 'ai_specialist'], key: 'ai_specialist' },
+      { names: ['editor'], key: 'editor' },
+    ]
+    const SWITCH_PREFIXES = ['switch to', 'go to', 'take me to', "let's talk to", 'as the']
+    const lowerText = t.toLowerCase()
+    let switchedModeValue: string | null | undefined = undefined
+    outer: for (const { names, key } of MODE_NAME_MAP) {
+      for (const name of names) {
+        if (name === 'discovery' && /back to discovery/.test(lowerText)) {
+          switchedModeValue = null; break outer
+        }
+        for (const prefix of SWITCH_PREFIXES) {
+          if (lowerText.includes(`${prefix} ${name}`)) {
+            switchedModeValue = key; break outer
+          }
+        }
+        if (lowerText.includes(`${name} mode`)) {
+          switchedModeValue = key; break outer
+        }
+      }
+    }
+    if (switchedModeValue !== undefined) {
+      await switchMode(switchedModeValue, true)
+    }
 
     // Find any IN REVIEW document for the current mode to enable staleness detection
     const currentModeForStale = film?.current_mode ?? null
@@ -1392,8 +1443,7 @@ export default function FilmStudio() {
                 const bgColor = isActive ? 'rgba(200,169,110,0.07)' : (isHov && !isGated) ? 'var(--bg-elev-2)' : 'transparent'
                 const handleModeClick = async () => {
                   if (isGated) return
-                  const { error } = await supabase.from('films').update({ current_mode: modeValue }).eq('id', filmId)
-                  if (!error) setFilm(prev => prev ? { ...prev, current_mode: modeValue } : null)
+                  await switchMode(modeValue)
                 }
 
                 if (railCollapsed) {
@@ -1673,9 +1723,27 @@ export default function FilmStudio() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3rem 2rem' }}>
             <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0' }}>
               {(viewingSessionId ? viewingMessages : messages).map((msg, i, arr) => {
+                if ((msg as any).type === 'mode_divider') {
+                  return (
+                    <div key={msg.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      margin: '2rem 0', color: 'var(--fg-dim-2)',
+                    }}>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--fg-dim-2)', opacity: 0.25 }} />
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: '8px',
+                        letterSpacing: '0.22em', textTransform: 'uppercase',
+                        color: 'var(--fg-dim-2)', whiteSpace: 'nowrap',
+                      }}>
+                        {(msg as any).mode}
+                      </span>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--fg-dim-2)', opacity: 0.25 }} />
+                    </div>
+                  )
+                }
                 const isUser = msg.role === 'user'
                 // Show separator before a Matinee message that follows a user message
-                const showSeparator = !isUser && i > 0 && arr[i - 1].role === 'user'
+                const showSeparator = !isUser && i > 0 && (arr[i - 1] as any).type !== 'mode_divider' && arr[i - 1].role === 'user'
                 return (
                   <div key={i}>
                     {showSeparator && (
