@@ -846,8 +846,12 @@ export default function FilmStudio() {
       await switchMode(switchedModeValue, true)
     }
 
+    // Use the just-switched mode value if available — setFilm is async and the
+    // film closure won't reflect the update until the next render.
+    const effectiveMode = switchedModeValue !== undefined ? switchedModeValue : (film?.current_mode ?? null)
+
     // Find any IN REVIEW document for the current mode to enable staleness detection
-    const currentModeForStale = film?.current_mode ?? null
+    const currentModeForStale = effectiveMode
     const inReviewDocument = (() => {
       if (!currentModeForStale) return null
       const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === currentModeForStale)
@@ -865,7 +869,7 @@ export default function FilmStudio() {
 
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null, gatesClosed: film?.gates_closed ?? [], inReviewDocument })
+      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: effectiveMode, gatesClosed: film?.gates_closed ?? [], inReviewDocument })
     })
     const data = await response.json()
 
