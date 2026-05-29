@@ -2340,7 +2340,7 @@ export default function FilmStudio() {
                       <button
                         onClick={() => generateDocument(openDocument, doc.mode)}
                         disabled={generating === openDocument || !canGenerate}
-                        style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--fg-dim)' : 'var(--fg-dim)', background: 'transparent', border: `1px solid var(--line)`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                        style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--fg)' : 'var(--fg-dim-2)', background: 'transparent', border: `1px solid var(--line)`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                       >
                         {generating === openDocument ? 'Generating...' : 'Regenerate'}
                       </button>
