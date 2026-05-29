@@ -1651,7 +1651,7 @@ export default function FilmStudio() {
                       }} />
                     )}
                     {isUser ? (
-                      <div style={{ marginLeft: '25%', marginBottom: '1.5rem', marginTop: i === 0 ? 0 : '1.5rem' }}>
+                      <div style={{ marginLeft: '10%', paddingLeft: '1rem', borderLeft: '1px solid var(--line)', marginBottom: '1.5rem', marginTop: i === 0 ? 0 : '1.5rem' }}>
                         <p style={{ fontSize: '0.9rem', lineHeight: 1.65, color: 'var(--fg-dim)', fontWeight: 400, margin: 0 }}>
                           {msg.content}
                         </p>
