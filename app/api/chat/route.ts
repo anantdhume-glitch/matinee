@@ -760,9 +760,29 @@ If SESSION is RETURNING, you are returning to a film you know. A new session is 
 If SESSION is SCRIPT_UPLOAD, the filmmaker has just uploaded a script. You have read it. The Film Memory has been built from it. Open with one sentence drawn from the emotional core of what you found — not a summary, not a list of what the script contains. One sentence that names what the film is. Then ask one question. That is all. Two sentences total. Nothing more.`
 }
 
+const STALENESS_TRIGGERS = ['Regenerate when you\'re ready', 'Regenerate before']
+
+function buildStalenessSuffix(documentType: string, documentContent: string): string {
+  return `
+
+CURRENT ${documentType.toUpperCase()} — IN REVIEW:
+${documentContent.slice(0, 2000)}
+
+GATE DOCUMENT STALENESS RULE:
+A gate document for this mode is currently IN REVIEW (shown above). After every filmmaker message, check whether what they have said meaningfully changes anything stated in the current document above.
+"Meaningfully changes" means: what they said would require rewriting at least one sentence in the document. A clarification that confirms something already written is not a meaningful change.
+If a meaningful change is detected:
+- End your response with a single staleness nudge — always the last line, never the first
+- Name the specific points that have changed: "The brief no longer reflects your thinking on [point] and [point]. Regenerate when you're ready."
+- If multiple points changed, consolidate into one sentence — never multiple nudge lines
+- Do not repeat the nudge if the filmmaker ignores it — wait for the next meaningful change
+- Do not nudge if the filmmaker has just regenerated
+If no meaningful change: respond normally. Do not mention the document.`
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed, filmId } = await req.json()
+    const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed, filmId, inReviewDocument } = await req.json()
 
     let referenceBlock = ''
     if (filmId) {
@@ -779,7 +799,12 @@ export async function POST(req: NextRequest) {
       referenceBlock = buildReferenceBlock(sourceDocuments, currentMode ?? 'discovery')
     }
 
-    const systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
+    let systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
+
+    // Inject IN REVIEW document content + staleness instructions when one exists
+    if (inReviewDocument?.type && inReviewDocument?.content && messages.length > 0) {
+      systemPrompt += buildStalenessSuffix(inReviewDocument.type, inReviewDocument.content)
+    }
 
     const apiMessages = messages.length > 0
       ? messages.slice(-20)
@@ -795,6 +820,10 @@ export async function POST(req: NextRequest) {
 
     const content = conversationResponse.content[0].type === 'text' ? conversationResponse.content[0].text : ''
 
+    // Detect staleness nudge in response
+    const stalenessDetected = inReviewDocument?.type && STALENESS_TRIGGERS.some(t => content.includes(t))
+    const stale_document_id = stalenessDetected ? inReviewDocument.type : null
+
     // Call 2 — extraction (only if shouldExtract)
     const userMessage = messages.length > 0 ? (messages[messages.length - 1]?.content ?? '') : ''
     const doExtract = shouldExtract(messages)
@@ -808,7 +837,7 @@ export async function POST(req: NextRequest) {
       portrait = extracted.portrait
     }
 
-    return NextResponse.json({ content, memory, portrait })
+    return NextResponse.json({ content, memory, portrait, stale_document_id })
 
   } catch (error) {
     console.error('Chat route error:', error)

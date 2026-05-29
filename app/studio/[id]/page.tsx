@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import {
@@ -483,6 +484,7 @@ export default function FilmStudio() {
     gates_closed: GateClosed[]
     documents_generated: DocumentGenerated[]
     documents_content: Partial<Record<GateId, string>>
+    documents_stale?: Partial<Record<GateId, boolean>>
     source_documents?: {
       script?: {
         current?: { filename: string; extracted_text: string; uploaded_at: string }
@@ -791,14 +793,39 @@ export default function FilmStudio() {
     setMessages(updated)
 
     const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+
+    // Find any IN REVIEW document for the current mode to enable staleness detection
+    const currentModeForStale = film?.current_mode ?? null
+    const inReviewDocument = (() => {
+      if (!currentModeForStale) return null
+      const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === currentModeForStale)
+      for (const doc of modeDocs) {
+        const isGenerated = film?.documents_generated?.some(d => d.document === doc.gateId)
+        const gateEntry = film?.gates_closed?.find(g => g.gate === doc.gateId)
+        const isApproved = !!gateEntry && gateEntry.status !== 'reopened'
+        if (isGenerated && !isApproved) {
+          const content = film?.documents_content?.[doc.gateId]
+          if (content) return { type: doc.gateId, content }
+        }
+      }
+      return null
+    })()
+
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null, gatesClosed: film?.gates_closed ?? [] })
+      body: JSON.stringify({ filmId, messages: updated.map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: film?.current_mode ?? null, gatesClosed: film?.gates_closed ?? [], inReviewDocument })
     })
     const data = await response.json()
 
     await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId, session_id: activeSessionId })
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content }])
+
+    // Write is_stale flag when staleness nudge was fired
+    if (data.stale_document_id) {
+      const updatedStale = { ...(film?.documents_stale ?? {}), [data.stale_document_id]: true }
+      await supabase.from('films').update({ documents_stale: updatedStale }).eq('id', filmId)
+      setFilm(prev => prev ? { ...prev, documents_stale: updatedStale } : null)
+    }
 
     if (data.memory) {
       if (memoryData) {
@@ -985,6 +1012,10 @@ export default function FilmStudio() {
 
   const generateDocument = async (gateId: GateId, owningMode: string) => {
     setGenerating(gateId)
+    // Reset staleness before generating
+    const staleReset = { ...(film?.documents_stale ?? {}), [gateId]: false }
+    await supabase.from('films').update({ documents_stale: staleReset }).eq('id', filmId)
+    setFilm(prev => prev ? { ...prev, documents_stale: staleReset } : null)
     try {
       const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
       const docLabel = ARCHIVE_DOCUMENTS.find(d => d.gateId === gateId)?.label ?? gateId
@@ -2224,11 +2255,26 @@ export default function FilmStudio() {
                 </div>
               </div>
 
+              {/* Staleness banner — shown when IN REVIEW and is_stale */}
+              {gateState === 'IN REVIEW' && film?.documents_stale?.[openDocument] && (
+                <div style={{
+                  borderLeft: '2px solid var(--gate-review)',
+                  backgroundColor: 'rgba(200, 149, 110, 0.15)',
+                  color: 'var(--gate-review)',
+                  fontSize: '0.85rem',
+                  padding: '0.75rem 1rem',
+                  margin: '0 3rem',
+                  flexShrink: 0,
+                }}>
+                  This document is out of date. The conversation has moved. Regenerate before approving.
+                </div>
+              )}
+
               {/* Content — scrollable */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 3rem' }}>
                 {isGenerated ? (
-                  <div style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-                    {film?.documents_content?.[openDocument] ?? ''}
+                  <div className="doc-prose" style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                    <ReactMarkdown>{film?.documents_content?.[openDocument] ?? ''}</ReactMarkdown>
                   </div>
                 ) : (
                   <p style={{ fontSize: '0.84rem', lineHeight: 1.85, color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
@@ -2289,13 +2335,24 @@ export default function FilmStudio() {
                       </label>
                     </>
                   )}
-                  {gateState === 'IN REVIEW' && !hasPendingImport && (
-                    <button
-                      onClick={() => approveGate(openDocument)}
-                      style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
-                    >
-                      Approve
-                    </button>
+                  {gateState === 'IN REVIEW' && (
+                    <>
+                      <button
+                        onClick={() => generateDocument(openDocument, doc.mode)}
+                        disabled={generating === openDocument || !canGenerate}
+                        style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--fg)' : 'var(--fg-dim-2)', background: 'transparent', border: `1px solid var(--line)`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                      >
+                        {generating === openDocument ? 'Generating...' : 'Regenerate'}
+                      </button>
+                      {!hasPendingImport && (
+                        <button
+                          onClick={() => approveGate(openDocument)}
+                          style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                        >
+                          Approve
+                        </button>
+                      )}
+                    </>
                   )}
                   {gateState === 'LOCKED' && (
                     <button

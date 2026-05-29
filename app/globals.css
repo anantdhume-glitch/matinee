@@ -96,3 +96,12 @@ input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--fg);
   caret-color: var(--fg);
 }
+
+/* ── Document markdown prose ── */
+.doc-prose p { margin-bottom: 1rem; }
+.doc-prose h1, .doc-prose h2, .doc-prose h3 { margin-bottom: 0.6rem; margin-top: 1.4rem; font-weight: 500; letter-spacing: 0.03em; }
+.doc-prose ul, .doc-prose ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+.doc-prose li { margin-bottom: 0.35rem; }
+.doc-prose strong { font-weight: 600; color: var(--fg); }
+.doc-prose em { font-style: italic; }
+.doc-prose hr { border: none; border-top: 1px solid var(--line); margin: 1.25rem 0; }
