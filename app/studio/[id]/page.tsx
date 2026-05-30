@@ -1439,9 +1439,8 @@ export default function FilmStudio() {
                   }
                 }
                 const iconColor = isActive ? 'var(--accent)' : 'var(--fg-dim-2)'
-                const bgColor = isActive ? 'rgba(200,169,110,0.07)' : (isHov && !isGated) ? 'var(--bg-elev-2)' : 'transparent'
+                const bgColor = isActive ? 'rgba(200,169,110,0.07)' : isHov ? 'var(--bg-elev-2)' : 'transparent'
                 const handleModeClick = async () => {
-                  if (isGated) return
                   await switchMode(modeValue)
                 }
 
@@ -1450,11 +1449,11 @@ export default function FilmStudio() {
                     <div
                       key={key}
                       onClick={handleModeClick}
-                      onMouseEnter={() => { if (!isGated) setHoveredMode(key) }}
+                      onMouseEnter={() => setHoveredMode(key)}
                       onMouseLeave={() => setHoveredMode(null)}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: '8px 0', cursor: isGated ? 'default' : 'pointer',
+                        padding: '8px 0', cursor: 'pointer',
                         backgroundColor: bgColor, position: 'relative',
                       }}
                     >
@@ -1485,11 +1484,11 @@ export default function FilmStudio() {
                   <div
                     key={key}
                     onClick={handleModeClick}
-                    onMouseEnter={() => { if (!isGated) setHoveredMode(key) }}
+                    onMouseEnter={() => setHoveredMode(key)}
                     onMouseLeave={() => setHoveredMode(null)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '9px',
-                      padding: '7px 14px', cursor: isGated ? 'default' : 'pointer',
+                      padding: '7px 14px', cursor: 'pointer',
                       backgroundColor: bgColor,
                     }}
                   >
