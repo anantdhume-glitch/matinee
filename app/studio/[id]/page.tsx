@@ -749,6 +749,9 @@ export default function FilmStudio() {
         return
       }
 
+      const { data: freshFilm } = await supabase.from('films').select('*').eq('id', filmId).single()
+      if (freshFilm) setFilm(freshFilm)
+
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
       const openingResponse = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
