@@ -22,6 +22,9 @@ type GateClosed = {
   cleared_by?: 'matinee_work' | 'import'
   imported_document?: string
   confirmed_by_filmmaker_at?: string
+  // Story 3 — snapshot of the document text at the moment of approval.
+  // Never overwritten. Survives reopens and regenerations.
+  approved_content?: string
 }
 type DocumentGenerated = {
   document: GateId
@@ -1000,10 +1003,14 @@ export default function FilmStudio() {
   }
 
   const approveGate = async (gateId: GateId, clearedBy?: 'matinee_work' | 'import') => {
+    // Story 3 — snapshot the document text at the moment of approval.
+    // This survives any future regeneration and can be recovered if the gate is reopened.
+    const approvedContent = film?.documents_content?.[gateId]
     const newGate: GateClosed = {
       gate: gateId,
       closed_at: new Date().toISOString(),
       ...(clearedBy ? { cleared_by: clearedBy } : {}),
+      ...(approvedContent ? { approved_content: approvedContent } : {}),
     }
     const existing = film?.gates_closed ?? []
     const updated = existing.some(g => g.gate === gateId)
@@ -1074,16 +1081,27 @@ export default function FilmStudio() {
     try {
       const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
 
+      // Story 1 — pass current document content so regeneration refines rather than replaces.
+      const existingDocumentContent = film?.documents_content?.[gateId] ?? undefined
+
+      // Story 2 — a gate with status 'reopened' was explicitly reopened by the filmmaker;
+      // pass forceRegenerate so the server-side lock check permits the write.
+      const gateEntry = film?.gates_closed?.find(g => g.gate === gateId)
+      const forceRegenerate = gateEntry?.status === 'reopened'
+
       const response = await fetch('/api/generate-document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gateId,
+          filmId,
           filmTitle: film?.title,
           filmMemory: memoryData,
           portrait: memoryData,
           gatesClosed: film?.gates_closed ?? [],
           closedDocumentContent: film?.documents_content ?? {},
+          existingDocumentContent,
+          forceRegenerate,
         })
       })
 

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { buildPortraitBlock, referenceDocumentsSection } from '@/lib/portrait'
 
@@ -16,7 +17,7 @@ type GateId =
   | 'edit_plan'
   | 'music_cue_sheet'
 
-function buildGenerationPrompt(
+function buildBasePrompt(
   gateId: GateId,
   filmTitle: string,
   portrait: Record<string, any> | null,
@@ -263,10 +264,33 @@ Produce the document directly from the source material above. Nothing before it.
   }
 }
 
+// Story 1 — Self-reference in regeneration.
+// Wraps buildBasePrompt and appends the existing-version block when
+// existingDocumentContent is present so regeneration refines rather than replaces.
+function buildGenerationPrompt(
+  gateId: GateId,
+  filmTitle: string,
+  portrait: Record<string, any> | null,
+  closedDocumentContent: Record<string, string>,
+  referenceBlock: string,
+  importedContent?: string,
+  existingDocumentContent?: string
+): string {
+  const base = buildBasePrompt(gateId, filmTitle, portrait, closedDocumentContent, referenceBlock, importedContent)
+  if (!existingDocumentContent) return base
+  return `${base}
+
+EXISTING VERSION — previously generated and reviewed by the filmmaker:
+${existingDocumentContent}
+
+Honour everything already written. Fill any gaps. Revise only what the filmmaker has explicitly asked to change. Do not rewrite from scratch.`
+}
+
 export async function POST(req: NextRequest) {
   try {
     const {
       gateId,
+      filmId,
       filmTitle,
       filmMemory,
       portrait,
@@ -274,7 +298,34 @@ export async function POST(req: NextRequest) {
       referenceBlock,
       importedContent,
       closedDocumentContent,
+      existingDocumentContent,
+      forceRegenerate,
     } = await req.json()
+
+    // Story 2 — Gate lock enforcement.
+    // A gate with closed_at and no 'reopened' status is LOCKED.
+    // Refuse generation unless the caller has explicitly passed forceRegenerate.
+    if (filmId) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: filmRow } = await supabase
+        .from('films')
+        .select('gates_closed')
+        .eq('id', filmId)
+        .single()
+      if (filmRow?.gates_closed) {
+        const gateEntry = (filmRow.gates_closed as any[]).find((g: any) => g.gate === gateId)
+        const isLocked = gateEntry && gateEntry.closed_at && gateEntry.status !== 'reopened'
+        if (isLocked && !forceRegenerate) {
+          return NextResponse.json(
+            { content: '', success: false, error: 'gate_locked' },
+            { status: 403 }
+          )
+        }
+      }
+    }
 
     const source = portrait ?? filmMemory
     const prompt = buildGenerationPrompt(
@@ -283,7 +334,8 @@ export async function POST(req: NextRequest) {
       source,
       closedDocumentContent ?? {},
       referenceBlock ?? '',
-      importedContent
+      importedContent,
+      existingDocumentContent
     )
 
     const response = await anthropic.messages.create({
