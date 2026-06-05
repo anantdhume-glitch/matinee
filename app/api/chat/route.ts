@@ -582,6 +582,10 @@ ${portraitContext ? `CURRENT PORTRAIT STATE — values already confirmed in the 
 FIELD RULES:
 portrait_target_length — Captures the filmmaker's explicitly stated runtime. Recognise: episode count with duration ("X episodes, Y minutes each"), series format ("X-part series"), per-episode runtime ("Y minutes per episode"), or any explicit total or per-episode duration statement. When the filmmaker states any of these, write the value here. Do not route duration statements to decisions_made.
 
+portrait_tone — Captures the emotional texture and register of the film, not surface adjectives. Look for: how the filmmaker describes the feeling they want the audience to carry, the emotional atmosphere of specific scenes or sequences, the temperature of the film's moral world, the quality of tension or release the filmmaker is reaching for. Write in full descriptive sentences, not adjective lists. A flat adjective list is not sufficient — capture the specific emotional texture this filmmaker is describing for this film.
+
+portrait_world — Captures the specific physical, political, and emotional world the film inhabits. Never use qualifiers like "likely" or "possibly" — only write what the filmmaker has explicitly described. Include: the geographic and historical setting, the political conditions, the physical environments central to the story, the texture of daily life under those conditions. If the filmmaker has named specific places, periods, or conditions, use them precisely. Do not generalise or infer beyond what has been stated.
+
 decisions_made — Key creative and production decisions confirmed in this exchange. Do not include target length, episode count, or runtime statements here — these belong in portrait_target_length.
 
 Return empty string in "value" for any field where nothing meaningful was shared. Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
