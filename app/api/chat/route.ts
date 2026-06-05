@@ -516,14 +516,44 @@ function shouldExtract(messages: { role: string; content: string }[]): boolean {
   return text.length >= 40
 }
 
+const EXTRACTION_PORTRAIT_LABELS: Record<string, string> = {
+  portrait_logline:          'Logline',
+  portrait_emotional_core:   'Emotional Core',
+  portrait_story:            'Story',
+  portrait_world:            'World',
+  portrait_subjects:         'Subjects',
+  portrait_themes:           'Themes',
+  portrait_approach:         'Approach',
+  portrait_tone:             'Tone',
+  portrait_visual_world:     'Visual World',
+  portrait_audience:         'Audience',
+  portrait_comparable_films: 'Comparable Films',
+  portrait_target_length:    'Target Length',
+}
+
+function buildCurrentPortraitContext(portrait: Record<string, any> | null | undefined): string {
+  if (!portrait) return ''
+  const lines: string[] = []
+  for (const [key, label] of Object.entries(EXTRACTION_PORTRAIT_LABELS)) {
+    const value = portrait[key]?.value
+    if (value && typeof value === 'string' && value.trim()) {
+      lines.push(`- ${label}: ${value}`)
+    }
+  }
+  if (lines.length === 0) return ''
+  return lines.join('\n')
+}
+
 async function extractMemoryAndPortrait(
   userMessage: string,
   assistantResponse: string,
-): Promise<{ memory: any; portrait: any }> {
+  currentPortrait?: Record<string, any> | null,
+): Promise<{ memory: any; portrait: any; corrections: string[] }> {
   const emptyMemory = { logline: '', themes: '', emotional_core: '', filmmakers_words: '', key_decisions: '' }
 
+  const portraitContext = buildCurrentPortraitContext(currentPortrait)
   const extractionSystem = `You are an extraction engine. Extract structured data from a filmmaker's conversation.
-Return only a valid JSON object in this exact shape:
+${portraitContext ? `CURRENT PORTRAIT STATE — values already confirmed in the film's portrait:\n${portraitContext}\n\nCORRECTION DETECTION:\nIf the filmmaker's statement in this conversation directly contradicts a value in the current portrait state above — meaning they are explicitly overriding a confirmed value, not adding nuance or refinement — set "is_correction": true on that portrait field's output. A correction is an explicit override ("actually it's three episodes", "no, the tone is cold not warm"). Refinements and additions are not corrections.\n\n` : ''}Return only a valid JSON object in this exact shape:
 {
   "memory": {
     "emotional_core": "",
@@ -533,22 +563,28 @@ Return only a valid JSON object in this exact shape:
     "unresolved_threads": ""
   },
   "portrait": {
-    "portrait_logline": "",
-    "portrait_emotional_core": "",
-    "portrait_story": "",
-    "portrait_world": "",
-    "portrait_subjects": "",
-    "portrait_themes": "",
-    "portrait_approach": "",
-    "portrait_tone": "",
-    "portrait_visual_world": "",
-    "portrait_audience": "",
-    "portrait_unresolved_questions": "",
-    "portrait_comparable_films": "",
-    "portrait_target_length": ""
+    "portrait_logline": { "value": "", "is_correction": false },
+    "portrait_emotional_core": { "value": "", "is_correction": false },
+    "portrait_story": { "value": "", "is_correction": false },
+    "portrait_world": { "value": "", "is_correction": false },
+    "portrait_subjects": { "value": "", "is_correction": false },
+    "portrait_themes": { "value": "", "is_correction": false },
+    "portrait_approach": { "value": "", "is_correction": false },
+    "portrait_tone": { "value": "", "is_correction": false },
+    "portrait_visual_world": { "value": "", "is_correction": false },
+    "portrait_audience": { "value": "", "is_correction": false },
+    "portrait_unresolved_questions": { "value": "", "is_correction": false },
+    "portrait_comparable_films": { "value": "", "is_correction": false },
+    "portrait_target_length": { "value": "", "is_correction": false }
   }
 }
-Return empty string for any field where nothing meaningful was shared. Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
+
+FIELD RULES:
+portrait_target_length — Captures the filmmaker's explicitly stated runtime. Recognise: episode count with duration ("X episodes, Y minutes each"), series format ("X-part series"), per-episode runtime ("Y minutes per episode"), or any explicit total or per-episode duration statement. When the filmmaker states any of these, write the value here. Do not route duration statements to decisions_made.
+
+decisions_made — Key creative and production decisions confirmed in this exchange. Do not include target length, episode count, or runtime statements here — these belong in portrait_target_length.
+
+Return empty string in "value" for any field where nothing meaningful was shared. Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
 
   try {
     const response = await anthropic.messages.create({
@@ -572,10 +608,25 @@ Return empty string for any field where nothing meaningful was shared. Only popu
       .trim()
     const parsed = JSON.parse(stripped)
     if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
-    return { memory: parsed.memory ?? emptyMemory, portrait: parsed.portrait ?? {} }
+
+    // Flatten portrait fields from { value, is_correction } objects → flat string map + corrections list
+    const flatPortrait: Record<string, string> = {}
+    const corrections: string[] = []
+    for (const [key, entry] of Object.entries(parsed.portrait ?? {})) {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        const f = entry as { value?: string; is_correction?: boolean }
+        if (f.value) flatPortrait[key] = f.value
+        if (f.is_correction === true) corrections.push(key)
+      } else if (typeof entry === 'string' && entry) {
+        // Backward-compatible: model returned a bare string
+        flatPortrait[key] = entry
+      }
+    }
+
+    return { memory: parsed.memory ?? emptyMemory, portrait: flatPortrait, corrections }
   } catch (err) {
     console.error('Extraction call failed:', err)
-    return { memory: emptyMemory, portrait: {} }
+    return { memory: emptyMemory, portrait: {}, corrections: [] }
   }
 }
 
@@ -741,14 +792,16 @@ export async function POST(req: NextRequest) {
 
     let memory = { logline: '', themes: '', emotional_core: '', filmmakers_words: '', key_decisions: '' }
     let portrait: Record<string, any> = {}
+    let corrections: string[] = []
 
     if (doExtract) {
-      const extracted = await extractMemoryAndPortrait(userMessage, content)
+      const extracted = await extractMemoryAndPortrait(userMessage, content, filmMemory)
       memory = extracted.memory
       portrait = extracted.portrait
+      corrections = extracted.corrections
     }
 
-    return NextResponse.json({ content, memory, portrait, stale_document_id })
+    return NextResponse.json({ content, memory, portrait, corrections, stale_document_id })
 
   } catch (error) {
     console.error('Chat route error:', error)

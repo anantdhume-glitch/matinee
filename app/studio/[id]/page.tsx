@@ -382,7 +382,8 @@ async function mergeMemory(
   existing: FilmMemory,
   filmId: string,
   supabase: any,
-  createdBy: string = 'studio'
+  createdBy: string = 'studio',
+  corrections: string[] = [],
 ) {
   const longer = (a?: string, b?: string) =>
     (a?.length ?? 0) >= (b?.length ?? 0) ? a : b
@@ -431,11 +432,13 @@ async function mergeMemory(
       }
     } else {
       const existing_value = existing_field?.value ?? ''
-      if (extracted_value.length > existing_value.length) {
+      const isCorrection = corrections.includes(field)
+      if (isCorrection || extracted_value.length > existing_value.length) {
+        if (isCorrection) console.log('[MATINEE] Portrait correction applied:', field, extracted_value)
         portraitUpdates[field] = {
           value: extracted_value,
           created_by: createdBy,
-          created_in_mode: createdBy === 'import' ? 'import' : 'discovery',
+          created_in_mode: isCorrection ? 'correction' : (createdBy === 'import' ? 'import' : 'discovery'),
           updated_at: now,
           history: appendHistory(existing_field),
         }
@@ -886,8 +889,18 @@ export default function FilmStudio() {
 
     if (data.memory) {
       if (memoryData) {
-        const portraitToMerge = film?.current_mode ? {} : (data.portrait ?? {})
-        await mergeMemory(data.memory, portraitToMerge, memoryData, filmId, supabase)
+        const allPortrait = data.portrait ?? {}
+        const filmCorrections: string[] = data.corrections ?? []
+        // In production modes, portrait updates are gated to discovery.
+        // Exception: explicit corrections always apply regardless of mode.
+        const portraitToMerge = film?.current_mode
+          ? Object.fromEntries(
+              filmCorrections
+                .filter((k: string) => allPortrait[k])
+                .map((k: string) => [k, allPortrait[k]])
+            )
+          : allPortrait
+        await mergeMemory(data.memory, portraitToMerge, memoryData, filmId, supabase, 'studio', filmCorrections)
       } else {
         await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId, updated_at: new Date().toISOString() })
       }
