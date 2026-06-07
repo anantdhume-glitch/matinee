@@ -174,14 +174,14 @@ type GatePrereq = GateId | GateId[]
 
 function isPrereqMet(
   prereq: GatePrereq | undefined,
-  gatesClosed: { gate: string; closed_at?: string }[] | undefined
+  gatesClosed: { gate: string; closed_at?: string; status?: string }[] | undefined
 ): boolean {
   if (!prereq) return true
   const closed = gatesClosed ?? []
   if (Array.isArray(prereq)) {
-    return prereq.every(p => closed.some(g => g.gate === p && !!g.closed_at))
+    return prereq.every(p => closed.some(g => g.gate === p && !!g.closed_at && g.status !== 'reopened'))
   }
-  return closed.some(g => g.gate === prereq && !!g.closed_at)
+  return closed.some(g => g.gate === prereq && !!g.closed_at && g.status !== 'reopened')
 }
 
 const ALL_FIVE_BRIEFS: GateId[] = ['narration_brief', 'cinematography_brief', 'sound_brief', 'ai_brief', 'editorial_brief']
@@ -570,6 +570,7 @@ export default function FilmStudio() {
   const [showScriptHistory, setShowScriptHistory] = useState(false)
   const [generating, setGenerating] = useState<GateId | null>(null)
   const [generateError, setGenerateError] = useState<GateId | null>(null)
+  const [conversationWarningGate, setConversationWarningGate] = useState<GateId | null>(null)
   const [importPending, setImportPending] = useState<{
     gateId: GateId
     filename: string
@@ -1127,6 +1128,11 @@ export default function FilmStudio() {
     }
     return null
   }
+
+  // Returns true if at least one assistant response has been delivered in the given mode.
+  // Assistant messages receive `mode` on the first reply after a mode switch (line ~925).
+  const checkConversationExists = (modeId: string): boolean =>
+    messages.some(m => (m as any).mode === modeId && m.role === 'assistant')
 
   const generateDocument = async (gateId: GateId, owningMode: string) => {
     setGenerating(gateId)
@@ -2284,20 +2290,24 @@ export default function FilmStudio() {
                               const isReopened = gateEntry?.status === 'reopened'
                               const isApproved = !!gateEntry && !isReopened
                               const hasPendingImport = importPending?.gateId === doc.gateId
-                              const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' | 'REOPENED' =
-                                isReopened ? 'REOPENED' :
-                                isApproved ? 'LOCKED' :
+                              const genPrereqArchive = GATE_GENERATION_PREREQUISITES[doc.gateId]
+                              const prereqMetArchive = isPrereqMet(genPrereqArchive, film.gates_closed)
+                              const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' | 'REOPENED' | 'UNAVAILABLE' =
+                                isReopened    ? 'REOPENED'    :
+                                isApproved    ? 'LOCKED'      :
+                                !prereqMetArchive ? 'UNAVAILABLE' :
                                 (isGenerated || hasPendingImport) ? 'IN REVIEW' : 'OPEN'
                               const stateColor =
-                                gateState === 'LOCKED'    ? 'var(--accent)' :
-                                gateState === 'REOPENED'  ? 'var(--gate-review)' :
-                                gateState === 'IN REVIEW' ? 'var(--fg)' :
-                                                            'var(--fg-dim)'
+                                gateState === 'LOCKED'      ? 'var(--accent)' :
+                                gateState === 'REOPENED'    ? 'var(--gate-review)' :
+                                gateState === 'IN REVIEW'   ? 'var(--fg)' :
+                                gateState === 'UNAVAILABLE' ? 'var(--fg-dim-2)' :
+                                                              'var(--fg-dim)'
                               const iconColor =
-                                gateState === 'LOCKED'    ? 'var(--accent)' :
-                                gateState === 'REOPENED'  ? 'var(--gate-review)' :
-                                gateState === 'IN REVIEW' ? 'var(--fg-dim)' :
-                                                            'var(--fg-dim)'
+                                gateState === 'LOCKED'      ? 'var(--accent)' :
+                                gateState === 'REOPENED'    ? 'var(--gate-review)' :
+                                gateState === 'IN REVIEW'   ? 'var(--fg-dim)' :
+                                                              'var(--fg-dim)'
 
                               return (
                                 <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
@@ -2324,10 +2334,16 @@ export default function FilmStudio() {
                                     })()}
 
                                     {/* State pill */}
-                                    <span className={`gate-pill ${gateState === 'LOCKED' ? 'gate-pill-closed' : gateState === 'IN REVIEW' || gateState === 'REOPENED' ? 'gate-pill-review' : 'gate-pill-open'}`}>
-                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
-                                      {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : gateState === 'REOPENED' ? 'Reopened' : 'Open'}
-                                    </span>
+                                    {gateState === 'UNAVAILABLE' ? (
+                                      <span style={{ fontSize: '0.55rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                                        Unavailable
+                                      </span>
+                                    ) : (
+                                      <span className={`gate-pill ${gateState === 'LOCKED' ? 'gate-pill-closed' : gateState === 'IN REVIEW' || gateState === 'REOPENED' ? 'gate-pill-review' : 'gate-pill-open'}`}>
+                                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                                        {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : gateState === 'REOPENED' ? 'Reopened' : 'Open'}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               )
@@ -2354,6 +2370,40 @@ export default function FilmStudio() {
           )}
         </div>
       </div>
+
+      {/* CONVERSATION WARNING MODAL */}
+      {conversationWarningGate && (() => {
+        const warningDoc = ARCHIVE_DOCUMENTS.find(d => d.gateId === conversationWarningGate)
+        if (!warningDoc) return null
+        const modeLabel = MODE_CONFIG.find(m => m.key === warningDoc.mode)?.label ?? warningDoc.mode
+        const pendingGate = conversationWarningGate
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div style={{ background: 'var(--bg-elev)', maxWidth: '480px', width: '100%', border: '1px solid var(--line)', padding: '2rem 2.5rem' }}>
+              <p style={{ fontSize: '0.84rem', lineHeight: 1.75, color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", marginBottom: '1rem' }}>
+                This document will be generated from your Film Memory alone.
+              </p>
+              <p style={{ fontSize: '0.84rem', lineHeight: 1.75, color: 'var(--fg-dim)', fontFamily: "'DM Sans', system-ui, sans-serif", marginBottom: '1.75rem' }}>
+                A conversation with Matinee in {modeLabel} mode will make it richer and more specific to your vision.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => { setConversationWarningGate(null); generateDocument(pendingGate, warningDoc.mode) }}
+                  style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', background: 'transparent', border: '1px solid var(--line)', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                >
+                  Generate Anyway
+                </button>
+                <button
+                  onClick={() => { setConversationWarningGate(null); setOpenDocument(null); switchMode(warningDoc.mode) }}
+                  style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                >
+                  Go to {modeLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* PULSE ANIMATION */}
       <style>{`
@@ -2480,7 +2530,14 @@ export default function FilmStudio() {
                   {gateState === 'OPEN' && (
                     <>
                       <button
-                        onClick={() => canGenerate ? generateDocument(openDocument, doc.mode) : undefined}
+                        onClick={() => {
+                          if (!canGenerate) return
+                          if (!checkConversationExists(doc.mode)) {
+                            setConversationWarningGate(openDocument)
+                            return
+                          }
+                          generateDocument(openDocument, doc.mode)
+                        }}
                         disabled={generating === openDocument || !canGenerate}
                         style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--bg)' : 'var(--fg-dim)', background: canGenerate ? 'var(--accent)' : 'transparent', border: `1px solid ${canGenerate ? 'var(--accent)' : 'var(--line)'}`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                       >
