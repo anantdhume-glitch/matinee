@@ -877,7 +877,7 @@ export default function FilmStudio() {
     const data = await response.json()
 
     await supabase.from('messages').insert({ role: 'assistant', content: data.content, film_id: filmId, session_id: activeSessionId })
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content }])
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.content, mode: effectiveMode }])
 
     // Write is_stale flag when staleness nudge was fired
     if (data.stale_document_id) {
@@ -1474,7 +1474,7 @@ export default function FilmStudio() {
                 const iconColor = isActive ? 'var(--accent)' : 'var(--fg-dim-2)'
                 const bgColor = isActive ? 'rgba(200,169,110,0.07)' : isHov ? 'var(--bg-elev-2)' : 'transparent'
                 const handleModeClick = async () => {
-                  await switchMode(modeValue)
+                  await switchMode(modeValue, true)
                 }
 
                 if (railCollapsed) {
@@ -1791,6 +1791,19 @@ export default function FilmStudio() {
                       </div>
                     ) : (
                       <div style={{ marginBottom: '1.5rem' }}>
+                        {(msg as any).mode !== undefined && (
+                          <p style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '8px',
+                            color: 'var(--fg-dim)',
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            marginBottom: '0.4rem',
+                            opacity: 0.5
+                          }}>
+                            {(msg as any).mode === null ? 'Discovery' : (msg as any).mode}
+                          </p>
+                        )}
                         <p style={{ fontSize: '16px', lineHeight: 1.65, color: 'var(--fg)', fontWeight: 300, margin: 0 }}>
                           {msg.content}
                         </p>
