@@ -6,7 +6,7 @@ import { PORTRAIT_FIELD_LABELS, MODE_PORTRAIT_FIELDS, buildPortraitBlock, refere
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 type FilmMode = 'producer' | 'director' | 'narrator' | 'cinematographer' | 'editor' | 'ai_specialist'
-type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
+type GateId = 'film_brief' | 'treatment' | 'narration_brief' | 'cinematography_brief' | 'sound_brief' | 'ai_brief' | 'editorial_brief' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 
 type PromptContext = {
   filmMemory: Record<string, any> | null
@@ -92,7 +92,13 @@ function buildDirectorPrompt(ctx: PromptContext): string {
   const gateBlock = filmBriefLocked
     ? `GATE STATE:
 The Film Brief is locked. The filmmaker may request the Treatment at any time.
-The Treatment gate is ${treatmentLocked ? 'locked — the filmmaker has approved the Treatment. If asked, issue all five Department Briefs simultaneously in a single response.' : 'open — the Treatment has not yet been approved by the filmmaker.'}`
+The Treatment gate is ${treatmentLocked ? `locked — the filmmaker has approved the Treatment.
+
+YOUR TWO STATES (post-Treatment):
+
+STATE 1 — Conversational engagement: Director mode develops the creative thinking for all five departments through conversation. It does not produce the briefs in chat. It asks, challenges, surfaces contradictions, pushes the filmmaker's thinking on voice, image, sound, AI use, and editorial approach. When the filmmaker feels ready for any brief, direct them to the Archive to generate it.
+
+STATE 2 — Document production: Director mode does not produce Department Brief content in conversation. When asked, redirect: "Generate that from the Archive — the thinking we've done here will shape it."` : 'open — the Treatment has not yet been approved by the filmmaker.'}`
     : `GATE STATE:
 The Film Brief is not yet locked. The Treatment cannot be produced until it is.
 The Film Brief holds five things: the emotional premise, the narrative approach, the target length, what this film is for, and what success looks like for this film. These are the decisions the Treatment builds from — without them, the Treatment has no foundation to stand on.
@@ -130,9 +136,9 @@ Seven decisions. Each written as a paragraph — not a heading with bullets. The
 Produce the Treatment only on explicit request and only when the Film Brief gate is closed. When the Treatment is complete, tell the filmmaker it is ready for their review in the Archive.
 
 THE FIVE DEPARTMENT BRIEFS
-After the filmmaker approves the Treatment: issue all five Department Briefs simultaneously — in a single response. Never before Treatment approval. Never one at a time.
+After the filmmaker approves the Treatment, Director mode develops the thinking for all five briefs through conversation — Narration, Cinematography, Sound, AI Image, and Editorial. Each brief is generated from the Archive when the filmmaker is ready, not produced in conversation.
 
-The five briefs are for: Narrator, Cinematographer, AI Specialist, Editor, Sound. Each brief is the Director's specific instructions to that mode, derived from the Treatment. Short, direct, written as one filmmaker speaking to another.
+Never write brief content in chat. When the filmmaker asks for a brief, redirect: "Generate that from the Archive — the thinking we've done here will shape it." The Archive is the owning surface for brief documents.
 
 HOW YOU SPEAK
 When the filmmaker arrives in this mode mid-conversation, say nothing about the mode, the switch, or what you do. Do not greet them. Do not orient them. Ask the next question the film needs — as if you have always been here.
@@ -140,23 +146,20 @@ One question at a time. The question beneath the obvious question — the visual
 }
 
 function buildNarratorPrompt(ctx: PromptContext): string {
-  const departmentBriefsLocked = ctx.gatesClosed?.some(g => g.gate === 'department_briefs' && !!g.closed_at) ?? false
+  const narrationBriefLocked = ctx.gatesClosed?.some(g => g.gate === 'narration_brief' && !!g.closed_at) ?? false
   const modeSelectionBriefLocked = ctx.gatesClosed?.some(g => g.gate === 'mode_selection_brief' && !!g.closed_at) ?? false
   const hookDraftLocked = ctx.gatesClosed?.some(g => g.gate === 'hook_draft' && !!g.closed_at) ?? false
   const scriptLockLocked = ctx.gatesClosed?.some(g => g.gate === 'script_lock' && !!g.closed_at) ?? false
 
-  const gateBlock = !departmentBriefsLocked
+  const gateBlock = !narrationBriefLocked
     ? `PRODUCTION GATE STATE:
-The Director's Department Briefs are not yet locked. The Mode Selection Brief cannot be produced until they are.
-The Department Briefs are the Director's specific instructions to the Narrator — the tonal register, the structural approach, the emotional territory this film moves through. Without them, the Mode Selection Brief has no foundation.
-When the filmmaker explicitly asks to produce the Mode Selection Brief: tell them directly that the Department Briefs are not yet locked, that this is what is blocking production, and that the Director is the mode that produces them. Then offer to continue the current conversation — narrative voice, emotional mode, instinct — here and now. Do not say things like "still being prepared" or "not quite ready yet." Name the specific gate that is missing. Do not mention Discovery.
-The shape of the response — adapt to this film's specific details:
-"The Mode Selection Brief needs the Director's Department Briefs to be locked first — they are what tells the Narrator the tonal register, structural approach, and emotional territory this film moves through. Go to the Director to close that gate. While you do: what we've uncovered here — this film as a letter written to someone who will never read it — is exactly the kind of instinct the Mode Selection Brief will be built from. What is it that demands to be spoken into that silence?"
-
-This is the shape of the response: name the specific gate (Department Briefs), name the mode that owns it (Director), then stay in this conversation. Never use the phrases "still in development", "not available yet", "not quite ready", or "Discovery mode". Never redirect away from this conversation.`
+The Director's Narration Brief is not yet locked. The Mode Selection Brief cannot be produced until it is.
+The Narration Brief is the Director's specific instructions to the Narrator — the narrative voice, its register, its relationship to the subject, the structural role of narration in this film. Without it, the Mode Selection Brief has no foundation.
+When the filmmaker explicitly asks to produce the Mode Selection Brief: tell them directly that the Narration Brief is not yet locked, that this is what is blocking production, and that the Director is the mode that produces it. Then offer to continue the current conversation — narrative voice, emotional mode, instinct — here and now. Do not say things like "still being prepared" or "not quite ready yet." Name the specific gate that is missing. Do not mention Discovery.
+The shape of the response: name the specific gate (Narration Brief), name the mode that owns it (Director), then stay in this conversation. Never use the phrases "still in development", "not available yet", "not quite ready", or "Discovery mode". Never redirect away from this conversation.`
     : !modeSelectionBriefLocked
     ? `PRODUCTION GATE STATE:
-The Department Briefs are locked. The Narrator may now produce the Mode Selection Brief.
+The Narration Brief is locked. The Narrator may now produce the Mode Selection Brief.
 The Mode Selection Brief is the first document. It makes one decision: which narrative mode this film speaks in. Produce it only when the filmmaker explicitly asks.
 Hook Draft, Segment Scripts, Script Lock, and Audio Direction are not available until the Mode Selection Brief is approved.`
     : !hookDraftLocked
@@ -226,20 +229,20 @@ Cinema language only. One question at a time. You do not summarise what the film
 }
 
 function buildCinematographerPrompt(ctx: PromptContext): string {
-  const deptBriefsClosed = ctx.gatesClosed?.some(g => g.gate === 'department_briefs' && !!g.closed_at) ?? false
+  const cinematographyBriefClosed = ctx.gatesClosed?.some(g => g.gate === 'cinematography_brief' && !!g.closed_at) ?? false
   const consistencyLockClosed = ctx.gatesClosed?.some(g => g.gate === 'consistency_lock' && !!g.closed_at) ?? false
   const shotListClosed = ctx.gatesClosed?.some(g => g.gate === 'shot_list' && !!g.closed_at) ?? false
   const cameraLightClosed = ctx.gatesClosed?.some(g => g.gate === 'camera_light_plan' && !!g.closed_at) ?? false
 
-  const gateBlock = !deptBriefsClosed
+  const gateBlock = !cinematographyBriefClosed
     ? `PRODUCTION GATE STATE:
-The Director's Department Briefs are not yet approved. No document can be produced until they are.
-The Department Briefs are the Director's specific instructions to the Cinematographer — the visual world, the tonal register, the camera relationship, the light. Without them, every Consistency Lock, Shot List, and Camera & Light Plan has no foundation.
-When the filmmaker explicitly asks to produce a document: tell them directly that the Department Briefs are not yet approved, that this is what is blocking production, and that the Director is the mode that produces them. Then offer to continue the current conversation — visual language, consistency instincts, shot ideas — here and now. Name the specific gate that is missing. Do not mention Discovery.
-This is the shape of the response: name the specific gate (Department Briefs), name the mode that owns it (Director), then stay in this conversation. Never use the phrases "still in development", "not available yet", "not quite ready", or "Discovery mode". Never redirect away from this conversation.`
+The Director's Cinematography Brief is not yet approved. No document can be produced until it is.
+The Cinematography Brief is the Director's specific instructions to the Cinematographer — the visual grammar, movement philosophy, quality of light, palette, what the frame reveals and what it withholds. Without it, every Consistency Lock, Shot List, and Camera & Light Plan has no foundation.
+When the filmmaker explicitly asks to produce a document: tell them directly that the Cinematography Brief is not yet approved, that this is what is blocking production, and that the Director is the mode that produces it. Then offer to continue the current conversation — visual language, consistency instincts, shot ideas — here and now. Name the specific gate that is missing. Do not mention Discovery.
+This is the shape of the response: name the specific gate (Cinematography Brief), name the mode that owns it (Director), then stay in this conversation. Never use the phrases "still in development", "not available yet", "not quite ready", or "Discovery mode". Never redirect away from this conversation.`
     : !consistencyLockClosed
     ? `PRODUCTION GATE STATE:
-The Department Briefs are approved. The Cinematographer may now produce the Consistency Lock.
+The Cinematography Brief is approved. The Cinematographer may now produce the Consistency Lock.
 The Consistency Lock is the first document. It defines how a specific subject or location looks across every generated image — locking visual identity before AI Specialist sessions begin. Produce it only when the filmmaker explicitly asks, and only for one subject or location at a time.
 The Shot List and Camera & Light Plan are not available until the Consistency Lock is approved.`
     : !shotListClosed
@@ -733,6 +736,41 @@ If SESSION is RETURNING, you are returning to a film you know. A new session is 
 If SESSION is SCRIPT_UPLOAD, the filmmaker has just uploaded a script. It is here. You have not read it yet — that happens through conversation. Acknowledge simply that the script has arrived. Then ask one question: invite the filmmaker to tell you, in their own words, what this film is about for them. Two sentences total. Nothing more. Do not reference the film's subject, title, or anything from memory or documents — the opening is completely generic.`
 }
 
+const BRIEF_MAP: Partial<Record<string, GateId[]>> = {
+  narrator:       ['narration_brief'],
+  cinematographer:['cinematography_brief'],
+  ai_specialist:  ['ai_brief'],
+  editor:         ['editorial_brief'],
+  director:       ['narration_brief', 'cinematography_brief', 'sound_brief', 'ai_brief', 'editorial_brief'],
+}
+
+const BRIEF_LABELS: Partial<Record<GateId, string>> = {
+  narration_brief:      'NARRATION BRIEF',
+  cinematography_brief: 'CINEMATOGRAPHY BRIEF',
+  sound_brief:          'SOUND BRIEF',
+  ai_brief:             'AI IMAGE BRIEF',
+  editorial_brief:      'EDITORIAL BRIEF',
+}
+
+function buildBriefInjection(
+  currentMode: string | null,
+  gatesClosed: { gate: string; closed_at?: string }[],
+  documentsContent: Record<string, string>
+): string {
+  if (!currentMode) return ''
+  const briefIds = BRIEF_MAP[currentMode]
+  if (!briefIds) return ''
+  const parts: string[] = []
+  for (const gateId of briefIds) {
+    const gateEntry = gatesClosed.find(g => g.gate === gateId)
+    if (!gateEntry?.closed_at) continue
+    const content = documentsContent[gateId]
+    if (!content) continue
+    parts.push(`=== ${BRIEF_LABELS[gateId] ?? gateId.toUpperCase()} ===\n${content}`)
+  }
+  return parts.length > 0 ? '\n\n' + parts.join('\n\n') : ''
+}
+
 const STALENESS_TRIGGERS = ['Regenerate when you\'re ready', 'Regenerate before']
 
 function buildStalenessSuffix(documentType: string, documentContent: string): string {
@@ -758,6 +796,7 @@ export async function POST(req: NextRequest) {
     const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed, filmId, inReviewDocument } = await req.json()
 
     let referenceBlock = ''
+    let briefInjection = ''
     if (filmId) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -765,14 +804,24 @@ export async function POST(req: NextRequest) {
       )
       const { data: filmData } = await supabase
         .from('films')
-        .select('source_documents')
+        .select('source_documents, documents_content, gates_closed')
         .eq('id', filmId)
         .single()
       const sourceDocuments = filmData?.source_documents ?? {}
       referenceBlock = buildReferenceBlock(sourceDocuments, currentMode ?? 'discovery')
+      briefInjection = buildBriefInjection(
+        currentMode ?? null,
+        filmData?.gates_closed ?? [],
+        filmData?.documents_content ?? {}
+      )
     }
 
     let systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
+
+    // Inject mode-specific locked Department Brief(s) into system prompt
+    if (briefInjection) {
+      systemPrompt += briefInjection
+    }
 
     // Inject IN REVIEW document content + staleness instructions when one exists
     if (inReviewDocument?.type && inReviewDocument?.content && messages.length > 0) {

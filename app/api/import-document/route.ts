@@ -74,10 +74,10 @@ Return only a JSON object with this exact shape. No preamble. No explanation out
 }`
   }
 
-  if (gateId === 'department_briefs') {
-    return `${ctx}You are reading an externally produced set of Department Briefs for a film called "${filmTitle}".
+  if (gateId === 'narration_brief') {
+    return `${ctx}You are reading an externally produced Narration Brief for a film called "${filmTitle}".
 
-These briefs represent the Director's instructions to the Narrator, Cinematographer, AI Specialist, Editor, and Sound teams.
+This brief represents the Director's instructions to the Narrator — narrative voice, structural role of narration, what the narrator may and may not say, rhythm against silence.
 
 Extract everything relevant to the following Film Portrait fields:
 - portrait_visual_world: The visual world — light, palette, camera relationship, texture
@@ -87,7 +87,127 @@ Extract everything relevant to the following Film Portrait fields:
 - portrait_subjects: The subjects — who the people are and why they matter
 - portrait_comparable_films: Comparable films — in tone, approach, or visual world
 
-Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the briefs revealed clearly about the film's direction, and what was missing or unclear. Plain language. No bullet points in the summary.
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the brief revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_visual_world": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
+  if (gateId === 'cinematography_brief') {
+    return `${ctx}You are reading an externally produced Cinematography Brief for a film called "${filmTitle}".
+
+This brief represents the Director's instructions to the Cinematographer — visual grammar, movement philosophy, quality of light, palette, what the frame reveals and withholds.
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_visual_world: The visual world — light, palette, camera relationship, texture
+- portrait_tone: The tone — emotional temperature and pacing character
+- portrait_approach: The approach — how the film is being told
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the brief revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_visual_world": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
+  if (gateId === 'sound_brief') {
+    return `${ctx}You are reading an externally produced Sound Brief for a film called "${filmTitle}".
+
+This brief represents the Director's instructions to the Sound team — sonic world, philosophy of music, treatment of transmission and archive audio, use of silence, relationship between sound and image.
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_visual_world: The visual world — light, palette, camera relationship, texture
+- portrait_tone: The tone — emotional temperature and pacing character
+- portrait_approach: The approach — how the film is being told
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the brief revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_visual_world": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
+  if (gateId === 'ai_brief') {
+    return `${ctx}You are reading an externally produced AI Image Brief for a film called "${filmTitle}".
+
+This brief represents the Director's instructions for AI-generated imagery — what it may show, stylistic constraints, what it must never attempt, how generated images are treated in the edit.
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_visual_world: The visual world — light, palette, camera relationship, texture
+- portrait_tone: The tone — emotional temperature and pacing character
+- portrait_approach: The approach — how the film is being told
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the brief revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
+
+Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
+{
+  "extractedPortrait": {
+    "portrait_visual_world": "string or null",
+    "portrait_tone": "string or null",
+    "portrait_approach": "string or null",
+    "portrait_world": "string or null",
+    "portrait_subjects": "string or null",
+    "portrait_comparable_films": "string or null"
+  },
+  "fieldsAbsent": ["field keys where value is null"],
+  "summary": "..."
+}`
+  }
+
+  if (gateId === 'editorial_brief') {
+    return `${ctx}You are reading an externally produced Editorial Brief for a film called "${filmTitle}".
+
+This brief represents the Director's instructions to the Editor — pacing philosophy, structural approach, what the edit withholds, how tension is built and released, the relationship between image, sound and narration in the cut.
+
+Extract everything relevant to the following Film Portrait fields:
+- portrait_visual_world: The visual world — light, palette, camera relationship, texture
+- portrait_tone: The tone — emotional temperature and pacing character
+- portrait_approach: The approach — how the film is being told
+- portrait_world: The world — physical, atmospheric, historical setting
+- portrait_subjects: The subjects — who the people are and why they matter
+- portrait_comparable_films: Comparable films — in tone, approach, or visual world
+
+Write a one-paragraph summary in the voice of a thoughtful film collaborator: what the brief revealed clearly, and what was missing or unclear. Plain language. No bullet points in the summary.
 
 Return only a JSON object with this exact shape. No preamble. No explanation outside the JSON:
 {

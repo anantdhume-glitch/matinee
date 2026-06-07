@@ -31,7 +31,7 @@ type DocumentGenerated = {
   generated_at: string
   source?: 'import'
 }
-type GateId = 'film_brief' | 'treatment' | 'department_briefs' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
+type GateId = 'film_brief' | 'treatment' | 'narration_brief' | 'cinematography_brief' | 'sound_brief' | 'ai_brief' | 'editorial_brief' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 type PortraitField = {
   value: string
   created_by: string
@@ -133,7 +133,11 @@ const PORTRAIT_FIELDS: Array<{
 const ARCHIVE_DOCUMENTS = [
   { mode: 'producer', label: 'Film Brief', gateId: 'film_brief' as GateId },
   { mode: 'director', label: 'Treatment', gateId: 'treatment' as GateId },
-  { mode: 'director', label: 'Department Briefs', gateId: 'department_briefs' as GateId },
+  { mode: 'director', label: 'Narration Brief', gateId: 'narration_brief' as GateId },
+  { mode: 'director', label: 'Cinematography Brief', gateId: 'cinematography_brief' as GateId },
+  { mode: 'director', label: 'Sound Brief', gateId: 'sound_brief' as GateId },
+  { mode: 'director', label: 'AI Brief', gateId: 'ai_brief' as GateId },
+  { mode: 'director', label: 'Editorial Brief', gateId: 'editorial_brief' as GateId },
   { mode: 'narrator', label: 'Mode Selection Brief', gateId: 'mode_selection_brief' as GateId },
   { mode: 'narrator', label: 'Hook Draft', gateId: 'hook_draft' as GateId },
   { mode: 'narrator', label: 'Script Lock', gateId: 'script_lock' as GateId },
@@ -147,40 +151,77 @@ const ARCHIVE_DOCUMENTS = [
 ] as const
 
 const GATE_LABELS: Record<GateId, string> = {
-  film_brief:          'Film Brief',
-  treatment:           'Treatment',
-  department_briefs:   'Department Briefs',
-  mode_selection_brief:'Mode Selection Brief',
-  hook_draft:          'Hook Draft',
-  script_lock:         'Script Lock',
-  audio_direction:     'Audio Direction',
-  consistency_lock:    'Consistency Lock',
-  shot_list:           'Shot List',
-  camera_light_plan:   'Camera & Light Plan',
-  visual_prompt_package:'Visual Prompt Package',
-  edit_plan:           'Edit Plan',
-  music_cue_sheet:     'Music Cue Sheet',
+  film_brief:            'Film Brief',
+  treatment:             'Treatment',
+  narration_brief:       'Narration Brief',
+  cinematography_brief:  'Cinematography Brief',
+  sound_brief:           'Sound Brief',
+  ai_brief:              'AI Brief',
+  editorial_brief:       'Editorial Brief',
+  mode_selection_brief:  'Mode Selection Brief',
+  hook_draft:            'Hook Draft',
+  script_lock:           'Script Lock',
+  audio_direction:       'Audio Direction',
+  consistency_lock:      'Consistency Lock',
+  shot_list:             'Shot List',
+  camera_light_plan:     'Camera & Light Plan',
+  visual_prompt_package: 'Visual Prompt Package',
+  edit_plan:             'Edit Plan',
+  music_cue_sheet:       'Music Cue Sheet',
 }
 
-const GATE_PREREQUISITES: Partial<Record<GateId, GateId>> = {
-  treatment:            'film_brief',
-  department_briefs:    'treatment',
-  mode_selection_brief: 'department_briefs',
-  hook_draft:           'mode_selection_brief',
-  script_lock:          'hook_draft',
-  audio_direction:      'script_lock',
-  consistency_lock:      'department_briefs',
+type GatePrereq = GateId | GateId[]
+
+function isPrereqMet(
+  prereq: GatePrereq | undefined,
+  gatesClosed: { gate: string; closed_at?: string }[] | undefined
+): boolean {
+  if (!prereq) return true
+  const closed = gatesClosed ?? []
+  if (Array.isArray(prereq)) {
+    return prereq.every(p => closed.some(g => g.gate === p && !!g.closed_at))
+  }
+  return closed.some(g => g.gate === prereq && !!g.closed_at)
+}
+
+const ALL_FIVE_BRIEFS: GateId[] = ['narration_brief', 'cinematography_brief', 'sound_brief', 'ai_brief', 'editorial_brief']
+
+const GATE_GENERATION_PREREQUISITES: Partial<Record<GateId, GatePrereq>> = {
+  treatment:             'film_brief',
+  narration_brief:       'treatment',
+  cinematography_brief:  'treatment',
+  sound_brief:           'treatment',
+  ai_brief:              'treatment',
+  editorial_brief:       'treatment',
+  mode_selection_brief:  ALL_FIVE_BRIEFS,
+  hook_draft:            'mode_selection_brief',
+  script_lock:           'hook_draft',
+  audio_direction:       'script_lock',
+  consistency_lock:      ALL_FIVE_BRIEFS,
   shot_list:             'consistency_lock',
   camera_light_plan:     'shot_list',
-  visual_prompt_package: 'camera_light_plan',
-  edit_plan:             'audio_direction',
+  visual_prompt_package: ALL_FIVE_BRIEFS,
+  edit_plan:             ALL_FIVE_BRIEFS,
   music_cue_sheet:       'edit_plan',
+}
+
+const GATE_APPROVAL_PREREQUISITES: Partial<Record<GateId, GatePrereq>> = {
+  hook_draft:        'mode_selection_brief',
+  script_lock:       'hook_draft',
+  audio_direction:   'script_lock',
+  shot_list:         'consistency_lock',
+  camera_light_plan: 'shot_list',
+  music_cue_sheet:   'edit_plan',
 }
 
 const GATE_ICON_MAP: Record<GateId, React.ReactNode> = {
   film_brief:            <FileText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
   treatment:             <Clapperboard size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
-  department_briefs:     <LayoutList size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  narration_brief:       <Mic size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  cinematography_brief:  <Aperture size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  sound_brief:           <Music size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  ai_brief:              <Wand2 size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
+  editorial_brief:       <Scissors size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
   mode_selection_brief:  <Radio size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
   hook_draft:            <Anchor size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
   script_lock:           <ScrollText size={10} color="var(--fg-dim)" style={{ flexShrink: 0 }} />,
@@ -196,7 +237,11 @@ const GATE_ICON_MAP: Record<GateId, React.ReactNode> = {
 const ARCHIVE_ICON_MAP: Record<GateId, (color: string) => React.ReactNode> = {
   film_brief:            (c) => <FileText size={12} color={c} style={{ flexShrink: 0 }} />,
   treatment:             (c) => <Clapperboard size={12} color={c} style={{ flexShrink: 0 }} />,
-  department_briefs:     (c) => <LayoutList size={12} color={c} style={{ flexShrink: 0 }} />,
+  narration_brief:       (c) => <Mic size={12} color={c} style={{ flexShrink: 0 }} />,
+  cinematography_brief:  (c) => <Aperture size={12} color={c} style={{ flexShrink: 0 }} />,
+  sound_brief:           (c) => <Music size={12} color={c} style={{ flexShrink: 0 }} />,
+  ai_brief:              (c) => <Wand2 size={12} color={c} style={{ flexShrink: 0 }} />,
+  editorial_brief:       (c) => <Scissors size={12} color={c} style={{ flexShrink: 0 }} />,
   mode_selection_brief:  (c) => <Radio size={12} color={c} style={{ flexShrink: 0 }} />,
   hook_draft:            (c) => <Anchor size={12} color={c} style={{ flexShrink: 0 }} />,
   script_lock:           (c) => <ScrollText size={12} color={c} style={{ flexShrink: 0 }} />,
@@ -1465,10 +1510,9 @@ export default function FilmStudio() {
                 let isGated = false
                 if (modeDocs.length > 0) {
                   const firstDoc = modeDocs[0]
-                  const prereqId = GATE_PREREQUISITES[firstDoc.gateId]
-                  if (prereqId) {
-                    const prereqMet = film?.gates_closed?.some(g => g.gate === prereqId && !!g.closed_at) ?? false
-                    isGated = !prereqMet
+                  const genPrereq = GATE_GENERATION_PREREQUISITES[firstDoc.gateId]
+                  if (genPrereq) {
+                    isGated = !isPrereqMet(genPrereq, film?.gates_closed)
                   }
                 }
                 const iconColor = isActive ? 'var(--accent)' : 'var(--fg-dim-2)'
@@ -2262,10 +2306,8 @@ export default function FilmStudio() {
 
                                     {/* Document name */}
                                     {(() => {
-                                      const prereqGateId = GATE_PREREQUISITES[doc.gateId]
-                                      const prereqMet = prereqGateId
-                                        ? film.gates_closed?.some(g => g.gate === prereqGateId && !!g.closed_at) ?? false
-                                        : true
+                                      const genPrereq = GATE_GENERATION_PREREQUISITES[doc.gateId]
+                                      const prereqMet = isPrereqMet(genPrereq, film.gates_closed)
                                       const isClickable = isGenerated || prereqMet
                                       return isClickable ? (
                                         <span
@@ -2330,12 +2372,13 @@ export default function FilmStudio() {
         const isReopened = gateEntry?.status === 'reopened'
         const isApproved = !!gateEntry && !isReopened
         const hasPendingImport = importPending?.gateId === openDocument
-        const prereqGateId = GATE_PREREQUISITES[openDocument]
-        const prereqMet = prereqGateId
-          ? film?.gates_closed?.some(g => g.gate === prereqGateId && !!g.closed_at) ?? false
-          : true
+        const genPrereq = GATE_GENERATION_PREREQUISITES[openDocument]
+        const prereqMet = isPrereqMet(genPrereq, film?.gates_closed)
+        const approvalPrereq = GATE_APPROVAL_PREREQUISITES[openDocument]
+        const approvalPrereqMet = isPrereqMet(approvalPrereq, film?.gates_closed)
         const isOwningMode = film?.current_mode === doc.mode
         const canGenerate = prereqMet && isOwningMode
+        const canApprove = approvalPrereqMet
         const activeFlag = getActiveRippleFlag(openDocument)
 
         const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' =
@@ -2408,9 +2451,9 @@ export default function FilmStudio() {
                     </button>
                   </div>
                 )}
-                {!prereqMet && prereqGateId && (
+                {!prereqMet && genPrereq && (
                   <p style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
-                    Needs {GATE_LABELS[prereqGateId]} approved first.
+                    Needs {Array.isArray(genPrereq) ? 'all Department Briefs' : GATE_LABELS[genPrereq]} approved first.
                   </p>
                 )}
                 {prereqMet && !isOwningMode && !isGenerated && (
@@ -2464,13 +2507,18 @@ export default function FilmStudio() {
                       >
                         {generating === openDocument ? 'Generating...' : 'Regenerate'}
                       </button>
-                      {!hasPendingImport && (
+                      {!hasPendingImport && canApprove && (
                         <button
                           onClick={() => approveGate(openDocument)}
                           style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                         >
                           Approve
                         </button>
+                      )}
+                      {!hasPendingImport && !canApprove && approvalPrereq && (
+                        <p style={{ fontSize: '0.64rem', color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                          Approve {Array.isArray(approvalPrereq) ? 'prerequisites' : GATE_LABELS[approvalPrereq]} first.
+                        </p>
                       )}
                     </>
                   )}
