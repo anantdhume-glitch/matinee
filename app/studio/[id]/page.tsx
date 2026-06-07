@@ -434,8 +434,7 @@ async function mergeMemory(
       const existing_value = existing_field?.value ?? ''
       const isCorrection = corrections.includes(field)
       if (isCorrection || extracted_value.length > existing_value.length) {
-        if (isCorrection) console.log('[MATINEE] Portrait correction applied:', field, extracted_value)
-        portraitUpdates[field] = {
+portraitUpdates[field] = {
           value: extracted_value,
           created_by: createdBy,
           created_in_mode: isCorrection ? 'correction' : (createdBy === 'import' ? 'import' : 'discovery'),
