@@ -8,6 +8,11 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 type GateId =
   | 'film_brief'
   | 'treatment'
+  | 'narration_brief'
+  | 'cinematography_brief'
+  | 'sound_brief'
+  | 'ai_brief'
+  | 'editorial_brief'
   | 'mode_selection_brief'
   | 'hook_draft'
   | 'consistency_lock'
@@ -16,6 +21,8 @@ type GateId =
   | 'visual_prompt_package'
   | 'edit_plan'
   | 'music_cue_sheet'
+  | 'script_lock'
+  | 'audio_direction'
 
 function buildBasePrompt(
   gateId: GateId,
@@ -254,6 +261,66 @@ Transition behaviour: whether music carries across a cut or stops with it.
 Every cue must be traceable to a specific moment in the Edit Plan.
 
 Produce the Music Cue Sheet. Nothing before it. Nothing after it.`
+
+    case 'narration_brief':
+      return `You are producing a Narration Brief for "${filmTitle}".
+
+${portraitBlock}
+
+DIRECTOR'S TREATMENT:
+${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
+
+Write a Narration Brief for this film. Cover: the narrative voice — its register, its relationship to the subject, how much it knows and when; the structural role of narration — where it carries the film and where image takes over; what the narrator is permitted to say and what must be withheld; the rhythm of narration against silence. Ground every decision in the film's emotional core and tone. Be specific and opinionated.
+
+Produce the Narration Brief. Nothing before it. Nothing after it.`
+
+    case 'cinematography_brief':
+      return `You are producing a Cinematography Brief for "${filmTitle}".
+
+${portraitBlock}
+
+DIRECTOR'S TREATMENT:
+${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
+
+Write a Cinematography Brief for this film. Cover: the visual grammar — what the camera is drawn to and what it refuses; movement philosophy — when the camera moves and why; quality of light — its texture, source, temperature; palette — the range of colour this film lives in; what the frame reveals and what it withholds. Ground every decision in the film's world and emotional tone. Be specific and opinionated.
+
+Produce the Cinematography Brief. Nothing before it. Nothing after it.`
+
+    case 'sound_brief':
+      return `You are producing a Sound Brief for "${filmTitle}".
+
+${portraitBlock}
+
+DIRECTOR'S TREATMENT:
+${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
+
+Write a Sound Brief for this film. Cover: the sonic world this film inhabits; the philosophy of music — whether it leads, follows, or stays absent; the treatment of transmission sound and archive audio if present; the use of silence as a structural element; the relationship between sound and image in key moments. Ground every decision in the film's tone and world. Be specific and opinionated.
+
+Produce the Sound Brief. Nothing before it. Nothing after it.`
+
+    case 'ai_brief':
+      return `You are producing an AI Image Brief for "${filmTitle}".
+
+${portraitBlock}
+
+DIRECTOR'S TREATMENT:
+${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
+
+Write an AI Image Brief for this film. Cover: what AI-generated imagery is permitted to show — its visual register, its relationship to the documentary footage; stylistic constraints that maintain consistency across all generated sequences; what AI imagery must never attempt; how generated images are treated in the edit — as punctuation, as texture, as reconstruction. Ground every decision in the film's visual world and ethical stance. Be specific and opinionated.
+
+Produce the AI Image Brief. Nothing before it. Nothing after it.`
+
+    case 'editorial_brief':
+      return `You are producing an Editorial Brief for "${filmTitle}".
+
+${portraitBlock}
+
+DIRECTOR'S TREATMENT:
+${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
+
+Write an Editorial Brief for this film. Cover: the pacing philosophy — how this film breathes; the structural approach — how it opens, how it builds, how it lands; what the edit withholds and when; how tension is built and released; the relationship between image, sound and narration in the cut; episode structure if the film is serialised. Ground every decision in the film's emotional core and story. Be specific and opinionated.
+
+Produce the Editorial Brief. Nothing before it. Nothing after it.`
 
     default:
       return `You are producing a document for "${filmTitle}".
