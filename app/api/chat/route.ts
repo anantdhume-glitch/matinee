@@ -657,27 +657,39 @@ ${portraitContext ? `CURRENT PORTRAIT STATE — values already confirmed in the 
     "portrait_tone": { "value": "", "is_correction": false },
     "portrait_visual_world": { "value": "", "is_correction": false },
     "portrait_audience": { "value": "", "is_correction": false },
-    "portrait_unresolved_questions": { "value": "", "is_correction": false },
+    "portrait_unresolved_questions": { "value": [], "is_correction": false },
     "portrait_comparable_films": { "value": "", "is_correction": false },
     "portrait_target_length": { "value": "", "is_correction": false }
   }
 }
 
 FIELD RULES:
-portrait_target_length — Captures the filmmaker's explicitly stated runtime. Recognise: episode count with duration ("X episodes, Y minutes each"), series format ("X-part series"), per-episode runtime ("Y minutes per episode"), or any explicit total or per-episode duration statement. When the filmmaker states any of these, write the value here. Do not route duration statements to decisions_made.
+portrait_logline — The film in one sentence, as the filmmaker has committed to it. Only write this field when the filmmaker has stated a logline explicitly — a sentence they have offered as their own definition of the film. Do not infer a logline from the conversation. Do not construct one from themes and subject matter. If the filmmaker has not stated a logline, leave this empty.
 
-portrait_tone — Captures the emotional texture and register of the film, not surface adjectives. Look for: how the filmmaker describes the feeling they want the audience to carry, the emotional atmosphere of specific scenes or sequences, the temperature of the film's moral world, the quality of tension or release the filmmaker is reaching for. Write in full descriptive sentences, not adjective lists. A flat adjective list is not sufficient — capture the specific emotional texture this filmmaker is describing for this film.
+portrait_story — The narrative arc as the filmmaker has committed to it: where it begins, where it turns, where it ends. Only write this field when the filmmaker has explicitly described the story's shape or arc. Do not infer a story from character descriptions or subject matter. Do not construct a narrative from research context. If the filmmaker has not described the arc, leave this empty.
+
+portrait_emotional_core — What this film does to an audience — the emotional engine, as the filmmaker has named it. Only write this field when the filmmaker has explicitly stated the emotional effect they are reaching for. Do not infer it from tone descriptions or subject matter. If the filmmaker has not named it, leave this empty.
+
+portrait_tone — The committed emotional register of the film, as the filmmaker has explicitly locked it. This is not Matinee's read of the tone. This is the filmmaker's own stated commitment: "the tone is X" or "I want this film to feel X." Only write this when the filmmaker has made an explicit, committed statement about the film's emotional temperature. A filmmaker exploring tone, trying out descriptions, or responding to Matinee's suggestions is not a commitment — it is a signal for Film Memory, not Portrait. If the filmmaker has not made a clear commitment, leave this empty.
+
+portrait_approach — How the film will be made: the filmmaking method. Observational, constructed, narrated, hybrid, essay film, direct address, testimony-based. This is a production decision, not a character read. Do not write character descriptions, subject relationships, or emotional observations here. Only write this when the filmmaker has described the method of storytelling — how they will construct the film, not what it is about. If the filmmaker has described approach only in terms of character or subject, leave this empty.
 
 portrait_world — Captures the specific physical, political, and emotional world the film inhabits. Never use qualifiers like "likely" or "possibly" — only write what the filmmaker has explicitly described. Include: the geographic and historical setting, the political conditions, the physical environments central to the story, the texture of daily life under those conditions. If the filmmaker has named specific places, periods, or conditions, use them precisely. Do not generalise or infer beyond what has been stated.
 
+portrait_target_length — Captures the filmmaker's explicitly stated runtime. Recognise: episode count with duration ("X episodes, Y minutes each"), series format ("X-part series"), per-episode runtime ("Y minutes per episode"), or any explicit total or per-episode duration statement. When the filmmaker states any of these, write the value here. Do not route duration statements to decisions_made.
+
+portrait_comparable_films — Films the filmmaker has named as touchstones, references, or comparisons for tone, approach, or visual world. Only populate from explicit film references the filmmaker has named themselves. Do not include films Matinee has suggested unless the filmmaker has explicitly agreed they are relevant. Write as a plain list of film titles, comma-separated. If no film references were made in this exchange, leave this empty.
+
+portrait_unresolved_questions — An array of open questions the filmmaker is sitting with — questions they have explicitly named or that emerged from the conversation as genuinely unresolved. Not Matinee's questions. The filmmaker's own questions about their film. Each entry must be: { "question": "the exact question", "category": "Historical | Narrative | Strategic", "added_at": "[current ISO timestamp]" }. Return an empty array [] if no unresolved questions were explicitly raised in this exchange. Never invent questions. Only capture what the filmmaker named or directly acknowledged as open.
+
 decisions_made — Key creative and production decisions confirmed in this exchange. Do not include target length, episode count, or runtime statements here — these belong in portrait_target_length.
 
-Return empty string in "value" for any field where nothing meaningful was shared. Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
+Return empty string in "value" for any field where nothing meaningful was shared (empty array [] for portrait_unresolved_questions). Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
 
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
+      max_tokens: 1500,
       temperature: 0,
       system: extractionSystem,
       messages: [
@@ -702,8 +714,10 @@ Return empty string in "value" for any field where nothing meaningful was shared
     const corrections: string[] = []
     for (const [key, entry] of Object.entries(parsed.portrait ?? {})) {
       if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-        const f = entry as { value?: string; is_correction?: boolean }
-        if (f.value) flatPortrait[key] = f.value
+        const f = entry as { value?: string | any[]; is_correction?: boolean }
+        if (f.value !== undefined && f.value !== '' && !(Array.isArray(f.value) && f.value.length === 0)) {
+          flatPortrait[key] = f.value as any
+        }
         if (f.is_correction === true) corrections.push(key)
       } else if (typeof entry === 'string' && entry) {
         // Backward-compatible: model returned a bare string
