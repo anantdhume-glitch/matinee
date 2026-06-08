@@ -657,6 +657,7 @@ export default function FilmStudio() {
   const [viewportWidth, setViewportWidth] = useState(1440)
   const [tooltipGate, setTooltipGate] = useState<GateId | null>(null)
   const [showAllWords, setShowAllWords] = useState(false)
+  const [showAllArchive, setShowAllArchive] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -736,9 +737,10 @@ export default function FilmStudio() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-  // Reset context tab to mode default when mode changes
+  // Reset context tab and archive filter when mode changes
   useEffect(() => {
     setContextTab(getDefaultTab(film?.current_mode ?? null))
+    setShowAllArchive(false)
   }, [film?.current_mode])
 
 
@@ -2380,7 +2382,18 @@ export default function FilmStudio() {
 
                     {film?.current_mode && (
                       <>
-                        {(['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor'] as const).map(mode => (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <div
+                            onClick={() => setShowAllArchive(prev => !prev)}
+                            style={{ padding: '6px 12px', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer' }}
+                          >
+                            {showAllArchive ? 'Current mode only' : 'Show all'}
+                          </div>
+                        </div>
+                        {(showAllArchive
+                          ? ['producer', 'director', 'narrator', 'cinematographer', 'ai_specialist', 'editor']
+                          : [film.current_mode]
+                        ).map(mode => (
                           <div key={mode} style={{ marginBottom: '0.75rem' }}>
                             <div style={{ fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '20px 1rem 6px 12px' }}>
                               {mode.replace('_', ' ')}
@@ -2536,12 +2549,25 @@ export default function FilmStudio() {
                         wordEntries = phrases.map((p: string) => ({ text: p, session_id: null, mode: 'pre-migration', captured_at: null }))
                       }
 
+                      // Expand pre-migration pipe-delimited entries into individual display entries
+                      const expandedEntries: FilmakersWordsEntry[] = []
+                      for (const entry of wordEntries) {
+                        if (entry.mode === 'pre-migration' && entry.text.includes('|')) {
+                          const phrases = entry.text.split('|').map(p => p.trim()).filter(Boolean)
+                          for (const phrase of phrases) {
+                            expandedEntries.push({ text: phrase, session_id: null, mode: 'pre-migration', captured_at: null })
+                          }
+                        } else {
+                          expandedEntries.push(entry)
+                        }
+                      }
+
                       const openFlags = Array.isArray(filmMemory.continuity_flags)
                         ? filmMemory.continuity_flags.filter(f => f.status === 'open')
                         : []
                       const toneSignals = Array.isArray(filmMemory.tone_signals) ? filmMemory.tone_signals : []
                       const hasUnresolved = !!(filmMemory.unresolved_threads && filmMemory.unresolved_threads.trim())
-                      const hasContent = wordEntries.length > 0 || hasUnresolved || openFlags.length > 0 || toneSignals.length > 0
+                      const hasContent = expandedEntries.length > 0 || hasUnresolved || openFlags.length > 0 || toneSignals.length > 0
 
                       if (!hasContent) {
                         return (
@@ -2551,12 +2577,12 @@ export default function FilmStudio() {
                         )
                       }
 
-                      const displayWords = showAllWords ? wordEntries : wordEntries.slice(-3)
+                      const displayWords = showAllWords ? expandedEntries : expandedEntries.slice(-3)
 
                       return (
                         <>
                           {/* Section 1 — Your words */}
-                          {wordEntries.length > 0 && (
+                          {expandedEntries.length > 0 && (
                             <div style={{ marginBottom: '2rem' }}>
                               <p style={{ fontSize: '0.55rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
                                 Your words
@@ -2576,12 +2602,12 @@ export default function FilmStudio() {
                                   </div>
                                 ))}
                               </div>
-                              {wordEntries.length > 3 && (
+                              {expandedEntries.length > 3 && (
                                 <span
                                   onClick={() => setShowAllWords(prev => !prev)}
                                   style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
                                 >
-                                  {showAllWords ? 'Show fewer' : `Show all (${wordEntries.length})`}
+                                  {showAllWords ? 'Show fewer' : `Show all (${expandedEntries.length})`}
                                 </span>
                               )}
                             </div>
@@ -2641,7 +2667,7 @@ export default function FilmStudio() {
               )}
 
               {/* PLACEHOLDER TABS */}
-              {contextTab !== 'portrait' && contextTab !== 'archive' && contextTab !== 'memory' && (
+              {['brief', 'treatment', 'segments', 'shot_list_tab', 'images', 'edit_plan_tab'].includes(contextTab) && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
                   <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', textAlign: 'center' }}>
                     Coming in the next story.
