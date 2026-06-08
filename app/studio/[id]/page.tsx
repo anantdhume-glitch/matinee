@@ -1140,6 +1140,25 @@ export default function FilmStudio() {
       : [...existing, newGate]
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+
+    // Fire extraction pass after gate closes
+    const documentContent = film?.documents_content?.[gateId] ?? film?.gates_closed?.find(g => g.gate === gateId)?.approved_content ?? ''
+    if (documentContent) {
+      const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+      await fetch('/api/gate-approval-extraction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gateId,
+          filmId,
+          filmTitle: film?.title ?? '',
+          documentContent,
+          filmMemory: freshMemory,
+          sourceType: 'matinee_generated',
+        }),
+      })
+      await refreshPortrait()
+    }
   }
 
   const reopenGate = async (gateId: GateId) => {
@@ -1304,6 +1323,25 @@ export default function FilmStudio() {
       : [...existing, newGate]
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
+
+    // Fire extraction pass after gate closes
+    const documentContent = film?.documents_content?.[gateId] ?? ''
+    if (documentContent) {
+      const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+      await fetch('/api/gate-approval-extraction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gateId,
+          filmId,
+          filmTitle: film?.title ?? '',
+          documentContent,
+          filmMemory: freshMemory,
+          sourceType: 'filmmaker_uploaded',
+        }),
+      })
+      await refreshPortrait()
+    }
   }
 
   const confirmImport = async () => {
