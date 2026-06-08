@@ -8,10 +8,44 @@ import {
   FileText, Clapperboard, LayoutList, Radio, Anchor,
   ScrollText, Mic, Lock, List, LayoutTemplate,
   Aperture, Sparkles, Scissors, Music, Pin,
-  Sun, Wand2, Film, ChevronLeft, ChevronRight
+  Sun, Wand2, Film, ChevronLeft, ChevronRight, Info
 } from 'lucide-react'
 
 type Message = { id: string; role: string; content: string }
+
+type FilmakersWordsEntry = {
+  text: string
+  session_id: string | null
+  mode: string
+  captured_at: string | null
+}
+
+type ContinuityFlag = {
+  flag: string
+  source_a: string
+  source_b: string
+  status: 'open' | 'resolved'
+  flagged_at: string
+  filmmaker_response: string | null
+}
+
+type ToneSignal = {
+  signal: string
+  observed_in: string
+  mode: string
+  session_id: string
+  captured_at: string
+}
+
+type ConfidenceDimension = 'strong' | 'developing' | 'needs_attention'
+
+type GateConfidence = {
+  coverage: ConfidenceDimension
+  clarity: ConfidenceDimension
+  consistency: ConfidenceDimension
+  last_evaluated: string | null
+}
+
 type GateClosed = {
   gate: GateId
   closed_at?: string
@@ -22,9 +56,8 @@ type GateClosed = {
   cleared_by?: 'matinee_work' | 'import'
   imported_document?: string
   confirmed_by_filmmaker_at?: string
-  // Story 3 — snapshot of the document text at the moment of approval.
-  // Never overwritten. Survives reopens and regenerations.
   approved_content?: string
+  confidence?: GateConfidence
 }
 type DocumentGenerated = {
   document: GateId
@@ -66,24 +99,33 @@ type FilmMemory = {
   emotional_core?: string
   characters?: any
   decisions_made?: string
-  filmmakers_words?: string
+  filmmakers_words?: FilmakersWordsEntry[] | string
   unresolved_threads?: string
+  continuity_flags?: ContinuityFlag[]
+  tone_signals?: ToneSignal[]
   raw_memory?: string
   updated_at?: string
-  portrait_logline?:              PortraitField | null
-  portrait_emotional_core?:       PortraitField | null
-  portrait_story?:                PortraitField | null
-  portrait_world?:                PortraitField | null
-  portrait_subjects?:             PortraitField | null
-  portrait_themes?:               PortraitField | null
-  portrait_approach?:             PortraitField | null
-  portrait_tone?:                 PortraitField | null
-  portrait_visual_world?:         PortraitField | null
-  portrait_audience?:             PortraitField | null
-  portrait_directors_intent?:     PortraitField | null
-  portrait_unresolved_questions?: PortraitUnresolvedField | null
-  portrait_comparable_films?:     PortraitField | null
-  portrait_target_length?:        PortraitField | null
+  portrait_logline?:                  PortraitField | null
+  portrait_emotional_core?:           PortraitField | null
+  portrait_story?:                    PortraitField | null
+  portrait_world?:                    PortraitField | null
+  portrait_subjects?:                 PortraitField | null
+  portrait_themes?:                   PortraitField | null
+  portrait_approach?:                 PortraitField | null
+  portrait_tone?:                     PortraitField | null
+  portrait_visual_world?:             PortraitField | null
+  portrait_audience?:                 PortraitField | null
+  portrait_directors_intent?:         PortraitField | null
+  portrait_unresolved_questions?:     PortraitUnresolvedField | null
+  portrait_comparable_films?:         PortraitField | null
+  portrait_target_length?:            PortraitField | null
+  portrait_film_brief?:               PortraitField | null
+  portrait_treatment?:                PortraitField | null
+  portrait_narration_brief?:          PortraitField | null
+  portrait_cinematography_brief?:     PortraitField | null
+  portrait_sound_brief?:              PortraitField | null
+  portrait_ai_brief?:                 PortraitField | null
+  portrait_editorial_brief?:          PortraitField | null
 }
 type DirectEditState = { field: string | null; value: string; saving: boolean }
 type EntryMode = 'uploading' | 'soul' | 'conversation'
@@ -128,6 +170,16 @@ const PORTRAIT_FIELDS: Array<{
   { key: 'portrait_unresolved_questions', label: 'Unresolved Questions', question: 'No open questions yet. They will surface as the film develops.', special: 'unresolved_questions' },
   { key: 'portrait_comparable_films', label: 'Comparable Films', question: 'Which films — in tone, approach, or visual world — does this feel closest to?' },
   { key: 'portrait_target_length', label: 'Target Length', question: 'How long should this film be?' },
+]
+
+const PORTRAIT_GATE_FIELDS: Array<{ key: keyof FilmMemory; label: string }> = [
+  { key: 'portrait_film_brief',           label: 'Film Brief' },
+  { key: 'portrait_treatment',            label: 'Treatment' },
+  { key: 'portrait_narration_brief',      label: 'Narration' },
+  { key: 'portrait_cinematography_brief', label: 'Cinematography' },
+  { key: 'portrait_sound_brief',          label: 'Sound' },
+  { key: 'portrait_ai_brief',             label: 'AI Direction' },
+  { key: 'portrait_editorial_brief',      label: 'Editorial' },
 ]
 
 const ARCHIVE_DOCUMENTS = [
@@ -318,18 +370,19 @@ const FALLBACK_PORTRAIT_FIELD_KEYS = [
 
 // Tab map: mode value → ordered tab keys (first is default)
 const MODE_TABS: Record<string, string[]> = {
-  '':              ['archive', 'portrait'],
-  'producer':      ['brief', 'archive', 'portrait'],
-  'director':      ['treatment', 'archive', 'portrait'],
-  'narrator':      ['segments', 'archive', 'portrait'],
-  'cinematographer': ['shot_list_tab', 'archive', 'portrait'],
-  'ai_specialist': ['images', 'archive', 'portrait'],
-  'editor':        ['edit_plan_tab', 'archive', 'portrait'],
+  '':              ['archive', 'portrait', 'memory'],
+  'producer':      ['brief', 'archive', 'portrait', 'memory'],
+  'director':      ['treatment', 'archive', 'portrait', 'memory'],
+  'narrator':      ['segments', 'archive', 'portrait', 'memory'],
+  'cinematographer': ['shot_list_tab', 'archive', 'portrait', 'memory'],
+  'ai_specialist': ['images', 'archive', 'portrait', 'memory'],
+  'editor':        ['edit_plan_tab', 'archive', 'portrait', 'memory'],
 }
 
 const TAB_LABELS: Record<string, string> = {
   portrait:       'PORTRAIT',
   archive:        'ARCHIVE',
+  memory:         'MEMORY',
   brief:          'BRIEF',
   treatment:      'TREATMENT',
   segments:       'SEGMENTS',
@@ -433,15 +486,22 @@ async function mergeMemory(
   const longer = (a?: string, b?: string) =>
     (a?.length ?? 0) >= (b?.length ?? 0) ? a : b
 
-  const mergedMemory = {
+  const mergedMemory: Record<string, any> = {
     emotional_core:     longer(extracted?.emotional_core,     existing?.emotional_core),
     decisions_made:     longer(extracted?.decisions_made,     existing?.decisions_made),
     unresolved_threads: longer(extracted?.unresolved_threads, existing?.unresolved_threads),
     characters: (JSON.stringify(extracted?.characters)?.length ?? 0) >=
                 (JSON.stringify(existing?.characters)?.length ?? 0)
                 ? extracted?.characters : existing?.characters,
-    filmmakers_words: mergeFilmakersWords(extracted?.filmmakers_words, existing?.filmmakers_words),
     updated_at: new Date().toISOString(),
+  }
+  // Only merge filmmakers_words when still in legacy string format.
+  // Post-migration JSONB arrays are preserved as-is; Sprint 3E handles array writes.
+  if (typeof existing?.filmmakers_words === 'string' || !existing?.filmmakers_words) {
+    mergedMemory.filmmakers_words = mergeFilmakersWords(
+      extracted?.filmmakers_words as string | undefined,
+      existing?.filmmakers_words as string | undefined
+    )
   }
 
   const portraitUpdates: Record<string, any> = {}
@@ -595,6 +655,8 @@ export default function FilmStudio() {
   const [hoveredMode, setHoveredMode] = useState<string | null>(null)
   const [stripHovered, setStripHovered] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(1440)
+  const [tooltipGate, setTooltipGate] = useState<GateId | null>(null)
+  const [showAllWords, setShowAllWords] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -2052,110 +2114,149 @@ export default function FilmStudio() {
                           : modeFieldKeys
                             ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
                             : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
-                        return fieldsToRender.map((field, idx) => {
-                        const raw = filmMemory[field.key]
-                        const isEmpty = isFieldEmpty(raw)
-                        const value = getPortraitValue(raw)
-                        const isEditing = directEdit.field === field.key
-
                         return (
-                          <div key={field.key}>
-                            <div style={{ marginBottom: '1.5rem' }}>
-                              <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                {field.label}
-                              </p>
+                          <>
+                            {fieldsToRender.map((field, idx) => {
+                            const raw = filmMemory[field.key]
+                            const isEmpty = isFieldEmpty(raw)
+                            const value = getPortraitValue(raw)
+                            const isEditing = directEdit.field === field.key
 
-                              {isEmpty ? (
-                                <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                  <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
-                                    {field.question}
+                            return (
+                              <div key={field.key}>
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                  <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                    {field.label}
                                   </p>
-                                  {field.special === 'directors_intent' && (
-                                    isEditing ? (
-                                      <div>
-                                        <textarea
-                                          value={directEdit.value}
-                                          onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
-                                          placeholder="Write here..."
-                                          style={{
-                                            width: '100%', background: 'transparent',
-                                            border: 'none', borderBottom: '1px solid var(--line)',
-                                            color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
-                                            lineHeight: 1.6, padding: '0.4rem 0',
-                                            resize: 'vertical', minHeight: '70px',
-                                            outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
-                                          }}
-                                        />
-                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                          <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                                            {directEdit.saving ? 'Saving...' : 'Save'}
-                                          </button>
-                                          <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                                        Write your intent
-                                      </button>
-                                    )
-                                  )}
-                                </div>
-                              ) : (
-                                <>
-                                  {field.special === 'unresolved_questions' && Array.isArray(value) ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                      {(value as Array<{ question: string; category: string; added_at: string }>).map((item, idx) => (
-                                        <div key={`unresolved-${idx}`} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                          <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
-                                          <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : field.special === 'directors_intent' ? (
-                                    <>
-                                      <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>
-                                        {typeof value === 'string' ? value : ''}
+
+                                  {isEmpty ? (
+                                    <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                      <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
+                                        {field.question}
                                       </p>
-                                      {isEditing ? (
-                                        <div>
-                                          <textarea
-                                            value={directEdit.value}
-                                            onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
-                                            style={{
-                                              width: '100%', background: 'transparent',
-                                              border: 'none', borderBottom: '1px solid var(--line)',
-                                              color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
-                                              lineHeight: 1.6, padding: '0.4rem 0',
-                                              resize: 'vertical', minHeight: '70px',
-                                              outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
-                                            }}
-                                          />
-                                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                                              {directEdit.saving ? 'Saving...' : 'Save'}
-                                            </button>
-                                            <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                      {field.special === 'directors_intent' && (
+                                        isEditing ? (
+                                          <div>
+                                            <textarea
+                                              value={directEdit.value}
+                                              onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
+                                              placeholder="Write here..."
+                                              style={{
+                                                width: '100%', background: 'transparent',
+                                                border: 'none', borderBottom: '1px solid var(--line)',
+                                                color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
+                                                lineHeight: 1.6, padding: '0.4rem 0',
+                                                resize: 'vertical', minHeight: '70px',
+                                                outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
+                                              }}
+                                            />
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                              <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                                                {directEdit.saving ? 'Saving...' : 'Save'}
+                                              </button>
+                                              <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                            </div>
                                           </div>
+                                        ) : (
+                                          <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                                            Write your intent
+                                          </button>
+                                        )
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {field.special === 'unresolved_questions' && Array.isArray(value) ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                          {(value as Array<{ question: string; category: string; added_at: string }>).map((item, idx) => (
+                                            <div key={`unresolved-${idx}`} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                              <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
+                                              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
+                                            </div>
+                                          ))}
                                         </div>
+                                      ) : field.special === 'directors_intent' ? (
+                                        <>
+                                          <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>
+                                            {typeof value === 'string' ? value : ''}
+                                          </p>
+                                          {isEditing ? (
+                                            <div>
+                                              <textarea
+                                                value={directEdit.value}
+                                                onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
+                                                style={{
+                                                  width: '100%', background: 'transparent',
+                                                  border: 'none', borderBottom: '1px solid var(--line)',
+                                                  color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
+                                                  lineHeight: 1.6, padding: '0.4rem 0',
+                                                  resize: 'vertical', minHeight: '70px',
+                                                  outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
+                                                }}
+                                              />
+                                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                                                  {directEdit.saving ? 'Saving...' : 'Save'}
+                                                </button>
+                                                <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>Edit</button>
+                                          )}
+                                        </>
                                       ) : (
-                                        <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>Edit</button>
+                                        <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
+                                          {typeof value === 'string' ? value : ''}
+                                        </p>
                                       )}
                                     </>
-                                  ) : (
-                                    <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
-                                      {typeof value === 'string' ? value : ''}
-                                    </p>
                                   )}
-                                </>
-                              )}
-                            </div>
+                                </div>
 
-                            {idx < fieldsToRender.length - 1 && (
-                              <div style={{ height: '1px', background: 'var(--line)', marginBottom: '1.5rem' }} />
+                                {idx < fieldsToRender.length - 1 && (
+                                  <div style={{ height: '1px', background: 'var(--line)', marginBottom: '1.5rem' }} />
+                                )}
+                              </div>
+                            )
+                            })}
+
+                            {/* Gate document fields — docked state only */}
+                            {panelDocked && (
+                              <>
+                                <div style={{ height: '1px', background: 'var(--line)', margin: '0.5rem 0 1.5rem' }} />
+                                <p style={{ fontSize: '0.52rem', letterSpacing: '0.16em', color: 'var(--fg-dim-2)', textTransform: 'uppercase', marginBottom: '1.25rem' }}>
+                                  From your gate documents
+                                </p>
+                                {PORTRAIT_GATE_FIELDS.map((gf, gfIdx) => {
+                                  const gfRaw = filmMemory[gf.key]
+                                  const gfValue = getPortraitValue(gfRaw)
+                                  return (
+                                    <div key={gf.key} style={{ marginBottom: '1.5rem' }}>
+                                      <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                        {gf.label}
+                                      </p>
+                                      {gfValue ? (
+                                        <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>
+                                          {typeof gfValue === 'string' ? gfValue : ''}
+                                        </p>
+                                      ) : (
+                                        <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                          <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', margin: 0 }}>
+                                            Awaiting gate approval.
+                                          </p>
+                                        </div>
+                                      )}
+                                      {gfIdx < PORTRAIT_GATE_FIELDS.length - 1 && (
+                                        <div style={{ height: '1px', background: 'var(--line)', marginTop: '1.5rem' }} />
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </>
                             )}
-                          </div>
+                          </>
                         )
-                        })
                       })()
                     )}
                   </div>
@@ -2309,29 +2410,85 @@ export default function FilmStudio() {
                                 gateState === 'IN REVIEW'   ? 'var(--fg-dim)' :
                                                               'var(--fg-dim)'
 
+                              const genPrereqDoc = GATE_GENERATION_PREREQUISITES[doc.gateId]
+                              const prereqMetDoc = isPrereqMet(genPrereqDoc, film.gates_closed)
+                              const isClickable = isGenerated || prereqMetDoc
+                              const prereqTooltip = gateState === 'UNAVAILABLE' && genPrereqDoc
+                                ? Array.isArray(genPrereqDoc)
+                                  ? `${doc.label} requires all Department Briefs to be closed first.`
+                                  : `${doc.label} requires ${GATE_LABELS[genPrereqDoc]} to be closed first.`
+                                : null
+                              const gateConfidence = gateEntry?.confidence
+                              const showConfidence = !!(gateConfidence?.last_evaluated)
+
                               return (
                                 <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
-                                    {/* Document name */}
-                                    {(() => {
-                                      const genPrereq = GATE_GENERATION_PREREQUISITES[doc.gateId]
-                                      const prereqMet = isPrereqMet(genPrereq, film.gates_closed)
-                                      const isClickable = isGenerated || prereqMet
-                                      return isClickable ? (
-                                        <span
-                                          onClick={() => setOpenDocument(doc.gateId)}
-                                          style={{ fontSize: '13px', color: isApproved ? 'var(--accent)' : isGenerated ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1, fontStyle: isGenerated ? 'normal' : 'italic' }}
-                                        >
-                                          {doc.label}
-                                        </span>
-                                      ) : (
-                                        <span style={{ fontSize: '13px', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1 }}>
-                                          {doc.label}
-                                        </span>
-                                      )
-                                    })()}
+                                    {/* Document name + optional tooltip for blocked gates */}
+                                    {isClickable ? (
+                                      <span
+                                        onClick={() => setOpenDocument(doc.gateId)}
+                                        style={{ fontSize: '13px', color: isApproved ? 'var(--accent)' : isGenerated ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1, fontStyle: isGenerated ? 'normal' : 'italic' }}
+                                      >
+                                        {doc.label}
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: '13px', color: 'var(--fg-dim)', fontStyle: 'italic', flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>{doc.label}</span>
+                                        {prereqTooltip && (
+                                          <span
+                                            style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}
+                                            onMouseEnter={() => setTooltipGate(doc.gateId)}
+                                            onMouseLeave={() => setTooltipGate(null)}
+                                          >
+                                            <Info size={11} color="var(--fg-dim-2)" style={{ display: 'block' }} />
+                                            {tooltipGate === doc.gateId && (
+                                              <span style={{
+                                                position: 'absolute', bottom: '130%', left: '50%',
+                                                transform: 'translateX(-50%)',
+                                                backgroundColor: 'var(--bg-elev)', border: '1px solid var(--line)',
+                                                padding: '6px 10px', width: '200px',
+                                                fontSize: '0.65rem', lineHeight: 1.5,
+                                                color: 'var(--fg-dim)', zIndex: 30,
+                                                pointerEvents: 'none',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                              }}>
+                                                {prereqTooltip}
+                                              </span>
+                                            )}
+                                          </span>
+                                        )}
+                                      </span>
+                                    )}
+
+                                    {/* Confidence indicators — only when last_evaluated is set */}
+                                    {showConfidence && gateConfidence && (
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
+                                        {(['coverage', 'clarity', 'consistency'] as const).map(dim => {
+                                          const level = gateConfidence[dim]
+                                          if (level === 'strong') return null
+                                          return (
+                                            <span key={dim} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                              <span style={{
+                                                width: '5px', height: '5px', borderRadius: '50%', display: 'block',
+                                                backgroundColor: level === 'needs_attention'
+                                                  ? 'rgba(194,154,80,0.65)'
+                                                  : 'rgba(140,134,130,0.4)',
+                                              }} />
+                                              <span style={{
+                                                fontSize: '0.44rem', letterSpacing: '0.04em',
+                                                color: level === 'needs_attention' ? 'rgba(194,154,80,0.75)' : 'var(--fg-dim-2)',
+                                                textTransform: 'uppercase', lineHeight: 1,
+                                              }}>
+                                                {dim === 'coverage' ? 'Coverage' : dim === 'clarity' ? 'Clarity' : 'Consistency'}
+                                              </span>
+                                            </span>
+                                          )
+                                        })}
+                                      </div>
+                                    )}
 
                                     {/* State pill */}
                                     {gateState === 'UNAVAILABLE' ? (
@@ -2356,8 +2513,135 @@ export default function FilmStudio() {
                 </div>
               )}
 
+              {/* MEMORY TAB */}
+              {contextTab === 'memory' && (
+                <div style={{ padding: '1rem 1rem 2rem' }}>
+                  {!filmMemory ? (
+                    <p style={{ fontSize: '0.82rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                      As your film takes shape, Matinee's memory will surface here.
+                    </p>
+                  ) : (
+                    (() => {
+                      // Normalize filmmakers_words to entries array
+                      const wordsRaw = filmMemory.filmmakers_words
+                      let wordEntries: FilmakersWordsEntry[] = []
+                      if (Array.isArray(wordsRaw)) {
+                        wordEntries = wordsRaw.map(item =>
+                          typeof item === 'string'
+                            ? { text: item, session_id: null, mode: 'pre-migration', captured_at: null }
+                            : item as FilmakersWordsEntry
+                        )
+                      } else if (typeof wordsRaw === 'string' && wordsRaw.trim()) {
+                        const phrases = wordsRaw.split('|').map((p: string) => p.trim()).filter(Boolean)
+                        wordEntries = phrases.map((p: string) => ({ text: p, session_id: null, mode: 'pre-migration', captured_at: null }))
+                      }
+
+                      const openFlags = Array.isArray(filmMemory.continuity_flags)
+                        ? filmMemory.continuity_flags.filter(f => f.status === 'open')
+                        : []
+                      const toneSignals = Array.isArray(filmMemory.tone_signals) ? filmMemory.tone_signals : []
+                      const hasUnresolved = !!(filmMemory.unresolved_threads && filmMemory.unresolved_threads.trim())
+                      const hasContent = wordEntries.length > 0 || hasUnresolved || openFlags.length > 0 || toneSignals.length > 0
+
+                      if (!hasContent) {
+                        return (
+                          <p style={{ fontSize: '0.82rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                            As your film takes shape, Matinee's memory will surface here.
+                          </p>
+                        )
+                      }
+
+                      const displayWords = showAllWords ? wordEntries : wordEntries.slice(-3)
+
+                      return (
+                        <>
+                          {/* Section 1 — Your words */}
+                          {wordEntries.length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                              <p style={{ fontSize: '0.55rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                                Your words
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {displayWords.map((entry, idx) => (
+                                  <div key={idx} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                    <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0, fontStyle: 'italic' }}>
+                                      "{entry.text}"
+                                    </p>
+                                    {!(entry.captured_at === null && entry.mode === 'pre-migration') && (
+                                      <p style={{ fontSize: '0.6rem', color: 'var(--fg-dim-2)', margin: '0.25rem 0 0' }}>
+                                        {entry.mode.charAt(0).toUpperCase() + entry.mode.slice(1)}
+                                        {entry.captured_at && ` · ${formatDate(entry.captured_at)}`}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {wordEntries.length > 3 && (
+                                <span
+                                  onClick={() => setShowAllWords(prev => !prev)}
+                                  style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
+                                >
+                                  {showAllWords ? 'Show fewer' : `Show all (${wordEntries.length})`}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Section 2 — What's still open */}
+                          {hasUnresolved && (
+                            <div style={{ marginBottom: '2rem' }}>
+                              <p style={{ fontSize: '0.55rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                                What's still open
+                              </p>
+                              <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>
+                                {filmMemory.unresolved_threads}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Section 3 — Tensions Matinee is holding */}
+                          {openFlags.length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                              <p style={{ fontSize: '0.55rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                                Tensions Matinee is holding
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {openFlags.map((item, idx) => (
+                                  <p key={idx} style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>
+                                    {item.flag}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Section 4 — Tone — Matinee's read */}
+                          {toneSignals.length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                              <p style={{ fontSize: '0.55rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                Tone — Matinee's read
+                              </p>
+                              <p style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', fontStyle: 'italic', margin: '0 0 0.75rem' }}>
+                                Matinee's observation — not a committed decision.
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {toneSignals.map((item, idx) => (
+                                  <p key={idx} style={{ fontSize: '0.82rem', lineHeight: 1.6, color: '#a8a098', margin: 0 }}>
+                                    {item.signal}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()
+                  )}
+                </div>
+              )}
+
               {/* PLACEHOLDER TABS */}
-              {contextTab !== 'portrait' && contextTab !== 'archive' && (
+              {contextTab !== 'portrait' && contextTab !== 'archive' && contextTab !== 'memory' && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
                   <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', textAlign: 'center' }}>
                     Coming in the next story.
