@@ -643,7 +643,7 @@ ${portraitContext ? `CURRENT PORTRAIT STATE — values already confirmed in the 
     "emotional_core": "",
     "characters": "",
     "decisions_made": "",
-    "filmmakers_words": "",
+    "filmmakers_words": [],
     "unresolved_threads": ""
   },
   "portrait": {
@@ -684,7 +684,9 @@ portrait_unresolved_questions — An array of open questions the filmmaker is si
 
 decisions_made — Key creative and production decisions confirmed in this exchange. Do not include target length, episode count, or runtime statements here — these belong in portrait_target_length.
 
-Return empty string in "value" for any field where nothing meaningful was shared (empty array [] for portrait_unresolved_questions). Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
+filmmakers_words — Exact phrases, images, or sentences the filmmaker used that are precise and distinctively theirs. Copy verbatim from the conversation. Do not paraphrase. Do not summarize. Capture language that is specific, vivid, or uniquely theirs — not generic descriptions. Each entry is a single phrase or sentence. Return as a JSON array of strings: ["phrase one", "phrase two"]. Return [] only if the filmmaker said nothing specific or distinctive.
+
+Return empty string in "value" for any field where nothing meaningful was shared (empty array [] for portrait_unresolved_questions and filmmakers_words). Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
 
   try {
     const response = await anthropic.messages.create({
