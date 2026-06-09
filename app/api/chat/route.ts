@@ -690,7 +690,6 @@ Return empty string in "value" for any field where nothing meaningful was shared
 
   try {
     const conversationHistory = messages.map((m: {role: string, content: string}) => `${m.role === 'user' ? 'Filmmaker' : 'Matinee'}: "${m.content}"`).join('\n\n')
-    console.log('[DEBUG Call 2] conversationHistory sent to extraction:\n', conversationHistory)
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
@@ -712,7 +711,6 @@ Return empty string in "value" for any field where nothing meaningful was shared
       .replace(/```\s*$/i, '')
       .trim()
     const parsed = JSON.parse(stripped)
-    console.log('[DEBUG Call 2] raw parsed response from extraction:', JSON.stringify(parsed, null, 2))
     if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
 
     // Flatten portrait fields from { value, is_correction } objects → flat string map + corrections list
