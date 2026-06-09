@@ -446,17 +446,28 @@ function formatDate(ts: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-function mergeFilmakersWords(nw?: string, ew?: string): string {
-  if (!ew) return nw ?? ''
-  if (!nw) return ew
-  const existingPhrases = ew.split('|').map(p => p.trim()).filter(Boolean)
-  const newPhrases = nw.split('|').map(p => p.trim()).filter(Boolean)
-  for (const phrase of newPhrases) {
-    if (!existingPhrases.some(p => p.toLowerCase().includes(phrase.toLowerCase()) || phrase.toLowerCase().includes(p.toLowerCase()))) {
-      existingPhrases.push(phrase)
+function mergeFilmakersWords(
+  newWords: string | string[] | undefined,
+  existingWords: string | string[] | undefined
+): string[] {
+  const existing = Array.isArray(existingWords) ? existingWords
+    : typeof existingWords === 'string' && existingWords
+      ? existingWords.split('|').map(p => p.trim()).filter(Boolean)
+      : []
+  const incoming = Array.isArray(newWords) ? newWords
+    : typeof newWords === 'string' && newWords
+      ? newWords.split('|').map(p => p.trim()).filter(Boolean)
+      : []
+  const merged = [...existing]
+  for (const phrase of incoming) {
+    if (!merged.some(p =>
+      p.toLowerCase().includes(phrase.toLowerCase()) ||
+      phrase.toLowerCase().includes(p.toLowerCase())
+    )) {
+      merged.push(phrase)
     }
   }
-  return existingPhrases.join(' | ')
+  return merged
 }
 
 function appendHistory(
@@ -495,14 +506,10 @@ async function mergeMemory(
                 ? extracted?.characters : existing?.characters,
     updated_at: new Date().toISOString(),
   }
-  // Only merge filmmakers_words when still in legacy string format.
-  // Post-migration JSONB arrays are preserved as-is; Sprint 3E handles array writes.
-  if (typeof existing?.filmmakers_words === 'string' || !existing?.filmmakers_words) {
-    mergedMemory.filmmakers_words = mergeFilmakersWords(
-      extracted?.filmmakers_words as string | undefined,
-      existing?.filmmakers_words as string | undefined
-    )
-  }
+  mergedMemory.filmmakers_words = mergeFilmakersWords(
+    extracted?.filmmakers_words,
+    existing?.filmmakers_words
+  )
 
   const portraitUpdates: Record<string, any> = {}
   const now = new Date().toISOString()
