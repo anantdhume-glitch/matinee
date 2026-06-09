@@ -46,22 +46,26 @@ export function mergeMemoryFromExtraction(
   const nc = extracted.memory?.characters || []
   if (JSON.stringify(nc).length > JSON.stringify(ec).length) merged.characters = nc
 
-  const ew = (existing?.filmmakers_words || '') as string
-  const nw = (extracted.memory?.filmmakers_words || '') as string
-  if (!ew) {
-    merged.filmmakers_words = nw
-  } else if (nw) {
-    const existingPhrases = ew.split('|').map(p => p.trim()).filter(Boolean)
-    const newPhrases = nw.split('|').map(p => p.trim()).filter(Boolean)
-    for (const phrase of newPhrases) {
-      if (!existingPhrases.some(p =>
+  const existingWords = Array.isArray(existing?.filmmakers_words)
+    ? existing.filmmakers_words
+    : []
+  const newWords = Array.isArray(extracted.memory?.filmmakers_words)
+    ? extracted.memory.filmmakers_words
+    : []
+
+  if (newWords.length > 0) {
+    const merged_words = [...existingWords]
+    for (const phrase of newWords) {
+      if (!merged_words.some(p =>
         p.toLowerCase().includes(phrase.toLowerCase()) ||
         phrase.toLowerCase().includes(p.toLowerCase())
       )) {
-        existingPhrases.push(phrase)
+        merged_words.push(phrase)
       }
     }
-    merged.filmmakers_words = existingPhrases.join(' | ')
+    merged.filmmakers_words = merged_words
+  } else {
+    merged.filmmakers_words = existingWords
   }
 
   for (const field of PORTRAIT_TEXT_FIELDS) {
