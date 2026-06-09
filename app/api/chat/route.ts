@@ -629,7 +629,7 @@ function buildCurrentPortraitContext(portrait: Record<string, any> | null | unde
 }
 
 async function extractMemoryAndPortrait(
-  userMessage: string,
+  messages: { role: string; content: string }[],
   assistantResponse: string,
   currentPortrait?: Record<string, any> | null,
 ): Promise<{ memory: any; portrait: any; corrections: string[] }> {
@@ -697,7 +697,7 @@ Return empty string in "value" for any field where nothing meaningful was shared
       messages: [
         {
           role: 'user',
-          content: `Filmmaker said: "${userMessage}"\n\nMatinee responded: "${assistantResponse}"\n\nExtract memory and portrait fields from this exchange.`
+          content: `Here is the full conversation so far:\n\n${messages.map((m: {role: string, content: string}) => `${m.role === 'user' ? 'Filmmaker' : 'Matinee'}: "${m.content}"`).join('\n\n')}\n\nMatinee's latest response: "${assistantResponse}"\n\nExtract memory and portrait fields from this full conversation.`
         }
       ]
     })
@@ -940,7 +940,6 @@ export async function POST(req: NextRequest) {
     const stale_document_id = stalenessDetected ? inReviewDocument.type : null
 
     // Call 2 — extraction (only if shouldExtract)
-    const userMessage = messages.length > 0 ? (messages[messages.length - 1]?.content ?? '') : ''
     const doExtract = shouldExtract(messages)
 
     let memory = { logline: '', themes: '', emotional_core: '', filmmakers_words: '', key_decisions: '' }
@@ -948,7 +947,7 @@ export async function POST(req: NextRequest) {
     let corrections: string[] = []
 
     if (doExtract) {
-      const extracted = await extractMemoryAndPortrait(userMessage, content, filmMemory)
+      const extracted = await extractMemoryAndPortrait(messages, content, filmMemory)
       memory = extracted.memory
       portrait = extracted.portrait
       corrections = extracted.corrections
