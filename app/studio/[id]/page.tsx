@@ -448,23 +448,35 @@ function formatDate(ts: string): string {
 
 function mergeFilmakersWords(
   newWords: string | string[] | undefined,
-  existingWords: string | string[] | undefined
-): string[] {
-  const existing = Array.isArray(existingWords) ? existingWords
+  existingWords: FilmakersWordsEntry[] | string | undefined
+): FilmakersWordsEntry[] {
+  // Normalise existing to FilmakersWordsEntry[]
+  const existing: FilmakersWordsEntry[] = Array.isArray(existingWords)
+    ? existingWords.map(item =>
+        typeof item === 'string'
+          ? { text: item, session_id: null, mode: 'pre-migration', captured_at: null }
+          : item
+      )
     : typeof existingWords === 'string' && existingWords
-      ? existingWords.split('|').map(p => p.trim()).filter(Boolean)
+      ? existingWords.split('|').map(p => ({ text: p.trim(), session_id: null, mode: 'pre-migration', captured_at: null })).filter(e => e.text)
       : []
-  const incoming = Array.isArray(newWords) ? newWords
+
+  // Normalise incoming to plain strings
+  const incoming: string[] = Array.isArray(newWords)
+    ? newWords
     : typeof newWords === 'string' && newWords
       ? newWords.split('|').map(p => p.trim()).filter(Boolean)
       : []
-  const merged = [...existing]
+
+  const existingTexts = existing.map(e => e.text)
+  const merged: FilmakersWordsEntry[] = [...existing]
   for (const phrase of incoming) {
-    if (!merged.some(p =>
-      p.toLowerCase().includes(phrase.toLowerCase()) ||
-      phrase.toLowerCase().includes(p.toLowerCase())
+    if (!existingTexts.some(t =>
+      t.toLowerCase().includes(phrase.toLowerCase()) ||
+      phrase.toLowerCase().includes(t.toLowerCase())
     )) {
-      merged.push(phrase)
+      merged.push({ text: phrase, session_id: null, mode: 'discovery', captured_at: new Date().toISOString() })
+      existingTexts.push(phrase)
     }
   }
   return merged
