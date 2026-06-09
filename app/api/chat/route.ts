@@ -689,6 +689,9 @@ filmmakers_words — Exact phrases, images, or sentences the filmmaker used that
 Return empty string in "value" for any field where nothing meaningful was shared (empty array [] for portrait_unresolved_questions and filmmakers_words). Only populate from explicit signal in the conversation — never invent. Raw JSON only. Nothing else.`
 
   try {
+    const conversationHistory = messages.map((m: {role: string, content: string}) => `${m.role === 'user' ? 'Filmmaker' : 'Matinee'}: "${m.content}"`).join('\n\n')
+    console.log('[DEBUG Call 2] conversationHistory sent to extraction:\n', conversationHistory)
+
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
@@ -697,7 +700,7 @@ Return empty string in "value" for any field where nothing meaningful was shared
       messages: [
         {
           role: 'user',
-          content: `Here is the full conversation so far:\n\n${messages.map((m: {role: string, content: string}) => `${m.role === 'user' ? 'Filmmaker' : 'Matinee'}: "${m.content}"`).join('\n\n')}\n\nMatinee's latest response: "${assistantResponse}"\n\nExtract memory and portrait fields from this full conversation.`
+          content: `Here is the full conversation so far:\n\n${conversationHistory}\n\nMatinee's latest response: "${assistantResponse}"\n\nExtract memory and portrait fields from this full conversation.`
         }
       ]
     })
@@ -709,6 +712,7 @@ Return empty string in "value" for any field where nothing meaningful was shared
       .replace(/```\s*$/i, '')
       .trim()
     const parsed = JSON.parse(stripped)
+    console.log('[DEBUG Call 2] raw parsed response from extraction:', JSON.stringify(parsed, null, 2))
     if (parsed.portrait) delete parsed.portrait['portrait_directors_intent']
 
     // Flatten portrait fields from { value, is_correction } objects → flat string map + corrections list
