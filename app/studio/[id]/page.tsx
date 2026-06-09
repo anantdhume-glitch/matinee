@@ -2397,6 +2397,7 @@ export default function FilmStudio() {
                                   if (data.success) {
                                     const { data: freshFilm } = await supabase.from('films').select('*').eq('id', filmId).single()
                                     if (freshFilm) setFilm(freshFilm)
+                                    await sendMessage(`I've uploaded a research document: ${f.name}`)
                                   } else {
                                     setUploadError(data.error || 'Something went wrong uploading your research. Try again.')
                                   }
