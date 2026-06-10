@@ -1170,7 +1170,7 @@ export default function FilmStudio() {
     const documentContent = film?.documents_content?.[gateId] ?? film?.gates_closed?.find(g => g.gate === gateId)?.approved_content ?? ''
     if (documentContent) {
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-      await fetch('/api/gate-approval-extraction', {
+      const extractionResponse = await fetch('/api/gate-approval-extraction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1182,12 +1182,23 @@ export default function FilmStudio() {
           sourceType: 'matinee_generated',
         }),
       })
+      const extractionResult = await extractionResponse.json()
       const { data: freshFilm } = await supabase
         .from('films')
         .select('*')
         .eq('id', filmId)
         .single()
-      if (freshFilm) setFilm(freshFilm)
+      if (freshFilm) {
+        // Patch confidence directly from API response if Supabase re-fetch hasn't caught up
+        if (extractionResult?.confidence && freshFilm.gates_closed) {
+          freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
+            g.gate === gateId
+              ? { ...g, confidence: extractionResult.confidence }
+              : g
+          )
+        }
+        setFilm(freshFilm)
+      }
       await refreshPortrait()
     }
   }
