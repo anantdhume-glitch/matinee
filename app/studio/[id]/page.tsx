@@ -1021,11 +1021,17 @@ export default function FilmStudio() {
         const filmCorrections: string[] = data.corrections ?? []
         // In production modes, portrait updates are gated to discovery.
         // Exception: explicit corrections always apply regardless of mode.
+        // Exception: first-time writes (no existing value) always apply regardless of mode.
+        const existingPortraitKeys = memoryData ? Object.keys(memoryData).filter(k => {
+          const field = (memoryData as any)[k]
+          return field && (typeof field === 'object') && field.value && field.value !== ''
+        }) : []
+
         const portraitToMerge = film?.current_mode
           ? Object.fromEntries(
-              filmCorrections
-                .filter((k: string) => allPortrait[k])
-                .map((k: string) => [k, allPortrait[k]])
+              Object.entries(allPortrait).filter(([k]) =>
+                filmCorrections.includes(k) || !existingPortraitKeys.includes(k)
+              )
             )
           : allPortrait
         await mergeMemory(data.memory, portraitToMerge, memoryData, filmId, supabase, 'studio', filmCorrections)
