@@ -1170,7 +1170,7 @@ export default function FilmStudio() {
     const documentContent = film?.documents_content?.[gateId] ?? film?.gates_closed?.find(g => g.gate === gateId)?.approved_content ?? ''
     if (documentContent) {
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-      await fetch('/api/gate-approval-extraction', {
+      const extractionResponse = await fetch('/api/gate-approval-extraction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1182,6 +1182,23 @@ export default function FilmStudio() {
           sourceType: 'matinee_generated',
         }),
       })
+      const extractionResult = await extractionResponse.json()
+      const { data: freshFilm } = await supabase
+        .from('films')
+        .select('*')
+        .eq('id', filmId)
+        .single()
+      if (freshFilm) {
+        // Patch confidence directly from API response if Supabase re-fetch hasn't caught up
+        if (extractionResult?.confidence && freshFilm.gates_closed) {
+          freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
+            g.gate === gateId
+              ? { ...g, confidence: extractionResult.confidence }
+              : g
+          )
+        }
+        setFilm(freshFilm)
+      }
       await refreshPortrait()
     }
   }
@@ -2545,21 +2562,26 @@ export default function FilmStudio() {
                                       <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
                                         {(['coverage', 'clarity', 'consistency'] as const).map(dim => {
                                           const level = gateConfidence[dim]
-                                          if (level === 'strong') return null
                                           return (
                                             <span key={dim} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                              <span style={{
-                                                width: '5px', height: '5px', borderRadius: '50%', display: 'block',
-                                                backgroundColor: level === 'needs_attention'
-                                                  ? 'rgba(194,154,80,0.65)'
-                                                  : 'rgba(140,134,130,0.4)',
-                                              }} />
+                                              {level !== 'strong' && (
+                                                <span style={{
+                                                  width: '5px', height: '5px', borderRadius: '50%', display: 'block',
+                                                  backgroundColor: level === 'needs_attention'
+                                                    ? 'rgba(194,154,80,0.65)'
+                                                    : 'rgba(140,134,130,0.4)',
+                                                }} />
+                                              )}
                                               <span style={{
                                                 fontSize: '0.44rem', letterSpacing: '0.04em',
-                                                color: level === 'needs_attention' ? 'rgba(194,154,80,0.75)' : 'var(--fg-dim-2)',
+                                                color: level === 'needs_attention'
+                                                  ? 'rgba(194,154,80,0.75)'
+                                                  : level === 'strong'
+                                                  ? 'rgba(140,134,130,0.55)'
+                                                  : 'var(--fg-dim-2)',
                                                 textTransform: 'uppercase', lineHeight: 1,
                                               }}>
-                                                {dim === 'coverage' ? 'Coverage' : dim === 'clarity' ? 'Clarity' : 'Consistency'}
+                                                {dim === 'coverage' ? 'COV' : dim === 'clarity' ? 'CLR' : 'CON'}
                                               </span>
                                             </span>
                                           )
