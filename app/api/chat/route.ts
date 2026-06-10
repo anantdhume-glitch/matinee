@@ -693,7 +693,7 @@ Return empty string in "value" for any field where nothing meaningful was shared
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
+      max_tokens: 2500,
       temperature: 0,
       system: extractionSystem,
       messages: [
@@ -924,7 +924,7 @@ export async function POST(req: NextRequest) {
     }
 
     const apiMessages = messages.length > 0
-      ? messages.slice(-20)
+      ? messages.filter(m => m.content !== null && m.content !== undefined && m.content !== '').slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
     // Call 1 — conversation
