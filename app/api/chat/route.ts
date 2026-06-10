@@ -672,11 +672,11 @@ portrait_emotional_core — What this film does to an audience — the emotional
 
 portrait_tone — The committed emotional register of the film, as the filmmaker has explicitly locked it. This is not Matinee's read of the tone. This is the filmmaker's own stated commitment: "the tone is X" or "I want this film to feel X." Only write this when the filmmaker has made an explicit, committed statement about the film's emotional temperature. A filmmaker exploring tone, trying out descriptions, or responding to Matinee's suggestions is not a commitment — it is a signal for Film Memory, not Portrait. If the filmmaker has not made a clear commitment, leave this empty.
 
-portrait_approach — How the film will be made: the filmmaking method. Observational, constructed, narrated, hybrid, essay film, direct address, testimony-based. This is a production decision, not a character read. Do not write character descriptions, subject relationships, or emotional observations here. Only write this when the filmmaker has described the method of storytelling — how they will construct the film, not what it is about. If the filmmaker has described approach only in terms of character or subject, leave this empty.
+portrait_approach — How the film will be made: the filmmaking method. Observational, constructed, narrated, hybrid, essay film, direct address, testimony-based, reconstructed sequences, archival-based. This is a production decision about construction, not a character read. Write this field when the filmmaker has described how they will build the film — including statements about reconstruction, sequence structure, or the relationship between visual material and narrative logic. A filmmaker saying "reconstructed sequences" or "we will show X through Y method" is an approach statement — write it. Only leave empty if the filmmaker has described their film purely in terms of subject matter with no indication of how it will be constructed.
 
 portrait_world — Captures the specific physical, political, and emotional world the film inhabits. Never use qualifiers like "likely" or "possibly" — only write what the filmmaker has explicitly described. Include: the geographic and historical setting, the political conditions, the physical environments central to the story, the texture of daily life under those conditions. If the filmmaker has named specific places, periods, or conditions, use them precisely. Do not generalise or infer beyond what has been stated.
 
-portrait_target_length — Captures the filmmaker's explicitly stated runtime. Recognise: episode count with duration ("X episodes, Y minutes each"), series format ("X-part series"), per-episode runtime ("Y minutes per episode"), or any explicit total or per-episode duration statement. When the filmmaker states any of these, write the value here. Do not route duration statements to decisions_made.
+portrait_target_length — Captures the filmmaker's explicitly stated runtime or format. Recognise any of: episode count with duration ("two episodes of 30 minutes each"), series format ("X-part series"), per-episode runtime ("Y minutes per episode"), total runtime, or any explicit duration statement. When the filmmaker states any of these — in any mode, at any point in the conversation — write the value here as a clean plain-English string (e.g. "Two episodes, 30 minutes each"). Do not route duration or format statements to decisions_made. If a duration is in decisions_made but not here, that is an error — write it here.
 
 portrait_comparable_films — Films the filmmaker has named as touchstones, references, or comparisons for tone, approach, or visual world. Only populate from explicit film references the filmmaker has named themselves. Do not include films Matinee has suggested unless the filmmaker has explicitly agreed they are relevant. Write as a plain list of film titles, comma-separated. If no film references were made in this exchange, leave this empty.
 
@@ -693,7 +693,7 @@ Return empty string in "value" for any field where nothing meaningful was shared
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
+      max_tokens: 2500,
       temperature: 0,
       system: extractionSystem,
       messages: [
@@ -924,7 +924,7 @@ export async function POST(req: NextRequest) {
     }
 
     const apiMessages = messages.length > 0
-      ? messages.slice(-20)
+      ? messages.filter((m: { role: string; content: string }) => m.content !== null && m.content !== undefined && m.content !== '').slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
     // Call 1 — conversation
