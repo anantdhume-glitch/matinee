@@ -924,7 +924,7 @@ export async function POST(req: NextRequest) {
     }
 
     const apiMessages = messages.length > 0
-      ? messages.filter(m => m.content !== null && m.content !== undefined && m.content !== '').slice(-20)
+      ? messages.filter((m: { role: string; content: string }) => m.content !== null && m.content !== undefined && m.content !== '').slice(-20)
       : [{ role: 'user', content: 'Begin.' }]
 
     // Call 1 — conversation
