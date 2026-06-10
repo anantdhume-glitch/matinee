@@ -1182,6 +1182,12 @@ export default function FilmStudio() {
           sourceType: 'matinee_generated',
         }),
       })
+      const { data: freshFilm } = await supabase
+        .from('films')
+        .select('*')
+        .eq('id', filmId)
+        .single()
+      if (freshFilm) setFilm(freshFilm)
       await refreshPortrait()
     }
   }
@@ -2545,21 +2551,26 @@ export default function FilmStudio() {
                                       <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
                                         {(['coverage', 'clarity', 'consistency'] as const).map(dim => {
                                           const level = gateConfidence[dim]
-                                          if (level === 'strong') return null
                                           return (
                                             <span key={dim} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                              <span style={{
-                                                width: '5px', height: '5px', borderRadius: '50%', display: 'block',
-                                                backgroundColor: level === 'needs_attention'
-                                                  ? 'rgba(194,154,80,0.65)'
-                                                  : 'rgba(140,134,130,0.4)',
-                                              }} />
+                                              {level !== 'strong' && (
+                                                <span style={{
+                                                  width: '5px', height: '5px', borderRadius: '50%', display: 'block',
+                                                  backgroundColor: level === 'needs_attention'
+                                                    ? 'rgba(194,154,80,0.65)'
+                                                    : 'rgba(140,134,130,0.4)',
+                                                }} />
+                                              )}
                                               <span style={{
                                                 fontSize: '0.44rem', letterSpacing: '0.04em',
-                                                color: level === 'needs_attention' ? 'rgba(194,154,80,0.75)' : 'var(--fg-dim-2)',
+                                                color: level === 'needs_attention'
+                                                  ? 'rgba(194,154,80,0.75)'
+                                                  : level === 'strong'
+                                                  ? 'rgba(140,134,130,0.55)'
+                                                  : 'var(--fg-dim-2)',
                                                 textTransform: 'uppercase', lineHeight: 1,
                                               }}>
-                                                {dim === 'coverage' ? 'Coverage' : dim === 'clarity' ? 'Clarity' : 'Consistency'}
+                                                {dim === 'coverage' ? 'COV' : dim === 'clarity' ? 'CLR' : 'CON'}
                                               </span>
                                             </span>
                                           )
