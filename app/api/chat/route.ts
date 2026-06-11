@@ -945,9 +945,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log('gatesClosed:', JSON.stringify(gatesClosed, null, 2))
     let systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
-    console.log('systemPrompt tail:', systemPrompt.slice(-500))
 
     // Inject mode-specific locked Department Brief(s) into system prompt
     if (briefInjection) {
