@@ -8,12 +8,25 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 type FilmMode = 'producer' | 'director' | 'narrator' | 'cinematographer' | 'editor' | 'ai_specialist'
 type GateId = 'film_brief' | 'treatment' | 'narration_brief' | 'cinematography_brief' | 'sound_brief' | 'ai_brief' | 'editorial_brief' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 
+type GateConfidence = {
+  coverage: 'strong' | 'developing' | 'needs_attention'
+  clarity: 'strong' | 'developing' | 'needs_attention'
+  consistency: 'strong' | 'developing' | 'needs_attention'
+  last_evaluated: string
+}
+
 type PromptContext = {
   filmMemory: Record<string, any> | null
   filmTitle: string
   sessionType: string
   currentMode: FilmMode
-  gatesClosed?: { gate: string; closed_at: string; status?: string; portrait_version?: string }[]
+  gatesClosed?: {
+    gate: string
+    closed_at: string
+    status?: string
+    portrait_version?: string
+    confidence?: GateConfidence
+  }[]
   referenceBlock?: string
 }
 
@@ -736,12 +749,33 @@ Return empty string in "value" for any field where nothing meaningful was shared
   }
 }
 
+function buildConfidenceBlock(gatesClosed: PromptContext['gatesClosed']): string {
+  if (!gatesClosed || gatesClosed.length === 0) return ''
+
+  const lines = gatesClosed
+    .filter(g => g.confidence && g.closed_at)
+    .map(g => {
+      const c = g.confidence!
+      return `${g.gate}: coverage=${c.coverage} clarity=${c.clarity} consistency=${c.consistency}`
+    })
+
+  if (lines.length === 0) return ''
+
+  return `\n\nGATE CONFIDENCE\n${lines.join('\n')}`
+}
+
 function buildSystemPrompt(
   filmMemory: any,
   sessionType: string,
   filmTitle: string,
   currentMode: string | null,
-  gatesClosed: { gate: string; closed_at: string; status?: string; portrait_version?: string }[] = [],
+  gatesClosed: {
+    gate: string
+    closed_at: string
+    status?: string
+    portrait_version?: string
+    confidence?: GateConfidence
+  }[] = [],
   referenceBlock: string = ''
 ): string {
   if (currentMode !== null && currentMode !== 'discovery') {
@@ -755,7 +789,7 @@ function buildSystemPrompt(
       referenceBlock: referenceBlock || undefined,
     }
     const modePrompt = MODE_PROMPTS[mode]?.(ctx) ?? ''
-    return `${buildUniversalPreamble()}\n\n${modePrompt}`
+    return `${buildUniversalPreamble()}\n\n${modePrompt}${buildConfidenceBlock(ctx.gatesClosed)}`
   }
 
   const memoryBlock = filmMemory
@@ -911,7 +945,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    console.log('gatesClosed:', JSON.stringify(gatesClosed, null, 2))
     let systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
+    console.log('systemPrompt tail:', systemPrompt.slice(-500))
 
     // Inject mode-specific locked Department Brief(s) into system prompt
     if (briefInjection) {
