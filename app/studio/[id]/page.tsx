@@ -659,6 +659,7 @@ export default function FilmStudio() {
     extractedPortrait: any
   } | null>(null)
   const [importDiscussing, setImportDiscussing] = useState(false)
+  const [importConfirming, setImportConfirming] = useState(false)
   const [importLoading, setImportLoading] = useState<GateId | null>(null)
   const [filmMemory, setFilmMemory] = useState<FilmMemory | null>(null)
   const [portraitRefreshedAt, setPortraitRefreshedAt] = useState<string | null>(null)
@@ -1350,7 +1351,7 @@ export default function FilmStudio() {
     }
   }
 
-  const approveGateFromImport = async (gateId: GateId, filename: string) => {
+  const approveGateFromImport = async (gateId: GateId, filename: string, documentContent: string) => {
     const now = new Date().toISOString()
     const newGate: GateClosed = {
       gate: gateId,
@@ -1366,66 +1367,90 @@ export default function FilmStudio() {
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
 
-    // Fire extraction pass after gate closes
-    const documentContent = film?.documents_content?.[gateId] ?? ''
+    // Fire extraction pass after gate closes — best-effort, gate closure is primary
     if (documentContent) {
-      const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-      await fetch('/api/gate-approval-extraction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gateId,
-          filmId,
-          filmTitle: film?.title ?? '',
-          documentContent,
-          filmMemory: freshMemory,
-          sourceType: 'filmmaker_uploaded',
-        }),
-      })
-      await refreshPortrait()
+      try {
+        const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+        const extractionResponse = await fetch('/api/gate-approval-extraction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gateId,
+            filmId,
+            filmTitle: film?.title ?? '',
+            documentContent,
+            filmMemory: freshMemory,
+            sourceType: 'filmmaker_uploaded',
+          }),
+        })
+        const extractionResult = await extractionResponse.json()
+        const { data: freshFilm } = await supabase
+          .from('films')
+          .select('*')
+          .eq('id', filmId)
+          .single()
+        if (freshFilm) {
+          if (extractionResult?.confidence && freshFilm.gates_closed) {
+            freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
+              g.gate === gateId
+                ? { ...g, confidence: extractionResult.confidence }
+                : g
+            )
+          }
+          setFilm(freshFilm)
+        }
+      } catch (err) {
+        console.error('gate-approval-extraction failed:', err)
+      } finally {
+        await refreshPortrait()
+      }
     }
   }
 
   const confirmImport = async () => {
     if (!importPending) return
     const { gateId, filename, summary, extractedPortrait } = importPending
-
-    const { data: existingMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-    if (existingMemory) {
-      await mergeMemory({}, extractedPortrait, existingMemory, filmId, supabase, 'import')
-    }
-
-    const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-    let documentContent = summary
+    setImportConfirming(true)
     try {
-      const genResponse = await fetch('/api/generate-document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gateId,
-          filmTitle: film?.title,
-          filmMemory: freshMemory,
-          portrait: freshMemory,
-          gatesClosed: film?.gates_closed ?? [],
-          closedDocumentContent: film?.documents_content ?? {},
-          importedContent: summary,
+      const { data: existingMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+      if (existingMemory) {
+        await mergeMemory({}, extractedPortrait, existingMemory, filmId, supabase, 'import')
+      }
+
+      const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
+      let documentContent = summary
+      try {
+        const genResponse = await fetch('/api/generate-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gateId,
+            filmTitle: film?.title,
+            filmMemory: freshMemory,
+            portrait: freshMemory,
+            gatesClosed: film?.gates_closed ?? [],
+            closedDocumentContent: film?.documents_content ?? {},
+            importedContent: summary,
+          })
         })
-      })
-      const genData = await genResponse.json()
-      if (genData.success) documentContent = genData.content
-    } catch {}
+        const genData = await genResponse.json()
+        if (genData.success) documentContent = genData.content
+      } catch {}
 
-    const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: documentContent }
-    const newGenerated: DocumentGenerated = { document: gateId, generated_at: new Date().toISOString(), source: 'import' }
-    const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
-    await supabase.from('films').update({ documents_content: updatedContent, documents_generated: updatedGenerated }).eq('id', filmId)
-    setFilm(prev => prev ? { ...prev, documents_content: updatedContent, documents_generated: updatedGenerated } : null)
+      const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: documentContent }
+      const newGenerated: DocumentGenerated = { document: gateId, generated_at: new Date().toISOString(), source: 'import' }
+      const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
+      await supabase.from('films').update({ documents_content: updatedContent, documents_generated: updatedGenerated }).eq('id', filmId)
+      setFilm(prev => prev ? { ...prev, documents_content: updatedContent, documents_generated: updatedGenerated } : null)
 
-    await approveGateFromImport(gateId, filename)
+      await approveGateFromImport(gateId, filename, documentContent)
 
-    if (contextPanelOpen && contextTab === 'portrait') await refreshPortrait()
-    setImportPending(null)
-    setImportDiscussing(false)
+      if (contextPanelOpen && contextTab === 'portrait') await refreshPortrait()
+      setImportPending(null)
+      setImportDiscussing(false)
+    } finally {
+      setImportConfirming(false)
+    }
   }
 
   const discardImport = () => {
@@ -2909,8 +2934,8 @@ export default function FilmStudio() {
                 )}
                 {hasPendingImport && importDiscussing && (
                   <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.75rem' }}>
-                    <button onClick={confirmImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.64rem', letterSpacing: '0.06em' }}>
-                      Close gate
+                    <button onClick={confirmImport} disabled={importConfirming} style={{ background: 'none', border: 'none', padding: 0, color: importConfirming ? 'var(--fg-dim)' : 'var(--accent)', cursor: importConfirming ? 'default' : 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.64rem', letterSpacing: '0.06em' }}>
+                      {importConfirming ? 'Closing...' : 'Close gate'}
                     </button>
                     <button onClick={discardImport} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-dim)', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.64rem' }}>
                       Discard
