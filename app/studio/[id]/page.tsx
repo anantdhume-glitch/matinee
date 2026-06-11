@@ -1194,7 +1194,7 @@ export default function FilmStudio() {
         if (extractionResult?.confidence && freshFilm.gates_closed) {
           freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
             g.gate === gateId
-              ? { ...g, confidence: extractionResult.confidence }
+              ? { ...g, confidence: { ...extractionResult.confidence, last_evaluated: new Date().toISOString() } }
               : g
           )
         }
@@ -1393,7 +1393,7 @@ export default function FilmStudio() {
           if (extractionResult?.confidence && freshFilm.gates_closed) {
             freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
               g.gate === gateId
-                ? { ...g, confidence: extractionResult.confidence }
+                ? { ...g, confidence: { ...extractionResult.confidence, last_evaluated: new Date().toISOString() } }
                 : g
             )
           }
