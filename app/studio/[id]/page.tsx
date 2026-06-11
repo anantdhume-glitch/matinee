@@ -1350,7 +1350,7 @@ export default function FilmStudio() {
     }
   }
 
-  const approveGateFromImport = async (gateId: GateId, filename: string) => {
+  const approveGateFromImport = async (gateId: GateId, filename: string, documentContent: string) => {
     const now = new Date().toISOString()
     const newGate: GateClosed = {
       gate: gateId,
@@ -1367,10 +1367,9 @@ export default function FilmStudio() {
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
 
     // Fire extraction pass after gate closes
-    const documentContent = film?.documents_content?.[gateId] ?? ''
     if (documentContent) {
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
-      await fetch('/api/gate-approval-extraction', {
+      const extractionResponse = await fetch('/api/gate-approval-extraction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1382,6 +1381,22 @@ export default function FilmStudio() {
           sourceType: 'filmmaker_uploaded',
         }),
       })
+      const extractionResult = await extractionResponse.json()
+      const { data: freshFilm } = await supabase
+        .from('films')
+        .select('*')
+        .eq('id', filmId)
+        .single()
+      if (freshFilm) {
+        if (extractionResult?.confidence && freshFilm.gates_closed) {
+          freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
+            g.gate === gateId
+              ? { ...g, confidence: extractionResult.confidence }
+              : g
+          )
+        }
+        setFilm(freshFilm)
+      }
       await refreshPortrait()
     }
   }
@@ -1421,7 +1436,7 @@ export default function FilmStudio() {
     await supabase.from('films').update({ documents_content: updatedContent, documents_generated: updatedGenerated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, documents_content: updatedContent, documents_generated: updatedGenerated } : null)
 
-    await approveGateFromImport(gateId, filename)
+    await approveGateFromImport(gateId, filename, documentContent)
 
     if (contextPanelOpen && contextTab === 'portrait') await refreshPortrait()
     setImportPending(null)
