@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { createClient } from '@/lib/supabase'
+import { MODE_PORTRAIT_FIELDS } from '@/lib/portrait'
 import { useRouter, useParams } from 'next/navigation'
 import {
   FileText, Clapperboard, LayoutList, Radio, Anchor,
@@ -332,37 +333,6 @@ const MODE_CONFIG = [
   { key: 'editor',          label: 'Editor',          Icon: Film         },
 ]
 
-const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
-  producer: [
-    'portrait_logline', 'portrait_emotional_core', 'portrait_story',
-    'portrait_subjects', 'portrait_themes', 'portrait_approach',
-    'portrait_comparable_films', 'portrait_audience', 'portrait_target_length',
-    'portrait_unresolved_questions',
-  ],
-  director: [
-    'portrait_emotional_core', 'portrait_story', 'portrait_world',
-    'portrait_subjects', 'portrait_tone', 'portrait_visual_world',
-    'portrait_approach', 'portrait_target_length', 'portrait_comparable_films',
-    'portrait_unresolved_questions',
-  ],
-  narrator: [
-    'portrait_logline', 'portrait_emotional_core', 'portrait_story',
-    'portrait_subjects', 'portrait_themes', 'portrait_tone',
-    'portrait_approach', 'portrait_target_length', 'portrait_unresolved_questions',
-  ],
-  cinematographer: [
-    'portrait_tone', 'portrait_visual_world', 'portrait_world',
-    'portrait_subjects', 'portrait_approach', 'portrait_comparable_films',
-    'portrait_target_length',
-  ],
-  ai_specialist: [
-    'portrait_tone', 'portrait_visual_world', 'portrait_comparable_films',
-  ],
-  editor: [
-    'portrait_emotional_core', 'portrait_tone', 'portrait_approach',
-    'portrait_audience', 'portrait_target_length', 'portrait_unresolved_questions',
-  ],
-}
 
 const FALLBACK_PORTRAIT_FIELD_KEYS = [
   'portrait_logline', 'portrait_emotional_core', 'portrait_tone', 'portrait_unresolved_questions',
@@ -505,6 +475,7 @@ async function mergeMemory(
   supabase: any,
   createdBy: string = 'studio',
   corrections: string[] = [],
+  currentMode?: string,
 ) {
   const longer = (a?: string, b?: string) =>
     (a?.length ?? 0) >= (b?.length ?? 0) ? a : b
@@ -541,27 +512,30 @@ async function mergeMemory(
     'portrait_target_length',
   ]
 
+  const modeFields = currentMode ? (MODE_PORTRAIT_FIELDS[currentMode] ?? []) : []
+
   for (const field of PORTRAIT_TEXT_FIELDS) {
     const extracted_value = portrait?.[field]
     if (!extracted_value) continue
 
     const existing_field = (existing as any)?.[field]
+    const isCorrection = corrections.includes(field)
+    const isModeField = modeFields.includes(field)
 
     if (!existing_field) {
       portraitUpdates[field] = {
         value: extracted_value,
         created_by: createdBy,
-        created_in_mode: createdBy === 'import' ? 'import' : 'discovery',
+        created_in_mode: currentMode ?? (createdBy === 'import' ? 'import' : 'discovery'),
         updated_at: now,
       }
     } else {
       const existing_value = existing_field?.value ?? ''
-      const isCorrection = corrections.includes(field)
-      if (isCorrection || extracted_value.length > existing_value.length) {
-portraitUpdates[field] = {
+      if (isCorrection || isModeField || extracted_value.length > existing_value.length) {
+        portraitUpdates[field] = {
           value: extracted_value,
           created_by: createdBy,
-          created_in_mode: isCorrection ? 'correction' : (createdBy === 'import' ? 'import' : 'discovery'),
+          created_in_mode: isCorrection ? 'correction' : (currentMode ?? (createdBy === 'import' ? 'import' : 'discovery')),
           updated_at: now,
           history: appendHistory(existing_field),
         }
@@ -1020,22 +994,21 @@ export default function FilmStudio() {
       if (memoryData) {
         const allPortrait = data.portrait ?? {}
         const filmCorrections: string[] = data.corrections ?? []
-        // In production modes, portrait updates are gated to discovery.
-        // Exception: explicit corrections always apply regardless of mode.
-        // Exception: first-time writes (no existing value) always apply regardless of mode.
         const existingPortraitKeys = memoryData ? Object.keys(memoryData).filter(k => {
           const field = (memoryData as any)[k]
           return field && (typeof field === 'object') && field.value && field.value !== ''
         }) : []
 
+        // Allow writes for: explicit corrections, first-time writes, and fields owned by the current mode.
+        const currentModeFields = film?.current_mode ? (MODE_PORTRAIT_FIELDS[film.current_mode] ?? []) : []
         const portraitToMerge = film?.current_mode
           ? Object.fromEntries(
               Object.entries(allPortrait).filter(([k]) =>
-                filmCorrections.includes(k) || !existingPortraitKeys.includes(k)
+                filmCorrections.includes(k) || !existingPortraitKeys.includes(k) || currentModeFields.includes(k)
               )
             )
           : allPortrait
-        await mergeMemory(data.memory, portraitToMerge, memoryData, filmId, supabase, 'studio', filmCorrections)
+        await mergeMemory(data.memory, portraitToMerge, memoryData, filmId, supabase, 'studio', filmCorrections, film?.current_mode ?? undefined)
       } else {
         await supabase.from('film_memory').insert({ ...data.memory, film_id: filmId, updated_at: new Date().toISOString() })
       }
