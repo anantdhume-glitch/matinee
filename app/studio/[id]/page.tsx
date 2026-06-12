@@ -431,22 +431,26 @@ function mergeFilmakersWords(
       ? existingWords.split('|').map(p => ({ text: p.trim(), session_id: null, mode: 'pre-migration', captured_at: null })).filter(e => e.text)
       : []
 
-  // Normalise incoming to plain strings
+  // Deduplicate the existing array first (keeps earliest occurrence, case-insensitive)
+  const seenTexts = new Set<string>()
+  const deduped: FilmakersWordsEntry[] = []
+  for (const entry of existing) {
+    if (!seenTexts.has(entry.text.toLowerCase())) {
+      seenTexts.add(entry.text.toLowerCase())
+      deduped.push(entry)
+    }
+  }
+
+  const merged: FilmakersWordsEntry[] = [...deduped]
   const incoming: string[] = Array.isArray(newWords)
     ? newWords
     : typeof newWords === 'string' && newWords
       ? newWords.split('|').map(p => p.trim()).filter(Boolean)
       : []
-
-  const existingTexts = existing.map(e => e.text)
-  const merged: FilmakersWordsEntry[] = [...existing]
   for (const phrase of incoming) {
-    if (!existingTexts.some(t =>
-      t.toLowerCase().includes(phrase.toLowerCase()) ||
-      phrase.toLowerCase().includes(t.toLowerCase())
-    )) {
+    if (!seenTexts.has(phrase.toLowerCase())) {
+      seenTexts.add(phrase.toLowerCase())
       merged.push({ text: phrase, session_id: null, mode: 'discovery', captured_at: new Date().toISOString() })
-      existingTexts.push(phrase)
     }
   }
   return merged
@@ -2661,7 +2665,8 @@ export default function FilmStudio() {
                         )
                       }
 
-                      const displayWords = showAllWords ? expandedEntries : expandedEntries.slice(-3)
+                      const reversedEntries = [...expandedEntries].reverse()
+                      const displayWords = showAllWords ? reversedEntries : reversedEntries.slice(0, 3)
 
                       return (
                         <>

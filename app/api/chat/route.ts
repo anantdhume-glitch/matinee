@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { PORTRAIT_FIELD_LABELS, MODE_PORTRAIT_FIELDS, buildPortraitBlock, referenceDocumentsSection } from '@/lib/portrait'
 
+export const maxDuration = 300
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 type FilmMode = 'producer' | 'director' | 'narrator' | 'cinematographer' | 'editor' | 'ai_specialist'
