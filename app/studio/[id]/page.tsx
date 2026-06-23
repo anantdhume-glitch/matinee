@@ -649,6 +649,11 @@ export default function FilmStudio() {
   const [tooltipGate, setTooltipGate] = useState<GateId | null>(null)
   const [showAllWords, setShowAllWords] = useState(false)
   const [showAllArchive, setShowAllArchive] = useState(false)
+  const [portraitExpanded, setPortraitExpanded] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [showAllUnresolved, setShowAllUnresolved] = useState(false)
+  const [showAllFlags, setShowAllFlags] = useState(false)
+  const [showAllToneSignals, setShowAllToneSignals] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -732,6 +737,11 @@ export default function FilmStudio() {
   useEffect(() => {
     setContextTab('portrait')
     setShowAllArchive(false)
+    setPortraitExpanded(false)
+    setCollapsedSections(new Set())
+    setShowAllUnresolved(false)
+    setShowAllFlags(false)
+    setShowAllToneSignals(false)
   }, [film?.current_mode])
 
 
@@ -2203,204 +2213,177 @@ export default function FilmStudio() {
             <div style={{ flex: 1, overflowY: 'auto' }}>
 
               {/* PORTRAIT TAB */}
-              {contextTab === 'portrait' && (
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  {/* Portrait header */}
-                  <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.6rem', letterSpacing: '0.2em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>
-                      Film Portrait
-                    </span>
-                    {portraitRefreshedAt && (
-                      <p style={{ fontSize: '0.6rem', color: 'var(--fg-dim)', letterSpacing: '0.03em', marginTop: '0.2rem' }}>
-                        {formatDate(portraitRefreshedAt)}
-                      </p>
-                    )}
-                  </div>
+              {contextTab === 'portrait' && (() => {
+                const PORTRAIT_GROUPS = [
+                  { header: 'NARRATIVE', keys: ['portrait_logline', 'portrait_emotional_core', 'portrait_story', 'portrait_world', 'portrait_subjects', 'portrait_themes'] },
+                  { header: 'METHOD', keys: ['portrait_approach', 'portrait_tone', 'portrait_visual_world', 'portrait_audience', 'portrait_comparable_films', 'portrait_target_length'] },
+                  { header: 'PRODUCTION', keys: ['portrait_film_brief', 'portrait_treatment', 'portrait_narration_brief', 'portrait_cinematography_brief', 'portrait_sound_brief', 'portrait_ai_brief', 'portrait_editorial_brief'] },
+                  { header: 'OPEN', keys: ['portrait_unresolved_questions'] },
+                ]
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    {/* Portrait header */}
+                    <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                          Film Portrait
+                        </span>
+                        <span
+                          onClick={() => setPortraitExpanded(prev => !prev)}
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer' }}
+                        >
+                          {portraitExpanded ? 'Current mode only' : 'Show all'}
+                        </span>
+                      </div>
+                      {portraitRefreshedAt && (
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-dim)' }}>
+                          {formatDate(portraitRefreshedAt)}
+                        </p>
+                      )}
+                    </div>
 
-                  {/* Portrait fields */}
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 2rem' }}>
-                    {!filmMemory ? (
-                      <p style={{ color: 'var(--fg-dim)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.7 }}>
-                        The portrait is still taking shape. Keep the conversation going and it will fill in.
-                      </p>
-                    ) : panelDocked ? (
-                      // DOCKED STATE — full portrait with grouped sections
-                      (() => {
-                        const PORTRAIT_GROUPS = [
-                          { header: 'THE STORY', keys: ['portrait_logline', 'portrait_emotional_core', 'portrait_story', 'portrait_world', 'portrait_subjects', 'portrait_themes'] },
-                          { header: 'THE APPROACH', keys: ['portrait_approach', 'portrait_tone', 'portrait_visual_world', 'portrait_audience', 'portrait_comparable_films', 'portrait_target_length'] },
-                          { header: 'PRODUCTION FOUNDATION', keys: ['portrait_film_brief', 'portrait_treatment', 'portrait_narration_brief', 'portrait_cinematography_brief', 'portrait_sound_brief', 'portrait_ai_brief', 'portrait_editorial_brief'] },
-                          { header: 'OPEN', keys: ['portrait_unresolved_questions'] },
-                        ]
-                        const diField = PORTRAIT_FIELDS.find(f => f.special === 'directors_intent')!
-                        const diRaw = filmMemory[diField.key]
-                        const diEmpty = isFieldEmpty(diRaw)
-                        const diValue = getPortraitValue(diRaw)
-                        const diEditing = directEdit.field === diField.key
-                        return (
-                          <>
-                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>
-                              FULL PORTRAIT
-                            </p>
-
-                            {/* Director's Intent — isolated */}
-                            <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.5rem', marginBottom: '2rem' }}>
-                              <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                {diField.label}
-                              </p>
-                              {diEmpty ? (
-                                <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                  <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: '0.75rem' }}>{diField.question}</p>
-                                  {diEditing ? (
-                                    <div>
-                                      <textarea value={directEdit.value} onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))} placeholder="Write here..." style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)', color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem', lineHeight: 1.6, padding: '0.4rem 0', resize: 'vertical', minHeight: '70px', outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
-                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>{directEdit.saving ? 'Saving...' : 'Save'}</button>
-                                        <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <button onClick={() => openDirectEdit(diField.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>Write your intent</button>
-                                  )}
-                                </div>
-                              ) : (
-                                <>
-                                  <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>{typeof diValue === 'string' ? diValue : ''}</p>
-                                  {diEditing ? (
-                                    <div>
-                                      <textarea value={directEdit.value} onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)', color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem', lineHeight: 1.6, padding: '0.4rem 0', resize: 'vertical', minHeight: '70px', outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
-                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>{directEdit.saving ? 'Saving...' : 'Save'}</button>
-                                        <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <button onClick={() => openDirectEdit(diField.key)} style={btnSmall}>Edit</button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-
-                            {/* Grouped sections */}
-                            {PORTRAIT_GROUPS.map((group, groupIdx) => {
-                              const allEmpty = group.keys.every(k => isFieldEmpty(filmMemory[k as keyof FilmMemory]))
-                              if (allEmpty) return null
-                              return (
-                                <div key={group.header} style={{ marginTop: groupIdx === 0 ? 0 : '20px' }}>
-                                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase', paddingBottom: '8px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
-                                    {group.header}
-                                  </p>
-                                  {group.keys.map(k => {
-                                    const raw = filmMemory[k as keyof FilmMemory]
-                                    if (isFieldEmpty(raw)) return null
-                                    const value = getPortraitValue(raw)
-                                    const pf = PORTRAIT_FIELDS.find(f => f.key === k)
-                                    const gf = PORTRAIT_GATE_FIELDS.find(f => f.key === k)
-                                    const label = pf?.label ?? gf?.label ?? k
-                                    const special = pf?.special
-                                    return (
-                                      <div key={k} style={{ marginBottom: '1.5rem' }}>
-                                        <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{label}</p>
-                                        {special === 'unresolved_questions' && Array.isArray(value) ? (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                            {(value as UnresolvedQuestion[]).filter(q => !q.resolved).map((item, qi) => (
-                                              <div key={qi} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                                <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
-                                                <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>{typeof value === 'string' ? value : ''}</p>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              )
-                            })}
-                          </>
-                        )
-                      })()
-                    ) : (
-                      // FLOATING STATE — mode-filtered fields (unchanged)
-                      (() => {
-                        const modeKey = film?.current_mode ?? null
-                        const modeFieldKeys = modeKey ? (MODE_PORTRAIT_FIELDS[modeKey] ?? null) : null
-                        const fieldsToRender = modeFieldKeys
-                          ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
-                          : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
-                        return (
-                          <>
-                            {fieldsToRender.map((field, idx) => {
-                            const raw = filmMemory[field.key]
-                            const isEmpty = isFieldEmpty(raw)
-                            const value = getPortraitValue(raw)
-                            const isEditing = directEdit.field === field.key
-
-                            return (
-                              <div key={field.key}>
-                                <div style={{ marginBottom: '1.5rem' }}>
-                                  <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                    {field.label}
-                                  </p>
-
-                                  {isEmpty ? (
-                                    <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                      <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
-                                        {field.question}
-                                      </p>
-                                      {field.special === 'directors_intent' && (
-                                        isEditing ? (
-                                          <div>
-                                            <textarea
-                                              value={directEdit.value}
-                                              onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
-                                              placeholder="Write here..."
-                                              style={{
-                                                width: '100%', background: 'transparent',
-                                                border: 'none', borderBottom: '1px solid var(--line)',
-                                                color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
-                                                lineHeight: 1.6, padding: '0.4rem 0',
-                                                resize: 'vertical', minHeight: '70px',
-                                                outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
-                                              }}
-                                            />
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                              <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                                                {directEdit.saving ? 'Saving...' : 'Save'}
-                                              </button>
-                                              <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                                            Write your intent
-                                          </button>
-                                        )
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {field.special === 'unresolved_questions' && Array.isArray(value) ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                          {(value as Array<{ question: string; category: string; added_at: string }>).map((item, idx) => (
-                                            <div key={`unresolved-${idx}`} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                              <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
-                                              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
-                                            </div>
-                                          ))}
+                    {/* Portrait fields */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 2rem' }}>
+                      {!filmMemory ? (
+                        <p style={{ color: 'var(--fg-dim)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.7 }}>
+                          The portrait is still taking shape. Keep the conversation going and it will fill in.
+                        </p>
+                      ) : portraitExpanded ? (
+                        // EXPANDED STATE — full portrait with grouped sections
+                        (() => {
+                          const diField = PORTRAIT_FIELDS.find(f => f.special === 'directors_intent')!
+                          const diRaw = filmMemory[diField.key]
+                          const diEmpty = isFieldEmpty(diRaw)
+                          const diValue = getPortraitValue(diRaw)
+                          const diEditing = directEdit.field === diField.key
+                          return (
+                            <>
+                              {/* Director's Intent — isolated */}
+                              <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.5rem', marginBottom: '2rem' }}>
+                                <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                  {diField.label}
+                                </p>
+                                {diEmpty ? (
+                                  <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                    <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: '0.75rem' }}>{diField.question}</p>
+                                    {diEditing ? (
+                                      <div>
+                                        <textarea value={directEdit.value} onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))} placeholder="Write here..." style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)', color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem', lineHeight: 1.6, padding: '0.4rem 0', resize: 'vertical', minHeight: '70px', outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                          <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>{directEdit.saving ? 'Saving...' : 'Save'}</button>
+                                          <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
                                         </div>
-                                      ) : field.special === 'directors_intent' ? (
-                                        <>
-                                          <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>
-                                            {typeof value === 'string' ? value : ''}
-                                          </p>
-                                          {isEditing ? (
+                                      </div>
+                                    ) : (
+                                      <button onClick={() => openDirectEdit(diField.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>Write your intent</button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>{typeof diValue === 'string' ? diValue : ''}</p>
+                                    {diEditing ? (
+                                      <div>
+                                        <textarea value={directEdit.value} onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)', color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem', lineHeight: 1.6, padding: '0.4rem 0', resize: 'vertical', minHeight: '70px', outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                          <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>{directEdit.saving ? 'Saving...' : 'Save'}</button>
+                                          <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <button onClick={() => openDirectEdit(diField.key)} style={btnSmall}>Edit</button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Grouped sections */}
+                              {PORTRAIT_GROUPS.map((group, groupIdx) => {
+                                const allEmpty = group.keys.every(k => isFieldEmpty(filmMemory[k as keyof FilmMemory]))
+                                if (allEmpty) return null
+                                const isCollapsed = collapsedSections.has(group.header)
+                                return (
+                                  <div key={group.header} style={{ marginTop: groupIdx === 0 ? 0 : '20px' }}>
+                                    <div
+                                      onClick={() => setCollapsedSections(prev => {
+                                        const next = new Set<string>(prev)
+                                        if (next.has(group.header)) next.delete(group.header)
+                                        else next.add(group.header)
+                                        return next
+                                      })}
+                                      style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase', paddingBottom: '8px', borderBottom: '1px solid var(--line)', marginBottom: '12px', borderLeft: '2px solid color-mix(in srgb, var(--accent) 30%, transparent)', paddingLeft: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                      <ChevronRight size={8} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform var(--dur-fast)', flexShrink: 0 }} />
+                                      {group.header}
+                                    </div>
+                                    {!isCollapsed && group.keys.map(k => {
+                                      const raw = filmMemory[k as keyof FilmMemory]
+                                      if (isFieldEmpty(raw)) return null
+                                      const value = getPortraitValue(raw)
+                                      const pf = PORTRAIT_FIELDS.find(f => f.key === k)
+                                      const gf = PORTRAIT_GATE_FIELDS.find(f => f.key === k)
+                                      const label = pf?.label ?? gf?.label ?? k
+                                      const special = pf?.special
+                                      return (
+                                        <div key={k} style={{ marginBottom: '1.5rem' }}>
+                                          <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{label}</p>
+                                          {special === 'unresolved_questions' && Array.isArray(value) ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                              {(value as UnresolvedQuestion[]).filter(q => !q.resolved).map((item, qi) => (
+                                                <div key={qi} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                                  <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
+                                                  <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>{typeof value === 'string' ? value : ''}</p>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )
+                              })}
+
+                            </>
+                          )
+                        })()
+                      ) : (
+                        // COLLAPSED STATE — mode-filtered fields
+                        (() => {
+                          const modeKey = film?.current_mode ?? null
+                          const modeFieldKeys = modeKey ? (MODE_PORTRAIT_FIELDS[modeKey] ?? null) : null
+                          const fieldsToRender = (modeFieldKeys
+                            ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
+                            : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
+                          ).filter(f => f.special !== 'directors_intent')
+                          return (
+                            <>
+                              {fieldsToRender.map((field, idx) => {
+                              const raw = filmMemory[field.key]
+                              const isEmpty = isFieldEmpty(raw)
+                              const value = getPortraitValue(raw)
+                              const isEditing = directEdit.field === field.key
+
+                              return (
+                                <div key={field.key}>
+                                  <div style={{ marginBottom: '1.5rem' }}>
+                                    <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                      {field.label}
+                                    </p>
+
+                                    {isEmpty ? (
+                                      <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                        <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: field.special === 'directors_intent' ? '0.75rem' : 0 }}>
+                                          {field.question}
+                                        </p>
+                                        {field.special === 'directors_intent' && (
+                                          isEditing ? (
                                             <div>
                                               <textarea
                                                 value={directEdit.value}
                                                 onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
+                                                placeholder="Write here..."
                                                 style={{
                                                   width: '100%', background: 'transparent',
                                                   border: 'none', borderBottom: '1px solid var(--line)',
@@ -2418,32 +2401,77 @@ export default function FilmStudio() {
                                               </div>
                                             </div>
                                           ) : (
-                                            <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>Edit</button>
-                                          )}
-                                        </>
-                                      ) : (
-                                        <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
-                                          {typeof value === 'string' ? value : ''}
-                                        </p>
-                                      )}
-                                    </>
+                                            <button onClick={() => openDirectEdit(field.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                                              Write your intent
+                                            </button>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <>
+                                        {field.special === 'unresolved_questions' && Array.isArray(value) ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                            {(value as Array<{ question: string; category: string; added_at: string }>).map((item, idx) => (
+                                              <div key={`unresolved-${idx}`} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                                <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
+                                                <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : field.special === 'directors_intent' ? (
+                                          <>
+                                            <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>
+                                              {typeof value === 'string' ? value : ''}
+                                            </p>
+                                            {isEditing ? (
+                                              <div>
+                                                <textarea
+                                                  value={directEdit.value}
+                                                  onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))}
+                                                  style={{
+                                                    width: '100%', background: 'transparent',
+                                                    border: 'none', borderBottom: '1px solid var(--line)',
+                                                    color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem',
+                                                    lineHeight: 1.6, padding: '0.4rem 0',
+                                                    resize: 'vertical', minHeight: '70px',
+                                                    outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box'
+                                                  }}
+                                                />
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                  <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                                                    {directEdit.saving ? 'Saving...' : 'Save'}
+                                                  </button>
+                                                  <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <button onClick={() => openDirectEdit(field.key)} style={btnSmall}>Edit</button>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap' }}>
+                                            {typeof value === 'string' ? value : ''}
+                                          </p>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {idx < fieldsToRender.length - 1 && (
+                                    <div style={{ height: '1px', background: 'var(--line)', marginBottom: '1.5rem' }} />
                                   )}
                                 </div>
+                              )
+                              })}
 
-                                {idx < fieldsToRender.length - 1 && (
-                                  <div style={{ height: '1px', background: 'var(--line)', marginBottom: '1.5rem' }} />
-                                )}
-                              </div>
-                            )
-                            })}
-
-                          </>
-                        )
-                      })()
-                    )}
+                            </>
+                          )
+                        })()
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* ARCHIVE TAB */}
               {contextTab === 'archive' && (
@@ -2806,9 +2834,17 @@ export default function FilmStudio() {
                               <p style={{ fontSize: '0.55rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
                                 What's still open
                               </p>
-                              <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>
-                                {filmMemory.unresolved_threads}
-                              </p>
+                              {showAllUnresolved && (
+                                <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>
+                                  {filmMemory.unresolved_threads}
+                                </p>
+                              )}
+                              <span
+                                onClick={() => setShowAllUnresolved(prev => !prev)}
+                                style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
+                              >
+                                {showAllUnresolved ? 'Show fewer' : 'Show all'}
+                              </span>
                             </div>
                           )}
 
@@ -2819,12 +2855,20 @@ export default function FilmStudio() {
                                 Tensions Matinee is holding
                               </p>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {openFlags.map((item, idx) => (
+                                {(showAllFlags ? openFlags : openFlags.slice(0, 3)).map((item, idx) => (
                                   <p key={idx} style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>
                                     {item.flag}
                                   </p>
                                 ))}
                               </div>
+                              {openFlags.length > 3 && (
+                                <span
+                                  onClick={() => setShowAllFlags(prev => !prev)}
+                                  style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
+                                >
+                                  {showAllFlags ? 'Show fewer' : `Show all (${openFlags.length})`}
+                                </span>
+                              )}
                             </div>
                           )}
 
@@ -2838,12 +2882,20 @@ export default function FilmStudio() {
                                 Matinee's observation — not a committed decision.
                               </p>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {toneSignals.map((item, idx) => (
+                                {(showAllToneSignals ? toneSignals : toneSignals.slice(0, 3)).map((item, idx) => (
                                   <p key={idx} style={{ fontSize: '0.82rem', lineHeight: 1.6, color: '#a8a098', margin: 0 }}>
                                     {item.signal}
                                   </p>
                                 ))}
                               </div>
+                              {toneSignals.length > 3 && (
+                                <span
+                                  onClick={() => setShowAllToneSignals(prev => !prev)}
+                                  style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
+                                >
+                                  {showAllToneSignals ? 'Show fewer' : `Show all (${toneSignals.length})`}
+                                </span>
+                              )}
                             </div>
                           )}
                         </>
