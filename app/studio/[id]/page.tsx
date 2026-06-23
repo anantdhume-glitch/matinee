@@ -2224,11 +2224,19 @@ export default function FilmStudio() {
                   <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                     {/* Portrait header */}
                     <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-                      <span style={{ fontSize: '0.6rem', letterSpacing: '0.2em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>
-                        Film Portrait
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase' }}>
+                          Film Portrait
+                        </span>
+                        <span
+                          onClick={() => setPortraitExpanded(prev => !prev)}
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color: 'var(--fg-dim)', textTransform: 'uppercase', cursor: 'pointer' }}
+                        >
+                          {portraitExpanded ? 'Current mode only' : 'Show all'}
+                        </span>
+                      </div>
                       {portraitRefreshedAt && (
-                        <p style={{ fontSize: '0.6rem', color: 'var(--fg-dim)', letterSpacing: '0.03em', marginTop: '0.2rem' }}>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-dim)' }}>
                           {formatDate(portraitRefreshedAt)}
                         </p>
                       )}
@@ -2337,12 +2345,6 @@ export default function FilmStudio() {
                                 )
                               })}
 
-                              <span
-                                onClick={() => setPortraitExpanded(false)}
-                                style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
-                              >
-                                Show fewer
-                              </span>
                             </>
                           )
                         })()
@@ -2351,9 +2353,10 @@ export default function FilmStudio() {
                         (() => {
                           const modeKey = film?.current_mode ?? null
                           const modeFieldKeys = modeKey ? (MODE_PORTRAIT_FIELDS[modeKey] ?? null) : null
-                          const fieldsToRender = modeFieldKeys
+                          const fieldsToRender = (modeFieldKeys
                             ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
                             : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
+                          ).filter(f => f.special !== 'directors_intent')
                           return (
                             <>
                               {fieldsToRender.map((field, idx) => {
@@ -2461,12 +2464,6 @@ export default function FilmStudio() {
                               )
                               })}
 
-                              <span
-                                onClick={() => setPortraitExpanded(true)}
-                                style={{ fontSize: '0.65rem', color: 'var(--fg-dim)', cursor: 'pointer', display: 'block', marginTop: '0.75rem', fontStyle: 'italic' }}
-                              >
-                                Show all
-                              </span>
                             </>
                           )
                         })()
