@@ -9,7 +9,7 @@ import {
   FileText, Clapperboard, LayoutList, Radio, Anchor,
   ScrollText, Mic, Lock, List, LayoutTemplate,
   Aperture, Sparkles, Scissors, Music, Pin,
-  Sun, Wand2, Film, ChevronLeft, ChevronRight, Info
+  Sun, Wand2, Film, ChevronLeft, ChevronRight, Info, Compass
 } from 'lucide-react'
 
 type Message = { id: string; role: string; content: string }
@@ -324,13 +324,13 @@ const PHASE_GROUPS: Array<{ label: string; initial: string; modes: string[] }> =
 ]
 
 const MODE_CONFIG = [
-  { key: 'discovery',       label: 'Discovery',      Icon: Sparkles     },
-  { key: 'producer',        label: 'Producer',        Icon: Clapperboard },
-  { key: 'director',        label: 'Director',        Icon: Sun          },
+  { key: 'discovery',       label: 'Discovery',      Icon: Compass      },
+  { key: 'producer',        label: 'Producer',        Icon: FileText     },
+  { key: 'director',        label: 'Director',        Icon: Clapperboard },
   { key: 'narrator',        label: 'Narrator',        Icon: Mic          },
   { key: 'cinematographer', label: 'Cinematographer', Icon: Aperture     },
-  { key: 'ai_specialist',   label: 'AI Specialist',   Icon: Wand2        },
-  { key: 'editor',          label: 'Editor',          Icon: Film         },
+  { key: 'ai_specialist',   label: 'AI Specialist',   Icon: Sparkles     },
+  { key: 'editor',          label: 'Editor',          Icon: Scissors     },
 ]
 
 
@@ -340,31 +340,23 @@ const FALLBACK_PORTRAIT_FIELD_KEYS = [
 
 // Tab map: mode value → ordered tab keys (first is default)
 const MODE_TABS: Record<string, string[]> = {
-  '':              ['archive', 'portrait', 'memory'],
-  'producer':      ['brief', 'archive', 'portrait', 'memory'],
-  'director':      ['treatment', 'archive', 'portrait', 'memory'],
-  'narrator':      ['segments', 'archive', 'portrait', 'memory'],
-  'cinematographer': ['shot_list_tab', 'archive', 'portrait', 'memory'],
-  'ai_specialist': ['images', 'archive', 'portrait', 'memory'],
-  'editor':        ['edit_plan_tab', 'archive', 'portrait', 'memory'],
+  '':              ['portrait', 'memory', 'archive'],
+  'producer':      ['portrait', 'memory', 'archive'],
+  'director':      ['portrait', 'memory', 'archive'],
+  'narrator':      ['portrait', 'memory', 'archive'],
+  'cinematographer': ['portrait', 'memory', 'archive'],
+  'ai_specialist': ['portrait', 'memory', 'archive'],
+  'editor':        ['portrait', 'memory', 'archive'],
 }
 
 const TAB_LABELS: Record<string, string> = {
-  portrait:       'PORTRAIT',
-  archive:        'ARCHIVE',
-  memory:         'MEMORY',
-  brief:          'BRIEF',
-  treatment:      'TREATMENT',
-  segments:       'SEGMENTS',
-  shot_list_tab:  'SHOT LIST',
-  images:         'IMAGES',
-  edit_plan_tab:  'EDIT PLAN',
+  portrait: 'PORTRAIT',
+  archive:  'ARCHIVE',
+  memory:   'MEMORY',
 }
 
-function getDefaultTab(mode: string | null): string {
-  const key = mode ?? ''
-  const tabs = MODE_TABS[key] ?? ['portrait']
-  return tabs[0]
+function getDefaultTab(_mode: string | null): string {
+  return 'portrait'
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -652,6 +644,7 @@ export default function FilmStudio() {
   const [panelDocked, setPanelDocked] = useState(false)
   const [hoveredMode, setHoveredMode] = useState<string | null>(null)
   const [stripHovered, setStripHovered] = useState(false)
+  const [railToggleHovered, setRailToggleHovered] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(1440)
   const [tooltipGate, setTooltipGate] = useState<GateId | null>(null)
   const [showAllWords, setShowAllWords] = useState(false)
@@ -737,7 +730,7 @@ export default function FilmStudio() {
 
   // Reset context tab and archive filter when mode changes
   useEffect(() => {
-    setContextTab(getDefaultTab(film?.current_mode ?? null))
+    setContextTab('portrait')
     setShowAllArchive(false)
   }, [film?.current_mode])
 
@@ -1907,17 +1900,33 @@ export default function FilmStudio() {
           {/* Chevron toggle at bottom */}
           <div
             onClick={() => setRailCollapsed(prev => !prev)}
+            onMouseEnter={() => setRailToggleHovered(true)}
+            onMouseLeave={() => setRailToggleHovered(false)}
             style={{
               borderTop: '1px solid var(--line)', cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center',
               justifyContent: railCollapsed ? 'center' : 'flex-end',
-              padding: railCollapsed ? '8px 0' : '8px 12px',
+              padding: '8px 12px',
+              position: 'relative',
             }}
           >
             {railCollapsed
               ? <ChevronRight size={14} strokeWidth={1.5} color="var(--fg-dim-2)" />
               : <ChevronLeft size={14} strokeWidth={1.5} color="var(--fg-dim-2)" />
             }
+            {railToggleHovered && (
+              <div style={{
+                position: 'absolute',
+                ...(railCollapsed ? { left: 'calc(100% + 4px)' } : { right: 'calc(100% + 4px)' }),
+                top: '50%', transform: 'translateY(-50%)',
+                backgroundColor: 'var(--bg-elev-2)', color: 'var(--fg-dim)',
+                fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em',
+                padding: '3px 7px', borderRadius: '2px',
+                whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none',
+              }}>
+                {railCollapsed ? 'Expand' : 'Collapse'}
+              </div>
+            )}
           </div>
 
         </div>
@@ -2082,9 +2091,21 @@ export default function FilmStudio() {
               cursor: !contextPanelOpen ? 'pointer' : 'default',
               transition: `background var(--dur-fast) var(--ease-stage)`,
               zIndex: 1,
-              overflow: 'hidden',
+              overflow: 'visible',
             }}
           >
+            {/* "Open panel" tooltip */}
+            {!contextPanelOpen && stripHovered && (
+              <div style={{
+                position: 'absolute', right: '36px', top: '50%', transform: 'translateY(-50%)',
+                backgroundColor: 'var(--bg-elev-2)', color: 'var(--fg-dim)',
+                fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em',
+                padding: '3px 7px', borderRadius: '2px',
+                whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none',
+              }}>
+                Open panel
+              </div>
+            )}
             <span style={{
               fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 500, letterSpacing: '0.06em',
               color: !contextPanelOpen && stripHovered ? 'var(--fg)' : '#8A8682',
@@ -2098,10 +2119,23 @@ export default function FilmStudio() {
             <span style={{
               fontFamily: 'var(--font-mono)', fontSize: '8px', lineHeight: 1,
               color: !contextPanelOpen && stripHovered ? 'var(--fg)' : '#8A8682',
-              transition: `color var(--dur-fast) var(--ease-stage)`,
+              transition: `color var(--dur-fast) var(--ease-stage), transform var(--dur-fast)`,
+              transform: !contextPanelOpen && stripHovered ? 'translateX(-2px)' : 'translateX(0)',
+              display: 'block',
             }}>
               ‹
             </span>
+            {/* Tab indicator dots */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
+              {(['portrait', 'memory', 'archive'] as const).map(tab => (
+                <span key={tab} style={{
+                  width: '4px', height: '4px',
+                  backgroundColor: contextTab === tab ? 'var(--accent)' : 'var(--fg-dim)',
+                  opacity: contextTab === tab ? 1 : 0.4,
+                  display: 'block',
+                }} />
+              ))}
+            </div>
           </div>
 
           {/* Open panel — floating (position:absolute, z-index:10) or docked (z-index:2) */}
@@ -2189,15 +2223,113 @@ export default function FilmStudio() {
                       <p style={{ color: 'var(--fg-dim)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.7 }}>
                         The portrait is still taking shape. Keep the conversation going and it will fill in.
                       </p>
+                    ) : panelDocked ? (
+                      // DOCKED STATE — full portrait with grouped sections
+                      (() => {
+                        const PORTRAIT_GROUPS = [
+                          { header: 'THE STORY', keys: ['portrait_logline', 'portrait_emotional_core', 'portrait_story', 'portrait_world', 'portrait_subjects', 'portrait_themes'] },
+                          { header: 'THE APPROACH', keys: ['portrait_approach', 'portrait_tone', 'portrait_visual_world', 'portrait_audience', 'portrait_comparable_films', 'portrait_target_length'] },
+                          { header: 'PRODUCTION FOUNDATION', keys: ['portrait_film_brief', 'portrait_treatment', 'portrait_narration_brief', 'portrait_cinematography_brief', 'portrait_sound_brief', 'portrait_ai_brief', 'portrait_editorial_brief'] },
+                          { header: 'OPEN', keys: ['portrait_unresolved_questions'] },
+                        ]
+                        const diField = PORTRAIT_FIELDS.find(f => f.special === 'directors_intent')!
+                        const diRaw = filmMemory[diField.key]
+                        const diEmpty = isFieldEmpty(diRaw)
+                        const diValue = getPortraitValue(diRaw)
+                        const diEditing = directEdit.field === diField.key
+                        return (
+                          <>
+                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>
+                              FULL PORTRAIT
+                            </p>
+
+                            {/* Director's Intent — isolated */}
+                            <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.5rem', marginBottom: '2rem' }}>
+                              <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                {diField.label}
+                              </p>
+                              {diEmpty ? (
+                                <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                  <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', marginBottom: '0.75rem' }}>{diField.question}</p>
+                                  {diEditing ? (
+                                    <div>
+                                      <textarea value={directEdit.value} onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))} placeholder="Write here..." style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)', color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem', lineHeight: 1.6, padding: '0.4rem 0', resize: 'vertical', minHeight: '70px', outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
+                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>{directEdit.saving ? 'Saving...' : 'Save'}</button>
+                                        <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => openDirectEdit(diField.key)} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>Write your intent</button>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', marginBottom: '0.6rem' }}>{typeof diValue === 'string' ? diValue : ''}</p>
+                                  {diEditing ? (
+                                    <div>
+                                      <textarea value={directEdit.value} onChange={e => setDirectEdit(prev => ({ ...prev, value: e.target.value }))} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)', color: 'var(--fg)', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.78rem', lineHeight: 1.6, padding: '0.4rem 0', resize: 'vertical', minHeight: '70px', outline: 'none', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
+                                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button onClick={saveDirectEdit} disabled={directEdit.saving} style={{ ...btnSmall, borderColor: 'var(--accent-dim)', color: 'var(--accent)' }}>{directEdit.saving ? 'Saving...' : 'Save'}</button>
+                                        <button onClick={() => setDirectEdit({ field: null, value: '', saving: false })} style={btnSmall}>Cancel</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => openDirectEdit(diField.key)} style={btnSmall}>Edit</button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
+                            {/* Grouped sections */}
+                            {PORTRAIT_GROUPS.map((group, groupIdx) => {
+                              const allEmpty = group.keys.every(k => isFieldEmpty(filmMemory[k as keyof FilmMemory]))
+                              if (allEmpty) return null
+                              return (
+                                <div key={group.header} style={{ marginTop: groupIdx === 0 ? 0 : '20px' }}>
+                                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', color: 'var(--fg-dim)', textTransform: 'uppercase', paddingBottom: '8px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
+                                    {group.header}
+                                  </p>
+                                  {group.keys.map(k => {
+                                    const raw = filmMemory[k as keyof FilmMemory]
+                                    if (isFieldEmpty(raw)) return null
+                                    const value = getPortraitValue(raw)
+                                    const pf = PORTRAIT_FIELDS.find(f => f.key === k)
+                                    const gf = PORTRAIT_GATE_FIELDS.find(f => f.key === k)
+                                    const label = pf?.label ?? gf?.label ?? k
+                                    const special = pf?.special
+                                    return (
+                                      <div key={k} style={{ marginBottom: '1.5rem' }}>
+                                        <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{label}</p>
+                                        {special === 'unresolved_questions' && Array.isArray(value) ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                            {(value as UnresolvedQuestion[]).filter(q => !q.resolved).map((item, qi) => (
+                                              <div key={qi} style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
+                                                <p style={{ fontSize: '0.82rem', lineHeight: 1.75, color: '#a8a098', margin: 0 }}>{item.question}</p>
+                                                <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--accent-dim)', textTransform: 'uppercase' }}>{item.category}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>{typeof value === 'string' ? value : ''}</p>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )
+                            })}
+                          </>
+                        )
+                      })()
                     ) : (
+                      // FLOATING STATE — mode-filtered fields (unchanged)
                       (() => {
                         const modeKey = film?.current_mode ?? null
                         const modeFieldKeys = modeKey ? (MODE_PORTRAIT_FIELDS[modeKey] ?? null) : null
-                        const fieldsToRender = panelDocked
-                          ? PORTRAIT_FIELDS
-                          : modeFieldKeys
-                            ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
-                            : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
+                        const fieldsToRender = modeFieldKeys
+                          ? PORTRAIT_FIELDS.filter(f => modeFieldKeys.includes(f.key as string))
+                          : PORTRAIT_FIELDS.filter(f => FALLBACK_PORTRAIT_FIELD_KEYS.includes(f.key as string))
                         return (
                           <>
                             {fieldsToRender.map((field, idx) => {
@@ -2305,40 +2437,6 @@ export default function FilmStudio() {
                             )
                             })}
 
-                            {/* Gate document fields — docked state only */}
-                            {panelDocked && (
-                              <>
-                                <div style={{ height: '1px', background: 'var(--line)', margin: '0.5rem 0 1.5rem' }} />
-                                <p style={{ fontSize: '0.52rem', letterSpacing: '0.16em', color: 'var(--fg-dim-2)', textTransform: 'uppercase', marginBottom: '1.25rem' }}>
-                                  From your gate documents
-                                </p>
-                                {PORTRAIT_GATE_FIELDS.map((gf, gfIdx) => {
-                                  const gfRaw = filmMemory[gf.key]
-                                  const gfValue = getPortraitValue(gfRaw)
-                                  return (
-                                    <div key={gf.key} style={{ marginBottom: '1.5rem' }}>
-                                      <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', color: 'var(--accent-dim)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                        {gf.label}
-                                      </p>
-                                      {gfValue ? (
-                                        <p style={{ fontSize: '0.82rem', lineHeight: 1.85, color: '#a8a098', whiteSpace: 'pre-wrap', margin: 0 }}>
-                                          {typeof gfValue === 'string' ? gfValue : ''}
-                                        </p>
-                                      ) : (
-                                        <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: '0.75rem' }}>
-                                          <p style={{ fontSize: '0.78rem', lineHeight: 1.7, color: 'var(--fg-dim)', fontStyle: 'italic', margin: 0 }}>
-                                            Awaiting gate approval.
-                                          </p>
-                                        </div>
-                                      )}
-                                      {gfIdx < PORTRAIT_GATE_FIELDS.length - 1 && (
-                                        <div style={{ height: '1px', background: 'var(--line)', marginTop: '1.5rem' }} />
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </>
-                            )}
                           </>
                         )
                       })()
@@ -2755,14 +2853,6 @@ export default function FilmStudio() {
                 </div>
               )}
 
-              {/* PLACEHOLDER TABS */}
-              {['brief', 'treatment', 'segments', 'shot_list_tab', 'images', 'edit_plan_tab'].includes(contextTab) && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
-                  <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '13px', fontStyle: 'italic', color: 'var(--fg-dim)', textAlign: 'center' }}>
-                    Coming in the next story.
-                  </p>
-                </div>
-              )}
 
             </div>
             </div>
