@@ -26,6 +26,27 @@ type GateId =
   | 'script_lock'
   | 'audio_direction'
 
+// Story G — mode-aware Portrait injection per gate
+const GATE_TO_MODE: Partial<Record<GateId, string>> = {
+  film_brief:           'producer',
+  treatment:            'director',
+  narration_brief:      'narrator',
+  mode_selection_brief: 'narrator',
+  hook_draft:           'narrator',
+  script_lock:          'narrator',
+  audio_direction:      'narrator',
+  cinematography_brief: 'cinematographer',
+  consistency_lock:     'cinematographer',
+  shot_list:            'cinematographer',
+  camera_light_plan:    'cinematographer',
+  visual_prompt_package:'ai_specialist',
+  ai_brief:             'ai_specialist',
+  editorial_brief:      'editor',
+  edit_plan:            'editor',
+  music_cue_sheet:      'editor',
+  sound_brief:          'editor',
+}
+
 function buildBasePrompt(
   gateId: GateId,
   filmTitle: string,
@@ -34,7 +55,8 @@ function buildBasePrompt(
   referenceBlock: string,
   importedContent?: string
 ): string {
-  const portraitBlock = buildPortraitBlock(portrait)
+  const mode = GATE_TO_MODE[gateId] ?? null
+  const portraitBlock = buildPortraitBlock(portrait, mode)
   const refSection = referenceDocumentsSection(referenceBlock)
   const importedSection = importedContent
     ? `\nIMPORTED DOCUMENT:\n${importedContent.slice(0, 6000)}\n`
@@ -323,6 +345,34 @@ ${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
 Write an Editorial Brief for this film. Cover: the pacing philosophy — how this film breathes; the structural approach — how it opens, how it builds, how it lands; what the edit withholds and when; how tension is built and released; the relationship between image, sound and narration in the cut; episode structure if the film is serialised. Ground every decision in the film's emotional core and story. Be specific and opinionated.
 
 Produce the Editorial Brief. Nothing before it. Nothing after it.`
+
+    case 'audio_direction':
+      return `You are producing an Audio Direction document for "${filmTitle}".
+
+An Audio Direction document gives a narrator — often the filmmaker recording their own voice — everything they need to perform this script with intention. It is not a technical brief. It is a performance guide. It is specific to this film, this voice, and this emotional journey.
+
+${portraitBlock}
+
+SCRIPT LOCK:
+${closedDocumentContent['script_lock'] ?? ''}${importedSection}${refSection}
+
+The Audio Direction contains exactly these seven sections, each written as a short prose block:
+
+VOICE CHARACTER — the quality and register of the narrating voice. Not the content of what is said — the way it is said. Intimate or formal? Close to the listener or held at a distance? What does the voice carry emotionally that the words themselves do not need to say?
+
+PACING PHILOSOPHY — how the narrator moves through the script. Where the voice slows and why. Where it moves with urgency. Where silence is held after a sentence before the next begins. This is not about length — it is about breath and intention.
+
+THE EMOTIONAL ARC — how the narrator's emotional presence shifts across the film's structure. Where they are most exposed. Where they hold back. If the film moves through distinct emotional phases — grief, wonder, anger, restoration — name how the voice tracks that movement.
+
+RELATIONSHIP TO MUSIC — how the narrator's voice lives alongside the score. Does the voice lead? Does it breathe with the music or against it? When the score swells, what does the voice do? When silence arrives, how does the voice treat it?
+
+WHAT THE VOICE NEVER DOES — the specific habits, tendencies, and choices that would betray this film's tone. What this narrator must resist. What is forbidden in this performance.
+
+SEGMENT-BY-SEGMENT NOTES — for each major segment or sequence in the script, one sentence of performance direction. Not paraphrase — the specific emotional key the segment must be performed in.
+
+RECORDING GUIDANCE — practical direction for the recording environment and session. Not technical specifications — the conditions that help this particular performance land.
+
+Produce the Audio Direction. Nothing before it. Nothing after it.`
 
     default:
       return `You are producing a document for "${filmTitle}".

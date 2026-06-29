@@ -32,8 +32,10 @@ type PromptContext = {
   referenceBlock?: string
 }
 
-// Research docs: useful for creative/development modes
-const RESEARCH_MODES = new Set(['discovery', 'producer', 'director', 'narrator'])
+// Research docs: useful for early creative/development modes only.
+// Narrator and beyond have enough context from Portrait + closed gate documents.
+// Restricting here saves 6,000–18,000 tokens per call from Narrator stage onward.
+const RESEARCH_MODES = new Set(['discovery', 'producer'])
 // Script docs: useful for narrative/writing/edit modes
 const SCRIPT_MODES   = new Set(['narrator', 'director', 'editor'])
 
@@ -791,7 +793,7 @@ portrait_target_length — Captures the filmmaker's explicitly stated runtime or
 
 portrait_comparable_films — Films the filmmaker has named as touchstones, references, or comparisons for tone, approach, or visual world. Only populate from explicit film references the filmmaker has named themselves. Do not include films Matinee has suggested unless the filmmaker has explicitly agreed they are relevant. Write as a plain list of film titles, comma-separated. If no film references were made in this exchange, leave this empty.
 
-portrait_unresolved_questions — An array of open questions the filmmaker is sitting with — questions they have explicitly named or that emerged from the conversation as genuinely unresolved. Not Matinee's questions. The filmmaker's own questions about their film. Each entry must be: { "question": "the exact question", "category": "Historical | Narrative | Strategic", "added_at": "[current ISO timestamp]" }. Return an empty array [] if no unresolved questions were explicitly raised in this exchange. Never invent questions. Only capture what the filmmaker named or directly acknowledged as open.
+portrait_unresolved_questions — An array of open questions the filmmaker is sitting with — questions they have explicitly named or that emerged from the conversation as genuinely unresolved. Not Matinee's questions. The filmmaker's own questions about their film. Each entry must be: { "question": "the exact question", "category": "Historical | Narrative | Strategic", "added_at": "[current ISO timestamp]", "resolved": false }. RETIREMENT RULE: If the filmmaker has explicitly answered a question in THIS exchange — not by inference, not by implication, only by a direct answer — set "resolved": true on that entry and include it in the returned array. Do not retire a question because a related topic was discussed. Only retire when the filmmaker has given a clear, direct answer. DEDUPLICATION RULE: Before adding a new question, check whether it is substantively the same as an existing question in the current portrait state above. If so, do not add a duplicate — carry forward the existing entry unchanged. Return an empty array [] if no unresolved questions were explicitly raised and none exist from prior context. Never invent questions. Only capture what the filmmaker named or directly acknowledged as open.
 
 decisions_made — Key creative and production decisions confirmed in this exchange. Do not include target length, episode count, or runtime statements here — these belong in portrait_target_length.
 
@@ -803,8 +805,8 @@ Return empty string in "value" for any field where nothing meaningful was shared
     const conversationHistory = messages.map((m: {role: string, content: string}) => `${m.role === 'user' ? 'Filmmaker' : 'Matinee'}: "${m.content}"`).join('\n\n')
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2500,
+      model: 'claude-haiku-4-5-20251001', // Story F: Haiku for extraction (~95% cost saving vs Sonnet)
+      max_tokens: 8000,                    // Story F: was 2500 — caused silent truncation of Portrait fields
       temperature: 0,
       system: extractionSystem,
       messages: [
