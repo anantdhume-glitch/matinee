@@ -66,6 +66,12 @@ type DocumentGenerated = {
   source?: 'import'
 }
 type GateId = 'film_brief' | 'treatment' | 'narration_brief' | 'cinematography_brief' | 'sound_brief' | 'ai_brief' | 'editorial_brief' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
+type StaleRecord = {
+  stale: boolean
+  reason: string
+  detected_at: string
+  overriding_mode: string
+}
 type PortraitField = {
   value: string
   created_by: string
@@ -583,7 +589,7 @@ export default function FilmStudio() {
     gates_closed: GateClosed[]
     documents_generated: DocumentGenerated[]
     documents_content: Partial<Record<GateId, string>>
-    documents_stale?: Partial<Record<GateId, boolean>>
+    documents_stale?: Partial<Record<GateId, StaleRecord>>
     source_documents?: {
       script?: {
         current?: { filename: string; extracted_text: string; uploaded_at: string }
@@ -992,7 +998,15 @@ export default function FilmStudio() {
 
     // Write is_stale flag when staleness nudge was fired
     if (data.stale_document_id) {
-      const updatedStale = { ...(film?.documents_stale ?? {}), [data.stale_document_id]: true }
+      const updatedStale = {
+        ...(film?.documents_stale ?? {}),
+        [data.stale_document_id]: {
+          stale: true,
+          reason: data.stale_reason ?? '',
+          detected_at: new Date().toISOString(),
+          overriding_mode: effectiveMode ?? 'unknown',
+        }
+      }
       await supabase.from('films').update({ documents_stale: updatedStale }).eq('id', filmId)
       setFilm(prev => prev ? { ...prev, documents_stale: updatedStale } : null)
     }
@@ -1244,7 +1258,7 @@ export default function FilmStudio() {
     setGenerating(gateId)
     setGenerateError(null)
     // Reset staleness before generating
-    const staleReset = { ...(film?.documents_stale ?? {}), [gateId]: false }
+    const staleReset = { ...(film?.documents_stale ?? {}), [gateId]: { stale: false, reason: '', detected_at: '', overriding_mode: '' } }
     await supabase.from('films').update({ documents_stale: staleReset }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, documents_stale: staleReset } : null)
     try {
@@ -2728,6 +2742,9 @@ export default function FilmStudio() {
                                         {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : gateState === 'REOPENED' ? 'Reopened' : 'Open'}
                                       </span>
                                     )}
+                                    {gateState === 'LOCKED' && film.documents_stale?.[doc.gateId]?.stale && (
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--gate-review)', flexShrink: 0 }} title="Out of date" />
+                                    )}
                                   </div>
                                 </div>
                               )
@@ -3004,8 +3021,9 @@ export default function FilmStudio() {
                 </div>
               </div>
 
-              {/* Staleness banner — shown when IN REVIEW and is_stale */}
-              {gateState === 'IN REVIEW' && film?.documents_stale?.[openDocument] && (
+              {/* Staleness banner — shown when IN REVIEW or LOCKED and is_stale */}
+              {(gateState === 'IN REVIEW' || gateState === 'LOCKED') &&
+                film?.documents_stale?.[openDocument]?.stale && (
                 <div style={{
                   borderLeft: '2px solid var(--gate-review)',
                   backgroundColor: 'rgba(200, 149, 110, 0.15)',
@@ -3015,7 +3033,10 @@ export default function FilmStudio() {
                   margin: '0 3rem',
                   flexShrink: 0,
                 }}>
-                  This document is out of date. The conversation has moved. Regenerate before approving.
+                  {film.documents_stale[openDocument].reason
+                    ? `This document is out of date. ${film.documents_stale[openDocument].reason}. Reopen and regenerate before continuing.`
+                    : 'This document is out of date. The conversation has moved. Reopen and regenerate before continuing.'
+                  }
                 </div>
               )}
 

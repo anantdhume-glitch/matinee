@@ -1002,6 +1002,21 @@ function buildBriefInjection(
 
 const STALENESS_TRIGGERS = ['Regenerate when you\'re ready', 'Regenerate before']
 
+const FIELD_TO_DOCUMENTS: Partial<Record<string, GateId[]>> = {
+  portrait_logline:         ['film_brief'],
+  portrait_emotional_core:  ['film_brief', 'treatment'],
+  portrait_story:           ['film_brief', 'treatment'],
+  portrait_world:           ['treatment', 'cinematography_brief'],
+  portrait_subjects:        ['film_brief', 'treatment'],
+  portrait_themes:          ['film_brief', 'treatment'],
+  portrait_approach:        ['film_brief', 'treatment'],
+  portrait_tone:            ['treatment', 'narration_brief', 'editorial_brief'],
+  portrait_visual_world:    ['treatment', 'cinematography_brief'],
+  portrait_audience:        ['film_brief'],
+  portrait_comparable_films:['treatment'],
+  portrait_target_length:   ['film_brief'],
+}
+
 function buildStalenessSuffix(documentType: string, documentContent: string): string {
   return `
 
@@ -1074,6 +1089,9 @@ export async function POST(req: NextRequest) {
     // Detect staleness nudge in response
     const stalenessDetected = inReviewDocument?.type && STALENESS_TRIGGERS.some(t => content.includes(t))
     const stale_document_id = stalenessDetected ? inReviewDocument.type : null
+    const stale_reason = stalenessDetected
+      ? content.trim().split('\n').filter(Boolean).pop()?.trim() ?? ''
+      : null
 
     // Call 2 — extraction (only if shouldExtract)
     const doExtract = shouldExtract(messages)
@@ -1089,7 +1107,49 @@ export async function POST(req: NextRequest) {
       corrections = extracted.corrections
     }
 
-    return NextResponse.json({ content, memory, portrait, corrections, stale_document_id })
+    // Story A — flag closed gate documents stale when portrait corrections touch their fields
+    if (corrections.length > 0 && filmId) {
+      const affectedDocs = new Set<GateId>()
+      for (const field of corrections) {
+        for (const doc of FIELD_TO_DOCUMENTS[field] ?? []) affectedDocs.add(doc)
+      }
+      if (affectedDocs.size > 0) {
+        const staleSupabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        const { data: filmRow } = await staleSupabase
+          .from('films')
+          .select('gates_closed, documents_stale')
+          .eq('id', filmId)
+          .single()
+        const closedGates = new Set(
+          (filmRow?.gates_closed ?? [])
+            .filter((g: { gate: string; closed_at?: string }) => !!g.closed_at)
+            .map((g: { gate: string }) => g.gate)
+        )
+        const existingStale: Record<string, any> = filmRow?.documents_stale ?? {}
+        const staleUpdates: Record<string, any> = {}
+        for (const doc of affectedDocs) {
+          if (closedGates.has(doc)) {
+            staleUpdates[doc] = {
+              stale: true,
+              reason: 'The portrait has been updated since this document was closed.',
+              detected_at: new Date().toISOString(),
+              overriding_mode: 'extraction',
+            }
+          }
+        }
+        if (Object.keys(staleUpdates).length > 0) {
+          await staleSupabase
+            .from('films')
+            .update({ documents_stale: { ...existingStale, ...staleUpdates } })
+            .eq('id', filmId)
+        }
+      }
+    }
+
+    return NextResponse.json({ content, memory, portrait, corrections, stale_document_id, stale_reason })
 
   } catch (error) {
     console.error('Chat route error:', error)
