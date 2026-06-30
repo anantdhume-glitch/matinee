@@ -1003,18 +1003,18 @@ function buildBriefInjection(
 const STALENESS_TRIGGERS = ['Regenerate when you\'re ready', 'Regenerate before']
 
 const FIELD_TO_DOCUMENTS: Partial<Record<string, GateId[]>> = {
-  portrait_logline:         ['film_brief'],
-  portrait_emotional_core:  ['film_brief', 'treatment'],
-  portrait_story:           ['film_brief', 'treatment'],
-  portrait_world:           ['treatment', 'cinematography_brief'],
-  portrait_subjects:        ['film_brief', 'treatment'],
-  portrait_themes:          ['film_brief', 'treatment'],
-  portrait_approach:        ['film_brief', 'treatment'],
-  portrait_tone:            ['treatment', 'narration_brief', 'editorial_brief'],
-  portrait_visual_world:    ['treatment', 'cinematography_brief'],
-  portrait_audience:        ['film_brief'],
-  portrait_comparable_films:['treatment'],
-  portrait_target_length:   ['film_brief'],
+  portrait_logline:          ['film_brief'],
+  portrait_emotional_core:   ['film_brief', 'treatment'],
+  portrait_story:            ['film_brief', 'treatment'],
+  portrait_world:            ['treatment', 'cinematography_brief'],
+  portrait_subjects:         ['treatment', 'cinematography_brief', 'consistency_lock'],
+  portrait_tone:             ['treatment', 'sound_brief', 'editorial_brief', 'narration_brief'],
+  portrait_visual_world:     ['treatment', 'cinematography_brief'],
+  portrait_approach:         ['film_brief', 'treatment', 'narration_brief'],
+  portrait_comparable_films: ['treatment', 'cinematography_brief'],
+  portrait_target_length:    ['film_brief'],
+  portrait_audience:         ['film_brief'],
+  portrait_themes:           ['film_brief', 'treatment'],
 }
 
 function buildStalenessSuffix(documentType: string, documentContent: string): string {
@@ -1109,11 +1109,14 @@ export async function POST(req: NextRequest) {
 
     // Story A — flag closed gate documents stale when portrait corrections touch their fields
     if (corrections.length > 0 && filmId) {
-      const affectedDocs = new Set<GateId>()
+      const fieldsByDoc = new Map<GateId, string[]>()
       for (const field of corrections) {
-        for (const doc of FIELD_TO_DOCUMENTS[field] ?? []) affectedDocs.add(doc)
+        for (const doc of FIELD_TO_DOCUMENTS[field] ?? []) {
+          if (!fieldsByDoc.has(doc)) fieldsByDoc.set(doc, [])
+          fieldsByDoc.get(doc)!.push(field)
+        }
       }
-      if (affectedDocs.size > 0) {
+      if (fieldsByDoc.size > 0) {
         const staleSupabase = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -1130,13 +1133,13 @@ export async function POST(req: NextRequest) {
         )
         const existingStale: Record<string, any> = filmRow?.documents_stale ?? {}
         const staleUpdates: Record<string, any> = {}
-        for (const doc of affectedDocs) {
+        for (const [doc, fields] of fieldsByDoc) {
           if (closedGates.has(doc)) {
             staleUpdates[doc] = {
               stale: true,
-              reason: 'The portrait has been updated since this document was closed.',
+              reason: `${fields.join(', ')} ${fields.length > 1 ? 'were' : 'was'} corrected in ${currentMode ?? 'an earlier'} mode — this document was built from the previous value`,
               detected_at: new Date().toISOString(),
-              overriding_mode: 'extraction',
+              overriding_mode: currentMode ?? 'unknown',
             }
           }
         }
