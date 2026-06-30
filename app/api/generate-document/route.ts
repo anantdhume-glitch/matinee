@@ -346,6 +346,28 @@ Write an Editorial Brief for this film. Cover: the pacing philosophy — how thi
 
 Produce the Editorial Brief. Nothing before it. Nothing after it.`
 
+    case 'script_lock':
+      return `You are producing the Script Lock for "${filmTitle}".
+
+The Script Lock is the actual narration — every word the narrator speaks, written out in full, segment by segment. It is not a brief about the narration. It is not a summary of voice or tone. It is the script itself, ready to be recorded.
+
+${portraitBlock}
+
+DIRECTOR'S TREATMENT:
+${closedDocumentContent['treatment'] ?? ''}
+
+NARRATION BRIEF:
+${closedDocumentContent['narration_brief'] ?? ''}
+
+HOOK:
+${closedDocumentContent['hook_draft'] ?? ''}${importedSection}${refSection}
+
+Write the full narration script for this film, structured into clearly marked segments that follow the structural approach established in the Treatment. Open with the Hook above, word for word — do not rewrite it, the filmmaker has already approved that opening. Continue in the voice, register, and restraint established by the Narration Brief: honour what the narrator is permitted to say and what must be withheld. Close exactly where the Treatment's opening-and-closing decision says the film ends — the last feeling, not just the last scene.
+
+Mark each segment clearly (SEGMENT 1, SEGMENT 2, etc.) so downstream documents — Audio Direction, Edit Plan, Music Cue Sheet — can reference specific segments precisely. Within each segment, write only what the narrator says — no camera direction, no music notes, no edit notes. Every line must be spoken language, not written description: read it aloud and it should sound like a person talking, not a document being read.
+
+Produce the Script Lock. Nothing before it. Nothing after it.`
+
     case 'audio_direction':
       return `You are producing an Audio Direction document for "${filmTitle}".
 
