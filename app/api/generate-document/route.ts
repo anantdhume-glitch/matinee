@@ -238,7 +238,10 @@ CONSISTENCY LOCK:
 ${closedDocumentContent['consistency_lock'] ?? ''}
 
 CAMERA & LIGHT PLAN:
-${closedDocumentContent['camera_light_plan'] ?? ''}${importedSection}${refSection}
+${closedDocumentContent['camera_light_plan'] ?? ''}
+
+AI BRIEF:
+${closedDocumentContent['ai_brief'] ?? ''}${importedSection}${refSection}
 
 Produce the Visual Prompt Package in exactly this structure:
 
@@ -248,7 +251,7 @@ CAMERA: [draw from Camera & Light Plan for this shot — position, angle, lens c
 LIGHT: [draw from Camera & Light Plan for this shot — source, direction, quality, colour temperature, shadow behaviour]
 ATMOSPHERE: [draw from Camera & Light Plan — haze, dust, grain, weather, texture. Append one comparable film reference if it sharpens the visual register]
 
-NEGATIVE PROMPT: [five to eight descriptors — the most important things this shot must not contain, drawn from the Consistency Lock's WHAT MUST NEVER CHANGE field]
+NEGATIVE PROMPT: [five to eight descriptors — the most important things this shot must not contain, drawn from the Consistency Lock's WHAT MUST NEVER CHANGE field and from anything the AI Brief above names as something AI imagery must never attempt]
 
 Each section is a dense, comma-separated string of precise visual descriptors. No verbs. No sentences. No impressionistic language.
 
@@ -265,11 +268,14 @@ SCRIPT LOCK:
 ${closedDocumentContent['script_lock'] ?? ''}
 
 AUDIO DIRECTION:
-${closedDocumentContent['audio_direction'] ?? ''}${importedSection}${refSection}
+${closedDocumentContent['audio_direction'] ?? ''}
+
+EDITORIAL BRIEF:
+${closedDocumentContent['editorial_brief'] ?? ''}${importedSection}${refSection}
 
 The Edit Plan contains exactly these sections, each written as a short prose block:
 
-ASSEMBLY APPROACH — the overarching logic of how the film is cut. What principle governs the edit.
+ASSEMBLY APPROACH — the overarching logic of how the film is cut. What principle governs the edit. Ground this in the structural and pacing philosophy already established in the Editorial Brief above — do not invent an assembly logic the Editorial Brief hasn't already committed to.
 NARRATION-TO-IMAGE RELATIONSHIP — how each narration segment maps to its visual sequence. Where narration leads and where image leads.
 PACING NOTES — where the cut breathes and where it drives. Specific to each segment.
 TRANSITION LOGIC — what connects segments and why. Cut, dissolve, hold, silence.
