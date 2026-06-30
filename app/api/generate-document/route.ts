@@ -391,7 +391,10 @@ An Audio Direction document gives a narrator — often the filmmaker recording t
 ${portraitBlock}
 
 SCRIPT LOCK:
-${closedDocumentContent['script_lock'] ?? ''}${importedSection}${refSection}
+${closedDocumentContent['script_lock'] ?? ''}
+
+SOUND BRIEF:
+${closedDocumentContent['sound_brief'] ?? ''}${importedSection}${refSection}
 
 The Audio Direction contains exactly these seven sections, each written as a short prose block:
 
@@ -401,7 +404,7 @@ PACING PHILOSOPHY — how the narrator moves through the script. Where the voice
 
 THE EMOTIONAL ARC — how the narrator's emotional presence shifts across the film's structure. Where they are most exposed. Where they hold back. If the film moves through distinct emotional phases — grief, wonder, anger, restoration — name how the voice tracks that movement.
 
-RELATIONSHIP TO MUSIC — how the narrator's voice lives alongside the score. Does the voice lead? Does it breathe with the music or against it? When the score swells, what does the voice do? When silence arrives, how does the voice treat it?
+RELATIONSHIP TO MUSIC — how the narrator's voice lives alongside the score. Does the voice lead? Does it breathe with the music or against it? When the score swells, what does the voice do? When silence arrives, how does the voice treat it? Ground this section specifically in the sonic philosophy and music treatment established in the Sound Brief above — do not invent a music relationship the Sound Brief hasn't already established.
 
 WHAT THE VOICE NEVER DOES — the specific habits, tendencies, and choices that would betray this film's tone. What this narrator must resist. What is forbidden in this performance.
 
