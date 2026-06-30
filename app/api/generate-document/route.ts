@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { buildPortraitBlock, referenceDocumentsSection } from '@/lib/portrait'
 
-export const maxDuration = 600
+export const maxDuration = 300
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -514,7 +514,7 @@ export async function POST(req: NextRequest) {
 
     const stream = anthropic.messages.stream({
       model: 'claude-sonnet-4-6',
-      max_tokens: 24000,
+      max_tokens: 16000,
       system: prompt,
       messages: [{ role: 'user', content: 'Produce the document.' }],
     })
