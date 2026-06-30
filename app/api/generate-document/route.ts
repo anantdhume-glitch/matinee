@@ -26,6 +26,14 @@ type GateId =
   | 'script_lock'
   | 'audio_direction'
 
+type GateInstanceKey = string  // 'film_brief' | 'consistency_lock::old_woman' etc.
+
+const MULTI_INSTANCE_GATES: GateId[] = ['consistency_lock']
+
+function gateInstanceId(gateId: GateId, instanceKey?: string): GateInstanceKey {
+  return instanceKey ? `${gateId}::${instanceKey}` : gateId
+}
+
 // Story G — mode-aware Portrait injection per gate
 const GATE_TO_MODE: Partial<Record<GateId, string>> = {
   film_brief:           'producer',
@@ -53,7 +61,8 @@ function buildBasePrompt(
   portrait: Record<string, any> | null,
   closedDocumentContent: Record<string, string>,
   referenceBlock: string,
-  importedContent?: string
+  importedContent?: string,
+  instanceKey?: string
 ): string {
   const mode = GATE_TO_MODE[gateId] ?? null
   const portraitBlock = buildPortraitBlock(portrait, mode)
@@ -141,13 +150,18 @@ Rules:
 
 Produce the hook. Nothing before it. Nothing after it.`
 
-    case 'consistency_lock':
-      return `You are producing a Consistency Lock for "${filmTitle}".
+    case 'consistency_lock': {
+      const subjectLabel = instanceKey ? ` — ${instanceKey.replace(/_/g, ' ')}` : ''
+      const visualWorldValue = portrait?.portrait_visual_world?.value ?? portrait?.portrait_visual_world ?? null
+      const carryForwardBlock = instanceKey
+        ? `\nFILM-WIDE VISUAL CONSTANTS — already decided, true for every subject in this film, state as fact, do not re-derive:\n${visualWorldValue ?? '(none recorded yet)'}\n\nSUBJECT-SPECIFIC — from conversation about this subject only:\n${closedDocumentContent[gateInstanceId('consistency_lock', instanceKey)] ?? '(new subject — gather from conversation)'}\n`
+        : ''
+      return `You are producing a Consistency Lock for "${filmTitle}"${subjectLabel}.
 
 A Consistency Lock defines how one specific subject or location looks across every generated image. It is a visual constitution — once approved, every AI Specialist session for this subject builds from it and cannot deviate without flagging it first.
 
 ${portraitBlock}
-
+${carryForwardBlock}
 DIRECTOR'S TREATMENT:
 ${closedDocumentContent['treatment'] ?? ''}${importedSection}${refSection}
 
@@ -164,6 +178,7 @@ WHAT MAY VARY: [elements that can shift between shots without breaking consisten
 Every line must be directly usable in an image generation prompt. No impressionistic or general language.
 
 Produce the Consistency Lock. Nothing before it. Nothing after it.`
+    }
 
     case 'shot_list':
       return `You are producing a Shot List for "${filmTitle}".
@@ -415,9 +430,10 @@ function buildGenerationPrompt(
   closedDocumentContent: Record<string, string>,
   referenceBlock: string,
   importedContent?: string,
-  existingDocumentContent?: string
+  existingDocumentContent?: string,
+  instanceKey?: string
 ): string {
-  const base = buildBasePrompt(gateId, filmTitle, portrait, closedDocumentContent, referenceBlock, importedContent)
+  const base = buildBasePrompt(gateId, filmTitle, portrait, closedDocumentContent, referenceBlock, importedContent, instanceKey)
   if (!existingDocumentContent) return base
   return `${base}
 
@@ -441,11 +457,11 @@ export async function POST(req: NextRequest) {
       closedDocumentContent,
       existingDocumentContent,
       forceRegenerate,
+      instanceKey,
     } = await req.json()
 
-    // Story 2 — Gate lock enforcement.
-    // A gate with closed_at and no 'reopened' status is LOCKED.
-    // Refuse generation unless the caller has explicitly passed forceRegenerate.
+    // Gate lock enforcement — instance-aware.
+    // A gate entry matching both gate+instance_key with closed_at and no 'reopened' status is LOCKED.
     if (filmId) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -457,7 +473,9 @@ export async function POST(req: NextRequest) {
         .eq('id', filmId)
         .single()
       if (filmRow?.gates_closed) {
-        const gateEntry = (filmRow.gates_closed as any[]).find((g: any) => g.gate === gateId)
+        const gateEntry = (filmRow.gates_closed as any[]).find(
+          (g: any) => g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null)
+        )
         const isLocked = gateEntry && gateEntry.closed_at && gateEntry.status !== 'reopened'
         if (isLocked && !forceRegenerate) {
           return NextResponse.json(
@@ -476,7 +494,8 @@ export async function POST(req: NextRequest) {
       closedDocumentContent ?? {},
       referenceBlock ?? '',
       importedContent,
-      existingDocumentContent
+      existingDocumentContent,
+      instanceKey
     )
 
     const response = await anthropic.messages.create({

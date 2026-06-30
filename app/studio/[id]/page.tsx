@@ -49,11 +49,12 @@ type GateConfidence = {
 
 type GateClosed = {
   gate: GateId
+  instance_key?: string  // present for multi-instance gates (e.g. consistency_lock::old_woman)
   closed_at?: string
   status?: 'reopened'
   last_closed_at?: string
-  ripple?: GateId[]
-  ripple_dismissed?: GateId[]
+  ripple?: string[]         // GateInstanceKey — may include compound keys like consistency_lock::old_woman
+  ripple_dismissed?: string[]
   cleared_by?: 'matinee_work' | 'import'
   imported_document?: string
   confirmed_by_filmmaker_at?: string
@@ -61,11 +62,30 @@ type GateClosed = {
   confidence?: GateConfidence
 }
 type DocumentGenerated = {
-  document: GateId
+  document: string  // GateInstanceKey — 'film_brief' | 'consistency_lock::old_woman' etc.
   generated_at: string
   source?: 'import'
 }
 type GateId = 'film_brief' | 'treatment' | 'narration_brief' | 'cinematography_brief' | 'sound_brief' | 'ai_brief' | 'editorial_brief' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
+
+// Instance key for multi-instance gates: 'consistency_lock::old_woman' or plain 'film_brief'
+type GateInstanceKey = string
+
+const MULTI_INSTANCE_GATES: GateId[] = ['consistency_lock']
+
+function gateInstanceId(gateId: GateId, instanceKey?: string): GateInstanceKey {
+  return instanceKey ? `${gateId}::${instanceKey}` : gateId
+}
+
+function parseGateKey(key: string): { gateId: GateId; instanceKey: string | undefined } {
+  const sep = key.indexOf('::')
+  if (sep === -1) return { gateId: key as GateId, instanceKey: undefined }
+  return { gateId: key.slice(0, sep) as GateId, instanceKey: key.slice(sep + 2) }
+}
+
+function slugify(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+}
 type StaleRecord = {
   stale: boolean
   reason: string
@@ -588,8 +608,8 @@ export default function FilmStudio() {
     current_mode: string | null
     gates_closed: GateClosed[]
     documents_generated: DocumentGenerated[]
-    documents_content: Partial<Record<GateId, string>>
-    documents_stale?: Partial<Record<GateId, StaleRecord>>
+    documents_content: Partial<Record<string, string>>
+    documents_stale?: Partial<Record<string, StaleRecord>>
     source_documents?: {
       script?: {
         current?: { filename: string; extracted_text: string; uploaded_at: string }
@@ -614,7 +634,7 @@ export default function FilmStudio() {
   const [contextPanelOpen, setContextPanelOpen] = useState(false)
   const [contextTab, setContextTab] = useState<string>('portrait')
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
-  const [openDocument, setOpenDocument] = useState<GateId | null>(null)
+  const [openDocument, setOpenDocument] = useState<string | null>(null)
   const [openSourceDocument, setOpenSourceDocument] = useState<{
     type: 'script'
     data: { current?: { filename: string; extracted_text: string; uploaded_at: string }; history?: Array<{ filename: string; extracted_text: string; uploaded_at: string }> }
@@ -623,9 +643,10 @@ export default function FilmStudio() {
     data: { id: string; filename: string; extracted_text: string; uploaded_at: string }
   } | null>(null)
   const [showScriptHistory, setShowScriptHistory] = useState(false)
-  const [generating, setGenerating] = useState<GateId | null>(null)
-  const [generateError, setGenerateError] = useState<GateId | null>(null)
-  const [conversationWarningGate, setConversationWarningGate] = useState<GateId | null>(null)
+  const [generating, setGenerating] = useState<string | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [conversationWarningGate, setConversationWarningGate] = useState<{ gateId: GateId; instanceKey?: string } | null>(null)
+  const [pendingConsistencySubject, setPendingConsistencySubject] = useState<string | null>(null)
   const [importPending, setImportPending] = useState<{
     gateId: GateId
     filename: string
@@ -652,7 +673,7 @@ export default function FilmStudio() {
   const [stripHovered, setStripHovered] = useState(false)
   const [railToggleHovered, setRailToggleHovered] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(1440)
-  const [tooltipGate, setTooltipGate] = useState<GateId | null>(null)
+  const [tooltipGate, setTooltipGate] = useState<string | null>(null)
   const [showAllWords, setShowAllWords] = useState(false)
   const [showAllArchive, setShowAllArchive] = useState(false)
   const [portraitExpanded, setPortraitExpanded] = useState(false)
@@ -663,8 +684,9 @@ export default function FilmStudio() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const archiveRowRefs = useRef<Partial<Record<GateId, HTMLDivElement>>>({})
+  const archiveRowRefs = useRef<Partial<Record<string, HTMLDivElement>>>({})
   const hasGreeted = useRef(false)
+  const packageDeliveredThisSessionRef = useRef(false)
   const router = useRouter()
   const params = useParams()
   const filmId = params.id as string
@@ -766,6 +788,9 @@ export default function FilmStudio() {
   }
 
   const switchMode = async (modeValue: string | null, fromConversation: boolean = false) => {
+    if (film?.current_mode === 'ai_specialist' && modeValue !== 'ai_specialist') {
+      packageDeliveredThisSessionRef.current = false
+    }
     const { error } = await supabase.from('films').update({ current_mode: modeValue }).eq('id', filmId)
     if (!error) {
       setFilm(prev => prev ? { ...prev, current_mode: modeValue } : null)
@@ -970,18 +995,36 @@ export default function FilmStudio() {
     // film closure won't reflect the update until the next render.
     const effectiveMode = switchedModeValue !== undefined ? switchedModeValue : (film?.current_mode ?? null)
 
-    // Find any IN REVIEW document for the current mode to enable staleness detection
+    // Find any IN REVIEW document for the current mode to enable staleness detection.
+    // For multi-instance gates, check all instance keys in documents_content.
     const currentModeForStale = effectiveMode
     const inReviewDocument = (() => {
       if (!currentModeForStale) return null
       const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === currentModeForStale)
       for (const doc of modeDocs) {
-        const isGenerated = film?.documents_generated?.some(d => d.document === doc.gateId)
-        const gateEntry = film?.gates_closed?.find(g => g.gate === doc.gateId)
-        const isApproved = !!gateEntry && gateEntry.status !== 'reopened'
-        if (isGenerated && !isApproved) {
-          const content = film?.documents_content?.[doc.gateId]
-          if (content) return { type: doc.gateId, content }
+        if (MULTI_INSTANCE_GATES.includes(doc.gateId)) {
+          // Check each instance key in documents_content
+          for (const key of Object.keys(film?.documents_content ?? {})) {
+            if (!key.startsWith(doc.gateId + '::') && key !== doc.gateId) continue
+            const { instanceKey } = parseGateKey(key)
+            const isGenerated = film?.documents_generated?.some(d => d.document === key)
+            const gateEntry = film?.gates_closed?.find(
+              g => g.gate === doc.gateId && (g.instance_key ?? null) === (instanceKey ?? null)
+            )
+            const isApproved = !!gateEntry && gateEntry.status !== 'reopened'
+            if (isGenerated && !isApproved) {
+              const content = film?.documents_content?.[key]
+              if (content) return { type: key, content }
+            }
+          }
+        } else {
+          const isGenerated = film?.documents_generated?.some(d => d.document === doc.gateId)
+          const gateEntry = film?.gates_closed?.find(g => g.gate === doc.gateId)
+          const isApproved = !!gateEntry && gateEntry.status !== 'reopened'
+          if (isGenerated && !isApproved) {
+            const content = film?.documents_content?.[doc.gateId]
+            if (content) return { type: doc.gateId, content }
+          }
         }
       }
       return null
@@ -989,7 +1032,7 @@ export default function FilmStudio() {
 
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filmId, messages: updated.filter(m => (m as any).type !== 'mode_divider').map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: effectiveMode, gatesClosed: film?.gates_closed ?? [], inReviewDocument })
+      body: JSON.stringify({ filmId, messages: updated.filter(m => (m as any).type !== 'mode_divider').map(m => ({ role: m.role, content: m.content })), filmMemory: memoryData, sessionType: 'RETURNING', filmTitle: film?.title, currentMode: effectiveMode, gatesClosed: film?.gates_closed ?? [], inReviewDocument, packageDeliveredThisSession: effectiveMode === 'ai_specialist' ? packageDeliveredThisSessionRef.current : undefined })
     })
     const data = await response.json()
 
@@ -1144,25 +1187,27 @@ export default function FilmStudio() {
     await refreshPortrait()
   }
 
-  const approveGate = async (gateId: GateId, clearedBy?: 'matinee_work' | 'import') => {
-    // Story 3 — snapshot the document text at the moment of approval.
-    // This survives any future regeneration and can be recovered if the gate is reopened.
-    const approvedContent = film?.documents_content?.[gateId]
+  const approveGate = async (gateKey: string, clearedBy?: 'matinee_work' | 'import') => {
+    const { gateId, instanceKey } = parseGateKey(gateKey)
+    const instanceStaleKey = gateInstanceId(gateId, instanceKey)
+    const approvedContent = film?.documents_content?.[instanceStaleKey]
     const newGate: GateClosed = {
       gate: gateId,
+      ...(instanceKey ? { instance_key: instanceKey } : {}),
       closed_at: new Date().toISOString(),
       ...(clearedBy ? { cleared_by: clearedBy } : {}),
       ...(approvedContent ? { approved_content: approvedContent } : {}),
     }
     const existing = film?.gates_closed ?? []
-    const updated = existing.some(g => g.gate === gateId)
-      ? existing.map(g => g.gate === gateId ? newGate : g)
+    const updated = existing.some(g => g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null))
+      ? existing.map(g => g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null) ? newGate : g)
       : [...existing, newGate]
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, gates_closed: updated } : null)
 
     // Fire extraction pass after gate closes
-    const documentContent = film?.documents_content?.[gateId] ?? film?.gates_closed?.find(g => g.gate === gateId)?.approved_content ?? ''
+    const documentContent = film?.documents_content?.[instanceStaleKey] ??
+      film?.gates_closed?.find(g => g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null))?.approved_content ?? ''
     if (documentContent) {
       const { data: freshMemory } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
       const extractionResponse = await fetch('/api/gate-approval-extraction', {
@@ -1184,10 +1229,9 @@ export default function FilmStudio() {
         .eq('id', filmId)
         .single()
       if (freshFilm) {
-        // Patch confidence directly from API response if Supabase re-fetch hasn't caught up
         if (extractionResult?.confidence && freshFilm.gates_closed) {
           freshFilm.gates_closed = freshFilm.gates_closed.map((g: GateClosed) =>
-            g.gate === gateId
+            g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null)
               ? { ...g, confidence: { ...extractionResult.confidence, last_evaluated: new Date().toISOString() } }
               : g
           )
@@ -1198,18 +1242,22 @@ export default function FilmStudio() {
     }
   }
 
-  const reopenGate = async (gateId: GateId) => {
-    const currentGate = film?.gates_closed?.find(g => g.gate === gateId)
+  const reopenGate = async (gateKey: string) => {
+    const { gateId, instanceKey } = parseGateKey(gateKey)
+    const currentGate = film?.gates_closed?.find(
+      g => g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null)
+    )
     if (!currentGate?.closed_at) return
 
     const lastClosedAt = currentGate.closed_at
 
     const affected = (film?.documents_generated ?? [])
-      .filter(d => d.generated_at > lastClosedAt && d.document !== gateId)
-      .map(d => d.document as GateId)
+      .filter(d => d.generated_at > lastClosedAt && d.document !== gateKey)
+      .map(d => d.document)
 
     const enrichedEntry: GateClosed = {
       gate: gateId,
+      ...(instanceKey ? { instance_key: instanceKey } : {}),
       status: 'reopened',
       last_closed_at: lastClosedAt,
       ripple: affected,
@@ -1217,7 +1265,7 @@ export default function FilmStudio() {
     }
 
     const updated = (film?.gates_closed ?? []).map(g =>
-      g.gate === gateId ? enrichedEntry : g
+      g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null) ? enrichedEntry : g
     )
 
     await supabase.from('films').update({ gates_closed: updated }).eq('id', filmId)
@@ -1254,22 +1302,25 @@ export default function FilmStudio() {
   const checkConversationExists = (modeId: string): boolean =>
     messages.some(m => (m as any).mode === modeId && m.role === 'assistant')
 
-  const generateDocument = async (gateId: GateId, owningMode: string) => {
-    setGenerating(gateId)
+  const generateDocument = async (gateId: GateId, owningMode: string, instanceKey?: string) => {
+    const instanceStaleKey = gateInstanceId(gateId, instanceKey)
+    setGenerating(instanceStaleKey)
     setGenerateError(null)
     // Reset staleness before generating
-    const staleReset = { ...(film?.documents_stale ?? {}), [gateId]: { stale: false, reason: '', detected_at: '', overriding_mode: '' } }
+    const staleReset = { ...(film?.documents_stale ?? {}), [instanceStaleKey]: { stale: false, reason: '', detected_at: '', overriding_mode: '' } }
     await supabase.from('films').update({ documents_stale: staleReset }).eq('id', filmId)
     setFilm(prev => prev ? { ...prev, documents_stale: staleReset } : null)
     try {
       const { data: memoryData } = await supabase.from('film_memory').select('*').eq('film_id', filmId).single()
 
-      // Story 1 — pass current document content so regeneration refines rather than replaces.
-      const existingDocumentContent = film?.documents_content?.[gateId] ?? undefined
+      // Pass current document content for this specific instance so regeneration refines rather than replaces.
+      const existingDocumentContent = film?.documents_content?.[instanceStaleKey] ?? undefined
 
-      // Story 2 — a gate with status 'reopened' was explicitly reopened by the filmmaker;
+      // A gate with status 'reopened' was explicitly reopened by the filmmaker;
       // pass forceRegenerate so the server-side lock check permits the write.
-      const gateEntry = film?.gates_closed?.find(g => g.gate === gateId)
+      const gateEntry = film?.gates_closed?.find(
+        g => g.gate === gateId && (g.instance_key ?? null) === (instanceKey ?? null)
+      )
       const forceRegenerate = gateEntry?.status === 'reopened'
 
       const response = await fetch('/api/generate-document', {
@@ -1285,29 +1336,27 @@ export default function FilmStudio() {
           closedDocumentContent: film?.documents_content ?? {},
           existingDocumentContent,
           forceRegenerate,
+          instanceKey,
         })
       })
 
       const data = await response.json()
 
       if (!data.success) {
-        setGenerateError(gateId)
+        setGenerateError(instanceStaleKey)
         return
       }
 
       // Race-condition fix: read documents_content/documents_generated fresh from
       // Supabase right before merging, instead of the React closure's local copy.
-      // Closes the window where a different document's generation (started after
-      // this one but finishing first) would otherwise have its save silently
-      // reverted when this write lands.
       const { data: freshFilm } = await supabase
         .from('films')
         .select('documents_content, documents_generated')
         .eq('id', filmId)
         .single()
 
-      const updatedContent = { ...(freshFilm?.documents_content ?? {}), [gateId]: data.content }
-      const newGenerated = { document: gateId, generated_at: new Date().toISOString() }
+      const updatedContent = { ...(freshFilm?.documents_content ?? {}), [instanceStaleKey]: data.content }
+      const newGenerated = { document: instanceStaleKey, generated_at: new Date().toISOString() }
       const updatedGenerated = [...(freshFilm?.documents_generated ?? []), newGenerated]
 
       await supabase.from('films').update({
@@ -1321,9 +1370,13 @@ export default function FilmStudio() {
         documents_generated: updatedGenerated,
       } : null)
 
-      setOpenDocument(gateId)
+      setOpenDocument(instanceStaleKey)
+      if (gateId === 'visual_prompt_package') {
+        packageDeliveredThisSessionRef.current = true
+      }
     } finally {
       setGenerating(null)
+      setPendingConsistencySubject(null)
     }
   }
 
@@ -2639,7 +2692,142 @@ export default function FilmStudio() {
                             <div style={{ fontSize: '11px', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent-dim)', padding: '20px 1rem 6px 12px' }}>
                               {mode.replace('_', ' ')}
                             </div>
-                            {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).map(doc => {
+                            {ARCHIVE_DOCUMENTS.filter(d => d.mode === mode).flatMap(doc => {
+                              // Multi-instance gate: render one row per existing instance + an "add new" row
+                              if (MULTI_INSTANCE_GATES.includes(doc.gateId)) {
+                                const genPrereqArchive = GATE_GENERATION_PREREQUISITES[doc.gateId]
+                                const prereqMetArchive = isPrereqMet(genPrereqArchive, film.gates_closed)
+                                const instanceKeys = Object.keys(film.documents_content ?? {})
+                                  .filter(k => k === doc.gateId || k.startsWith(doc.gateId + '::'))
+
+                                const instanceRows = instanceKeys.map(instanceKey => {
+                                  const { instanceKey: instPart } = parseGateKey(instanceKey)
+                                  const instLabel = instPart ? instPart.replace(/_/g, ' ') : doc.label
+                                  const isGenerated = film.documents_generated?.some(d => d.document === instanceKey)
+                                  const gateEntry = film.gates_closed?.find(
+                                    g => g.gate === doc.gateId && (g.instance_key ?? null) === (instPart ?? null)
+                                  )
+                                  const isReopened = gateEntry?.status === 'reopened'
+                                  const isApproved = !!gateEntry && !isReopened
+                                  const gateState: 'IN REVIEW' | 'LOCKED' | 'REOPENED' =
+                                    isReopened ? 'REOPENED' : isApproved ? 'LOCKED' : 'IN REVIEW'
+                                  const iconColor =
+                                    gateState === 'LOCKED'    ? 'var(--accent)' :
+                                    gateState === 'REOPENED'  ? 'var(--gate-review)' : 'var(--fg-dim)'
+                                  const gateConfidence = gateEntry?.confidence
+                                  const showConfidence = !!(gateConfidence?.last_evaluated)
+                                  return (
+                                    <div key={instanceKey} ref={el => { archiveRowRefs.current[instanceKey] = el ?? undefined }} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                        {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
+                                        <span
+                                          onClick={() => setOpenDocument(instanceKey)}
+                                          style={{ fontSize: '13px', color: isApproved ? 'var(--accent)' : 'var(--fg)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--line)', flex: 1 }}
+                                        >
+                                          {doc.label}: {instLabel}
+                                        </span>
+                                        {showConfidence && gateConfidence && (
+                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
+                                            {(['coverage', 'clarity', 'consistency'] as const).map(dim => {
+                                              const level = gateConfidence[dim]
+                                              return (
+                                                <span key={dim} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                  {level !== 'strong' && (
+                                                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', display: 'block', backgroundColor: level === 'needs_attention' ? 'rgba(194,154,80,0.65)' : 'rgba(140,134,130,0.4)' }} />
+                                                  )}
+                                                  <span style={{ fontSize: '0.44rem', letterSpacing: '0.04em', color: level === 'needs_attention' ? 'rgba(194,154,80,0.75)' : level === 'strong' ? 'rgba(140,134,130,0.55)' : 'var(--fg-dim-2)', textTransform: 'uppercase', lineHeight: 1 }}>
+                                                    {dim === 'coverage' ? 'COV' : dim === 'clarity' ? 'CLR' : 'CON'}
+                                                  </span>
+                                                </span>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                        <span className={`gate-pill ${gateState === 'LOCKED' ? 'gate-pill-closed' : 'gate-pill-review'}`}>
+                                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                                          {gateState === 'LOCKED' ? 'Closed' : gateState === 'IN REVIEW' ? 'In Review' : 'Reopened'}
+                                        </span>
+                                        {gateState === 'LOCKED' && film.documents_stale?.[instanceKey]?.stale && (
+                                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--gate-review)', flexShrink: 0 }} title="Out of date" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                })
+
+                                // "Add new" row — shown when prereq is met and mode is cinematographer
+                                const addRow = prereqMetArchive ? (
+                                  <div key={`${doc.gateId}::__new`} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                      {ARCHIVE_ICON_MAP[doc.gateId]('var(--fg-dim-2)')}
+                                      {pendingConsistencySubject !== null ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                          <input
+                                            autoFocus
+                                            value={pendingConsistencySubject}
+                                            onChange={e => setPendingConsistencySubject(e.target.value)}
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter' && pendingConsistencySubject.trim()) {
+                                                generateDocument(doc.gateId, doc.mode, slugify(pendingConsistencySubject))
+                                              }
+                                              if (e.key === 'Escape') setPendingConsistencySubject(null)
+                                            }}
+                                            placeholder="Subject name"
+                                            style={{ fontSize: '12px', background: 'transparent', border: '1px solid var(--line)', color: 'var(--fg)', padding: '2px 6px', fontFamily: "'DM Sans', system-ui, sans-serif", flex: 1 }}
+                                          />
+                                          <button
+                                            onClick={() => { if (pendingConsistencySubject.trim()) generateDocument(doc.gateId, doc.mode, slugify(pendingConsistencySubject)) }}
+                                            disabled={!pendingConsistencySubject.trim() || generating === gateInstanceId(doc.gateId, slugify(pendingConsistencySubject))}
+                                            style={{ fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bg)', background: 'var(--accent)', border: 'none', padding: '3px 8px', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                                          >
+                                            {generating ? 'Generating…' : 'Generate'}
+                                          </button>
+                                          <button onClick={() => setPendingConsistencySubject(null)} style={{ background: 'none', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}>✕</button>
+                                        </div>
+                                      ) : (
+                                        <span
+                                          onClick={() => {
+                                            const subjectHint = filmMemory?.portrait_subjects?.value ?? ''
+                                            const firstSubject = typeof subjectHint === 'string'
+                                              ? subjectHint.split(/[,\n]/)[0].trim()
+                                              : ''
+                                            setPendingConsistencySubject(firstSubject)
+                                          }}
+                                          style={{ fontSize: '13px', color: 'var(--fg-dim-2)', cursor: 'pointer', fontStyle: 'italic', flex: 1 }}
+                                        >
+                                          + {instanceKeys.length > 0 ? 'Lock another subject' : doc.label}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div key={`${doc.gateId}::__new`} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                      {ARCHIVE_ICON_MAP[doc.gateId]('var(--fg-dim-2)')}
+                                      <span style={{ fontSize: '13px', color: 'var(--fg-dim-2)', fontStyle: 'italic', flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>{doc.label}</span>
+                                        <span
+                                          style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}
+                                          onMouseEnter={() => setTooltipGate(`${doc.gateId}::prereq`)}
+                                          onMouseLeave={() => setTooltipGate(null)}
+                                        >
+                                          <Info size={11} color="var(--fg-dim-2)" style={{ display: 'block' }} />
+                                          {tooltipGate === `${doc.gateId}::prereq` && (
+                                            <span style={{ position: 'absolute', bottom: '130%', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'var(--bg-elev)', border: '1px solid var(--line)', padding: '6px 10px', width: '200px', fontSize: '0.65rem', lineHeight: 1.5, color: 'var(--fg-dim)', zIndex: 30, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                                              {doc.label} requires all Department Briefs to be closed first.
+                                            </span>
+                                          )}
+                                        </span>
+                                      </span>
+                                      <span style={{ fontSize: '0.55rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', fontFamily: "'DM Sans', system-ui, sans-serif" }}>Unavailable</span>
+                                    </div>
+                                  </div>
+                                )
+
+                                return [...instanceRows, addRow]
+                              }
+
+                              // Single-instance gate — original rendering
                               const isGenerated = film.documents_generated?.some(d => d.document === doc.gateId)
                               const gateEntry = film.gates_closed?.find(g => g.gate === doc.gateId)
                               const isReopened = gateEntry?.status === 'reopened'
@@ -2652,12 +2840,6 @@ export default function FilmStudio() {
                                 isApproved    ? 'LOCKED'      :
                                 !prereqMetArchive ? 'UNAVAILABLE' :
                                 (isGenerated || hasPendingImport) ? 'IN REVIEW' : 'OPEN'
-                              const stateColor =
-                                gateState === 'LOCKED'      ? 'var(--accent)' :
-                                gateState === 'REOPENED'    ? 'var(--gate-review)' :
-                                gateState === 'IN REVIEW'   ? 'var(--fg)' :
-                                gateState === 'UNAVAILABLE' ? 'var(--fg-dim-2)' :
-                                                              'var(--fg-dim)'
                               const iconColor =
                                 gateState === 'LOCKED'      ? 'var(--accent)' :
                                 gateState === 'REOPENED'    ? 'var(--gate-review)' :
@@ -2675,12 +2857,11 @@ export default function FilmStudio() {
                               const gateConfidence = gateEntry?.confidence
                               const showConfidence = !!(gateConfidence?.last_evaluated)
 
-                              return (
+                              return [(
                                 <div key={doc.gateId} ref={el => { archiveRowRefs.current[doc.gateId] = el ?? undefined }} style={{ padding: '0.45rem 1rem 0.45rem 20px', borderBottom: '1px solid var(--line)', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                                     {ARCHIVE_ICON_MAP[doc.gateId](iconColor)}
 
-                                    {/* Document name + optional tooltip for blocked gates */}
                                     {isClickable ? (
                                       <span
                                         onClick={() => setOpenDocument(doc.gateId)}
@@ -2717,7 +2898,6 @@ export default function FilmStudio() {
                                       </span>
                                     )}
 
-                                    {/* Confidence indicators — only when last_evaluated is set */}
                                     {showConfidence && gateConfidence && (
                                       <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
                                         {(['coverage', 'clarity', 'consistency'] as const).map(dim => {
@@ -2749,7 +2929,6 @@ export default function FilmStudio() {
                                       </div>
                                     )}
 
-                                    {/* State pill */}
                                     {gateState === 'UNAVAILABLE' ? (
                                       <span style={{ fontSize: '0.55rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim-2)', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
                                         Unavailable
@@ -2765,7 +2944,7 @@ export default function FilmStudio() {
                                     )}
                                   </div>
                                 </div>
-                              )
+                              )]
                             })}
                           </div>
                         ))}
@@ -2949,10 +3128,9 @@ export default function FilmStudio() {
 
       {/* CONVERSATION WARNING MODAL */}
       {conversationWarningGate && (() => {
-        const warningDoc = ARCHIVE_DOCUMENTS.find(d => d.gateId === conversationWarningGate)
+        const warningDoc = ARCHIVE_DOCUMENTS.find(d => d.gateId === conversationWarningGate.gateId)
         if (!warningDoc) return null
         const modeLabel = MODE_CONFIG.find(m => m.key === warningDoc.mode)?.label ?? warningDoc.mode
-        const pendingGate = conversationWarningGate
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div style={{ background: 'var(--bg-elev)', maxWidth: '480px', width: '100%', border: '1px solid var(--line)', padding: '2rem 2.5rem' }}>
@@ -2964,7 +3142,7 @@ export default function FilmStudio() {
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                 <button
-                  onClick={() => { setConversationWarningGate(null); generateDocument(pendingGate, warningDoc.mode) }}
+                  onClick={() => { setConversationWarningGate(null); generateDocument(conversationWarningGate.gateId, warningDoc.mode, conversationWarningGate.instanceKey) }}
                   style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', background: 'transparent', border: '1px solid var(--line)', padding: '0.5rem 1.25rem', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                 >
                   Generate Anyway
@@ -2991,21 +3169,27 @@ export default function FilmStudio() {
 
       {/* DOCUMENT OVERLAY */}
       {openDocument && (() => {
-        const doc = ARCHIVE_DOCUMENTS.find(d => d.gateId === openDocument)
+        const { gateId: openGateId, instanceKey: openInstanceKey } = parseGateKey(openDocument)
+        const doc = ARCHIVE_DOCUMENTS.find(d => d.gateId === openGateId)
         if (!doc) return null
         const isGenerated = film?.documents_generated?.some(d => d.document === openDocument)
-        const gateEntry = film?.gates_closed?.find(g => g.gate === openDocument)
+        const gateEntry = film?.gates_closed?.find(
+          g => g.gate === openGateId && (g.instance_key ?? null) === (openInstanceKey ?? null)
+        )
         const isReopened = gateEntry?.status === 'reopened'
         const isApproved = !!gateEntry && !isReopened
-        const hasPendingImport = importPending?.gateId === openDocument
-        const genPrereq = GATE_GENERATION_PREREQUISITES[openDocument]
+        const hasPendingImport = importPending?.gateId === openGateId
+        const genPrereq = GATE_GENERATION_PREREQUISITES[openGateId]
         const prereqMet = isPrereqMet(genPrereq, film?.gates_closed)
-        const approvalPrereq = GATE_APPROVAL_PREREQUISITES[openDocument]
+        const approvalPrereq = GATE_APPROVAL_PREREQUISITES[openGateId]
         const approvalPrereqMet = isPrereqMet(approvalPrereq, film?.gates_closed)
         const isOwningMode = film?.current_mode === doc.mode
         const canGenerate = prereqMet && isOwningMode
         const canApprove = approvalPrereqMet
-        const activeFlag = getActiveRippleFlag(openDocument)
+        const activeFlag = getActiveRippleFlag(openGateId)
+        const overlayLabel = openInstanceKey
+          ? `${doc.label}: ${openInstanceKey.replace(/_/g, ' ')}`
+          : doc.label
 
         const gateState: 'OPEN' | 'IN REVIEW' | 'LOCKED' =
           isApproved ? 'LOCKED' :
@@ -3023,7 +3207,7 @@ export default function FilmStudio() {
               {/* Header */}
               <div style={{ padding: '1.5rem 3rem 1rem', borderBottom: '1px solid var(--line)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.6rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent-dim)' }}>
-                  {doc.label}
+                  {overlayLabel}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <span className={`gate-pill ${gateState === 'LOCKED' ? 'gate-pill-closed' : gateState === 'IN REVIEW' ? 'gate-pill-review' : 'gate-pill-open'}`}>
@@ -3051,7 +3235,7 @@ export default function FilmStudio() {
                   margin: '0 3rem',
                   flexShrink: 0,
                 }}>
-                  {film.documents_stale[openDocument].reason
+                  {film.documents_stale[openDocument]?.reason
                     ? `This document is out of date. ${film.documents_stale[openDocument].reason}. Reopen and regenerate before continuing.`
                     : 'This document is out of date. The conversation has moved. Reopen and regenerate before continuing.'
                   }
@@ -3075,8 +3259,8 @@ export default function FilmStudio() {
               <div style={{ borderTop: '1px solid var(--line)', padding: '1rem 3rem', flexShrink: 0 }}>
                 {activeFlag && (
                   <div style={{ marginBottom: '0.75rem', fontSize: '0.64rem', color: 'var(--gate-review)', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span>{doc.label} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
-                    <button onClick={() => dismissRippleFlag(activeFlag, openDocument)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.64rem', fontFamily: "'DM Sans', system-ui, sans-serif", flexShrink: 0 }}>
+                    <span>{overlayLabel} was generated after {GATE_LABELS[activeFlag]} was approved. It may reflect the previous version.</span>
+                    <button onClick={() => dismissRippleFlag(activeFlag, openGateId)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gate-review)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.64rem', fontFamily: "'DM Sans', system-ui, sans-serif", flexShrink: 0 }}>
                       Dismiss
                     </button>
                   </div>
@@ -3113,10 +3297,10 @@ export default function FilmStudio() {
                         onClick={() => {
                           if (!canGenerate) return
                           if (!checkConversationExists(doc.mode)) {
-                            setConversationWarningGate(openDocument)
+                            setConversationWarningGate({ gateId: openGateId, instanceKey: openInstanceKey })
                             return
                           }
-                          generateDocument(openDocument, doc.mode)
+                          generateDocument(openGateId, doc.mode, openInstanceKey)
                         }}
                         disabled={generating === openDocument || !canGenerate}
                         style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--bg)' : 'var(--fg-dim)', background: canGenerate ? 'var(--accent)' : 'transparent', border: `1px solid ${canGenerate ? 'var(--accent)' : 'var(--line)'}`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
@@ -3124,13 +3308,13 @@ export default function FilmStudio() {
                         {generating === openDocument ? 'Generating...' : 'Generate'}
                       </button>
                       <label style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-dim)', cursor: 'pointer', padding: '0.5rem 1.25rem', border: '1px solid var(--line)', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-                        {importLoading === openDocument ? 'Reading...' : 'Import'}
+                        {importLoading === openGateId ? 'Reading...' : 'Import'}
                         <input
                           ref={importFileInputRef}
                           type="file"
                           accept=".pdf,.doc,.docx"
                           style={{ display: 'none' }}
-                          onChange={e => { const file = e.target.files?.[0]; if (file) { importDocument(openDocument, file); e.target.value = '' } }}
+                          onChange={e => { const file = e.target.files?.[0]; if (file) { importDocument(openGateId, file); e.target.value = '' } }}
                         />
                       </label>
                     </>
@@ -3138,7 +3322,7 @@ export default function FilmStudio() {
                   {gateState === 'IN REVIEW' && (
                     <>
                       <button
-                        onClick={() => generateDocument(openDocument, doc.mode)}
+                        onClick={() => generateDocument(openGateId, doc.mode, openInstanceKey)}
                         disabled={generating === openDocument || !canGenerate}
                         style={{ fontSize: '0.72rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: canGenerate ? 'var(--fg)' : 'var(--fg-dim-2)', background: 'transparent', border: `1px solid var(--line)`, padding: '0.5rem 1.25rem', cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: "'DM Sans', system-ui, sans-serif" }}
                       >

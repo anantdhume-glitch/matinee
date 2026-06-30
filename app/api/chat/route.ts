@@ -10,6 +10,14 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 type FilmMode = 'producer' | 'director' | 'narrator' | 'cinematographer' | 'editor' | 'ai_specialist'
 type GateId = 'film_brief' | 'treatment' | 'narration_brief' | 'cinematography_brief' | 'sound_brief' | 'ai_brief' | 'editorial_brief' | 'mode_selection_brief' | 'hook_draft' | 'script_lock' | 'audio_direction' | 'consistency_lock' | 'shot_list' | 'camera_light_plan' | 'visual_prompt_package' | 'edit_plan' | 'music_cue_sheet'
 
+type GateInstanceKey = string  // 'film_brief' | 'consistency_lock::old_woman' etc.
+
+const MULTI_INSTANCE_GATES: GateId[] = ['consistency_lock']
+
+function gateInstanceId(gateId: GateId, instanceKey?: string): GateInstanceKey {
+  return instanceKey ? `${gateId}::${instanceKey}` : gateId
+}
+
 type GateConfidence = {
   coverage: 'strong' | 'developing' | 'needs_attention'
   clarity: 'strong' | 'developing' | 'needs_attention'
@@ -24,12 +32,14 @@ type PromptContext = {
   currentMode: FilmMode
   gatesClosed?: {
     gate: string
+    instance_key?: string
     closed_at: string
     status?: string
     portrait_version?: string
     confidence?: GateConfidence
   }[]
   referenceBlock?: string
+  packageDeliveredThisSession?: boolean
 }
 
 // Research docs: useful for early creative/development modes only.
@@ -335,9 +345,19 @@ Cinema language only. One question at a time. You do not summarise what the film
 
 function buildCinematographerPrompt(ctx: PromptContext): string {
   const cinematographyBriefClosed = ctx.gatesClosed?.some(g => g.gate === 'cinematography_brief' && !!g.closed_at) ?? false
-  const consistencyLockClosed = ctx.gatesClosed?.some(g => g.gate === 'consistency_lock' && !!g.closed_at) ?? false
+  const anyConsistencyLockClosed = ctx.gatesClosed?.some(g => g.gate === 'consistency_lock' && !!g.closed_at) ?? false
   const shotListClosed = ctx.gatesClosed?.some(g => g.gate === 'shot_list' && !!g.closed_at) ?? false
   const cameraLightClosed = ctx.gatesClosed?.some(g => g.gate === 'camera_light_plan' && !!g.closed_at) ?? false
+
+  // Film-wide visual constants for the cinematographer to carry forward to new subjects.
+  const visualWorldValue = (ctx.filmMemory as any)?.portrait_visual_world?.value ?? null
+  const visualConstantsNote = anyConsistencyLockClosed && visualWorldValue
+    ? `\nFILM-WIDE VISUAL CONSTANTS — established for this film, carry these forward to any new subject discussion without re-asking:\n${visualWorldValue}`
+    : ''
+
+  const newLockAvailableNote = anyConsistencyLockClosed
+    ? `\nA new Consistency Lock remains available for any subject that does not yet have one. When the filmmaker brings a new subject, gather its specifics and produce a new lock — the film-wide visual constants above apply without re-derivation.`
+    : ''
 
   const gateBlock = !cinematographyBriefClosed
     ? `PRODUCTION GATE STATE:
@@ -345,23 +365,23 @@ The Director's Cinematography Brief is not yet approved. No document can be prod
 The Cinematography Brief is the Director's specific instructions to the Cinematographer — the visual grammar, movement philosophy, quality of light, palette, what the frame reveals and what it withholds. Without it, every Consistency Lock, Shot List, and Camera & Light Plan has no foundation.
 When the filmmaker explicitly asks to produce a document: tell them directly that the Cinematography Brief is not yet approved, that this is what is blocking production, and that the Director is the mode that produces it. Then offer to continue the current conversation — visual language, consistency instincts, shot ideas — here and now. Name the specific gate that is missing. Do not mention Discovery.
 This is the shape of the response: name the specific gate (Cinematography Brief), name the mode that owns it (Director), then stay in this conversation. Never use the phrases "still in development", "not available yet", "not quite ready", or "Discovery mode". Never redirect away from this conversation.`
-    : !consistencyLockClosed
+    : !anyConsistencyLockClosed
     ? `PRODUCTION GATE STATE:
 The Cinematography Brief is approved. The Cinematographer may now produce the Consistency Lock.
 The Consistency Lock is the first document. It defines how a specific subject or location looks across every generated image — locking visual identity before AI Specialist sessions begin. Produce it only when the filmmaker explicitly asks, and only for one subject or location at a time.
-The Shot List and Camera & Light Plan are not available until the Consistency Lock is approved.`
+The Shot List and Camera & Light Plan are not available until at least one Consistency Lock is approved.`
     : !shotListClosed
     ? `PRODUCTION GATE STATE:
-The Consistency Lock is approved. The Cinematographer may now produce the Shot List.
+At least one Consistency Lock is approved. The Cinematographer may now produce the Shot List for any subject whose lock is closed.${newLockAvailableNote}
 The Shot List defines every shot in a segment — shot number, subject, shot type, camera angle, and what the shot shows. One Shot List per segment. Never the full film in one session. Produce it only on explicit request.
-The Camera & Light Plan is not available until the Shot List is approved.`
+The Camera & Light Plan is not available until the Shot List is approved.${visualConstantsNote}`
     : !cameraLightClosed
     ? `PRODUCTION GATE STATE:
-The Shot List is approved. The Cinematographer may now produce the Camera & Light Plan.
-The Camera & Light Plan translates the Shot List into precise visual production language ready for AI Specialist prompt generation. Every element must be directly usable in an image generation prompt. Produce it only on explicit request.`
+The Shot List is approved. The Cinematographer may now produce the Camera & Light Plan.${newLockAvailableNote}
+The Camera & Light Plan translates the Shot List into precise visual production language ready for AI Specialist prompt generation. Every element must be directly usable in an image generation prompt. Produce it only on explicit request.${visualConstantsNote}`
     : `PRODUCTION GATE STATE:
-The Camera & Light Plan is approved. The Cinematographer's visual production chain for this segment is complete.
-You remain available for conversation about the next segment, a new subject's Consistency Lock, or any visual question the filmmaker brings.`
+The Camera & Light Plan is approved. The Cinematographer's visual production chain for this segment is complete.${newLockAvailableNote}
+You remain available for conversation about the next segment, a new subject's Consistency Lock, or any visual question the filmmaker brings.${visualConstantsNote}`
 
   return `You are Matinee — the filmmaker's cinematographer.
 
@@ -455,21 +475,23 @@ Cinema language only. One question at a time. You do not summarise what the film
 
 function buildAiSpecialistPrompt(ctx: PromptContext): string {
   const cameraLightClosed = ctx.gatesClosed?.some(g => g.gate === 'camera_light_plan' && !!g.closed_at) ?? false
-  const visualPromptClosed = ctx.gatesClosed?.some(g => g.gate === 'visual_prompt_package' && !!g.closed_at) ?? false
 
+  // visualPromptClosed is intentionally not derived from gates_closed — a closed Visual Prompt Package
+  // gate means one shot was ever approved for this film, not that this specific session is done.
+  // Session closure is determined by whether a package was generated in this conversation, not gate state.
   const gateBlock = !cameraLightClosed
     ? `PRODUCTION GATE STATE:
 The Camera & Light Plan is not yet approved. No Visual Prompt Package can be produced until it is.
 The Camera & Light Plan belongs to the Cinematographer — that is the mode that produces it. Without an approved Camera & Light Plan, there is no shot-specific visual language to build a prompt from.
 When the filmmaker explicitly asks to produce the Visual Prompt Package: tell them directly that the Camera & Light Plan is not yet approved, that this is what is blocking production, and that the Cinematographer is the mode that produces it. Then offer to continue the current conversation — prompt craft, generation strategy, how to describe a subject or a light quality in prompt language. Name the specific gate and the owning mode. Stay in this conversation. Never redirect to Discovery.
 This is the shape of the response: name the specific gate (Camera & Light Plan), name the mode that owns it (Cinematographer), then stay in this conversation. Never use the phrases "still in development", "not available yet", "not quite ready", or "Discovery mode". Never redirect away from this conversation.`
-    : !visualPromptClosed
+    : !ctx.packageDeliveredThisSession
     ? `PRODUCTION GATE STATE:
 The Camera & Light Plan is approved. The AI Specialist may now produce the Visual Prompt Package.
 The Visual Prompt Package is one shot. One session. The session closes after the package is delivered. Produce it only when the filmmaker explicitly requests it and only for one shot at a time.`
     : `PRODUCTION GATE STATE:
-The Visual Prompt Package for this session is delivered and approved. This session is closed.
-The AI Specialist remains available for conversation about prompt craft, generation strategy, or preparation for the next shot session.`
+The Visual Prompt Package for this session is delivered. This session is closed.
+The AI Specialist remains available for conversation about prompt craft, generation strategy, or preparation for the next shot session — which begins fresh the next time this mode is entered.`
 
   return `You are Matinee — the filmmaker's AI specialist.
 
@@ -876,7 +898,8 @@ function buildSystemPrompt(
     portrait_version?: string
     confidence?: GateConfidence
   }[] = [],
-  referenceBlock: string = ''
+  referenceBlock: string = '',
+  packageDeliveredThisSession: boolean = false
 ): string {
   if (currentMode !== null && currentMode !== 'discovery') {
     const mode = currentMode as FilmMode
@@ -887,6 +910,7 @@ function buildSystemPrompt(
       currentMode: mode,
       gatesClosed,
       referenceBlock: referenceBlock || undefined,
+      packageDeliveredThisSession,
     }
     const modePrompt = MODE_PROMPTS[mode]?.(ctx) ?? ''
     return `${buildUniversalPreamble()}\n\n${modePrompt}${buildConfidenceBlock(ctx.gatesClosed)}`
@@ -1037,7 +1061,7 @@ If no meaningful change: respond normally. Do not mention the document.`
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed, filmId, inReviewDocument } = await req.json()
+    const { messages, filmMemory, sessionType, filmTitle, currentMode, gatesClosed, filmId, inReviewDocument, packageDeliveredThisSession } = await req.json()
 
     let referenceBlock = ''
     let briefInjection = ''
@@ -1060,7 +1084,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock)
+    let systemPrompt = buildSystemPrompt(filmMemory, sessionType, filmTitle, currentMode, gatesClosed ?? [], referenceBlock, packageDeliveredThisSession ?? false)
 
     // Inject mode-specific locked Department Brief(s) into system prompt
     if (briefInjection) {
@@ -1107,7 +1131,8 @@ export async function POST(req: NextRequest) {
       corrections = extracted.corrections
     }
 
-    // Story A — flag closed gate documents stale when portrait corrections touch their fields
+    // Flag closed gate documents stale when portrait corrections touch their fields.
+    // For multi-instance gates (consistency_lock), flag every closed instance stale.
     if (corrections.length > 0 && filmId) {
       const fieldsByDoc = new Map<GateId, string[]>()
       for (const field of corrections) {
@@ -1126,21 +1151,24 @@ export async function POST(req: NextRequest) {
           .select('gates_closed, documents_stale')
           .eq('id', filmId)
           .single()
-        const closedGates = new Set(
-          (filmRow?.gates_closed ?? [])
-            .filter((g: { gate: string; closed_at?: string }) => !!g.closed_at)
-            .map((g: { gate: string }) => g.gate)
-        )
+        const closedGatesRaw: Array<{ gate: string; instance_key?: string; closed_at?: string }> =
+          (filmRow?.gates_closed ?? []).filter((g: any) => !!g.closed_at)
+        const closedGateIds = new Set(closedGatesRaw.map(g => g.gate))
         const existingStale: Record<string, any> = filmRow?.documents_stale ?? {}
         const staleUpdates: Record<string, any> = {}
+        const detectedAt = new Date().toISOString()
         for (const [doc, fields] of fieldsByDoc) {
-          if (closedGates.has(doc)) {
-            staleUpdates[doc] = {
-              stale: true,
-              reason: `${fields.join(', ')} ${fields.length > 1 ? 'were' : 'was'} corrected in ${currentMode ?? 'an earlier'} mode — this document was built from the previous value`,
-              detected_at: new Date().toISOString(),
-              overriding_mode: currentMode ?? 'unknown',
+          const reason = `${fields.join(', ')} ${fields.length > 1 ? 'were' : 'was'} corrected in ${currentMode ?? 'an earlier'} mode — this document was built from the previous value`
+          if (MULTI_INSTANCE_GATES.includes(doc)) {
+            // Flag every closed instance of this multi-instance gate stale
+            for (const g of closedGatesRaw) {
+              if (g.gate === doc) {
+                const instanceStaleKey = gateInstanceId(doc, g.instance_key)
+                staleUpdates[instanceStaleKey] = { stale: true, reason, detected_at: detectedAt, overriding_mode: currentMode ?? 'unknown' }
+              }
             }
+          } else if (closedGateIds.has(doc)) {
+            staleUpdates[doc] = { stale: true, reason, detected_at: detectedAt, overriding_mode: currentMode ?? 'unknown' }
           }
         }
         if (Object.keys(staleUpdates).length > 0) {
