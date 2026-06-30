@@ -452,7 +452,9 @@ function buildGenerationPrompt(
 EXISTING VERSION — previously generated and reviewed by the filmmaker:
 ${existingDocumentContent}
 
-Honour everything already written. Fill any gaps. Revise only what the filmmaker has explicitly asked to change. Do not rewrite from scratch.`
+Honour everything already written. Fill any gaps. Revise only what the filmmaker has explicitly asked to change. Do not rewrite from scratch.
+
+Exception: if anything in the existing version above conflicts with a decision stated under DECISIONS MADE IN CONVERSATION earlier in this prompt, the conversation decision is more recent and takes precedence. Revise the existing text to match it. This is not rewriting from scratch — it is correcting the one place where the existing version and a confirmed decision disagree. Everything else in the existing version that the decisions do not touch should still be honoured exactly as written.`
 }
 
 export async function POST(req: NextRequest) {
