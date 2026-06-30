@@ -1295,9 +1295,20 @@ export default function FilmStudio() {
         return
       }
 
-      const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: data.content }
+      // Race-condition fix: read documents_content/documents_generated fresh from
+      // Supabase right before merging, instead of the React closure's local copy.
+      // Closes the window where a different document's generation (started after
+      // this one but finishing first) would otherwise have its save silently
+      // reverted when this write lands.
+      const { data: freshFilm } = await supabase
+        .from('films')
+        .select('documents_content, documents_generated')
+        .eq('id', filmId)
+        .single()
+
+      const updatedContent = { ...(freshFilm?.documents_content ?? {}), [gateId]: data.content }
       const newGenerated = { document: gateId, generated_at: new Date().toISOString() }
-      const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
+      const updatedGenerated = [...(freshFilm?.documents_generated ?? []), newGenerated]
 
       await supabase.from('films').update({
         documents_content: updatedContent,
@@ -1431,9 +1442,16 @@ export default function FilmStudio() {
         if (genData.success) documentContent = genData.content
       } catch {}
 
-      const updatedContent = { ...(film?.documents_content ?? {}), [gateId]: documentContent }
+      // Same race-condition fix as generateDocument — read fresh before merging.
+      const { data: freshFilmForImport } = await supabase
+        .from('films')
+        .select('documents_content, documents_generated')
+        .eq('id', filmId)
+        .single()
+
+      const updatedContent = { ...(freshFilmForImport?.documents_content ?? {}), [gateId]: documentContent }
       const newGenerated: DocumentGenerated = { document: gateId, generated_at: new Date().toISOString(), source: 'import' }
-      const updatedGenerated = [...(film?.documents_generated ?? []), newGenerated]
+      const updatedGenerated = [...(freshFilmForImport?.documents_generated ?? []), newGenerated]
       await supabase.from('films').update({ documents_content: updatedContent, documents_generated: updatedGenerated }).eq('id', filmId)
       setFilm(prev => prev ? { ...prev, documents_content: updatedContent, documents_generated: updatedGenerated } : null)
 
