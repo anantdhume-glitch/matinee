@@ -1004,11 +1004,11 @@ const STALENESS_TRIGGERS = ['Regenerate when you\'re ready', 'Regenerate before'
 
 const FIELD_TO_DOCUMENTS: Partial<Record<string, GateId[]>> = {
   portrait_logline:          ['film_brief'],
-  portrait_emotional_core:   ['film_brief', 'treatment'],
-  portrait_story:            ['film_brief', 'treatment'],
+  portrait_emotional_core:   ['film_brief', 'treatment', 'script_lock'],
+  portrait_story:            ['film_brief', 'treatment', 'script_lock'],
   portrait_world:            ['treatment', 'cinematography_brief'],
   portrait_subjects:         ['treatment', 'cinematography_brief', 'consistency_lock'],
-  portrait_tone:             ['treatment', 'sound_brief', 'editorial_brief', 'narration_brief'],
+  portrait_tone:             ['treatment', 'sound_brief', 'editorial_brief', 'narration_brief', 'script_lock'],
   portrait_visual_world:     ['treatment', 'cinematography_brief'],
   portrait_approach:         ['film_brief', 'treatment', 'narration_brief'],
   portrait_comparable_films: ['treatment', 'cinematography_brief'],
