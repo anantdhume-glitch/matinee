@@ -502,10 +502,19 @@ async function mergeMemory(
   const longer = (a?: string, b?: string) =>
     (a?.length ?? 0) >= (b?.length ?? 0) ? a : b
 
+  const appendNew = (existing?: string, addition?: string) => {
+    const existingTrimmed = existing?.trim() ?? ''
+    const additionTrimmed = addition?.trim() ?? ''
+    if (!additionTrimmed) return existing
+    if (!existingTrimmed) return addition
+    if (existingTrimmed.includes(additionTrimmed)) return existing
+    return `${existingTrimmed}\n\n${additionTrimmed}`
+  }
+
   const mergedMemory: Record<string, any> = {
     emotional_core:     longer(extracted?.emotional_core,     existing?.emotional_core),
-    decisions_made:     longer(extracted?.decisions_made,     existing?.decisions_made),
-    unresolved_threads: longer(extracted?.unresolved_threads, existing?.unresolved_threads),
+    decisions_made:     appendNew(existing?.decisions_made,     extracted?.decisions_made),
+    unresolved_threads: appendNew(existing?.unresolved_threads, extracted?.unresolved_threads),
     characters: (JSON.stringify(extracted?.characters)?.length ?? 0) >=
                 (JSON.stringify(existing?.characters)?.length ?? 0)
                 ? extracted?.characters : existing?.characters,
