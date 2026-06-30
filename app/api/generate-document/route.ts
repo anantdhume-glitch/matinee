@@ -65,7 +65,10 @@ function buildBasePrompt(
   instanceKey?: string
 ): string {
   const mode = GATE_TO_MODE[gateId] ?? null
-  const portraitBlock = buildPortraitBlock(portrait, mode)
+  const decisionsSection = portrait?.decisions_made
+    ? `\n\nDECISIONS MADE IN CONVERSATION — not yet formalised into a Portrait field, still authoritative. Do not contradict these:\n${String(portrait.decisions_made).slice(0, 3000)}`
+    : ''
+  const portraitBlock = buildPortraitBlock(portrait, mode) + decisionsSection
   const refSection = referenceDocumentsSection(referenceBlock)
   const importedSection = importedContent
     ? `\nIMPORTED DOCUMENT:\n${importedContent.slice(0, 6000)}\n`
