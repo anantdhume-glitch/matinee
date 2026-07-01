@@ -11,6 +11,7 @@ export const PORTRAIT_FIELD_LABELS: Record<string, string> = {
   portrait_audience:         'Audience',
   portrait_comparable_films: 'Comparable Films',
   portrait_target_length:    'Target Length',
+  portrait_cinematography_brief: 'Cinematography Brief',
 }
 
 export const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
@@ -34,10 +35,11 @@ export const MODE_PORTRAIT_FIELDS: Record<string, string[]> = {
   cinematographer: [
     'portrait_tone', 'portrait_visual_world', 'portrait_world',
     'portrait_subjects', 'portrait_approach', 'portrait_comparable_films',
-    'portrait_target_length'
+    'portrait_target_length', 'portrait_cinematography_brief'
   ],
   ai_specialist: [
-    'portrait_tone', 'portrait_visual_world', 'portrait_comparable_films'
+    'portrait_tone', 'portrait_visual_world', 'portrait_comparable_films',
+    'portrait_cinematography_brief'
   ],
   editor: [
     'portrait_emotional_core', 'portrait_tone', 'portrait_approach',
