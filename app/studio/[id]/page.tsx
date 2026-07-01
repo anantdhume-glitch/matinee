@@ -1012,9 +1012,11 @@ export default function FilmStudio() {
       const modeDocs = ARCHIVE_DOCUMENTS.filter(d => d.mode === currentModeForStale)
       for (const doc of modeDocs) {
         if (MULTI_INSTANCE_GATES.includes(doc.gateId)) {
-          // Check each instance key in documents_content
+          // Check each instance key in documents_content — bare, un-keyed gate names
+          // are never a valid instance for a MULTI_INSTANCE_GATES member, even if a
+          // legacy un-scoped document happens to be sitting in documents_content.
           for (const key of Object.keys(film?.documents_content ?? {})) {
-            if (!key.startsWith(doc.gateId + '::') && key !== doc.gateId) continue
+            if (!key.startsWith(doc.gateId + '::')) continue
             const { instanceKey } = parseGateKey(key)
             const isGenerated = film?.documents_generated?.some(d => d.document === key)
             const gateEntry = film?.gates_closed?.find(
@@ -2706,8 +2708,10 @@ export default function FilmStudio() {
                               if (MULTI_INSTANCE_GATES.includes(doc.gateId)) {
                                 const genPrereqArchive = GATE_GENERATION_PREREQUISITES[doc.gateId]
                                 const prereqMetArchive = isPrereqMet(genPrereqArchive, film.gates_closed)
+                                // Bare, un-keyed gate names are never a valid instance for a
+                                // MULTI_INSTANCE_GATES member — only true compound keys render as rows.
                                 const instanceKeys = Object.keys(film.documents_content ?? {})
-                                  .filter(k => k === doc.gateId || k.startsWith(doc.gateId + '::'))
+                                  .filter(k => k.startsWith(doc.gateId + '::'))
 
                                 const instanceRows = instanceKeys.map(instanceKey => {
                                   const { instanceKey: instPart } = parseGateKey(instanceKey)
